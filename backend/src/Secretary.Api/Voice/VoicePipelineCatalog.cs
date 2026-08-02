@@ -26,13 +26,12 @@ public static class VoicePipelineCatalog
             "OpenAI · realtime 2.1",
             RealtimeModel: "gpt-realtime-2.1"),
 
-        // Listed, deliberately not dialable. Gemini Live speaks its own wire protocol, so it
-        // needs a session implementation behind a shared abstraction — not an entry here.
+        // Roughly four times cheaper than OpenAI. Whether Azerbaijani survives it is the whole
+        // reason it is dialable rather than assumed — that only a real call answers.
         new(
             CallPipeline.GeminiLive_3_1,
             "Gemini · Live 3.1",
-            RealtimeModel: "gemini-live-3.1",
-            Enabled: false),
+            RealtimeModel: "gemini-3.1-flash-live-preview"),
     ];
 
     public static IEnumerable<Entry> Dialable => All.Where(entry => entry.Enabled);

@@ -15,10 +15,11 @@ public static class ModelPricingGuard
     {
         var pricing = configuration.GetSection(ModelPricingOptions.SectionName).Get<ModelPricingOptions>();
 
-        // Realtime speech-to-speech bills exactly one model per call. The chained pipelines
-        // that billed three are gone; when Gemini Live lands it bills one of its own, checked
-        // the same way.
-        Require(pricing, configuration.GetSection("OpenAiRealtime")["Model"], "realtime model");
+        // Realtime speech-to-speech bills exactly one model per call, and each provider brings
+        // its own. Both are checked, because an unpriced one records every call it serves as
+        // free — and the whole point of running two is comparing what they cost.
+        Require(pricing, configuration.GetSection("OpenAiRealtime")["Model"], "OpenAI realtime model");
+        Require(pricing, configuration.GetSection("GeminiLive")["Model"], "Gemini Live model");
     }
 
     private static void Require(ModelPricingOptions? pricing, string? model, string description)
