@@ -47,6 +47,23 @@ public sealed class GeminiLiveOptions
     /// default, because a false turn-end there kills the in-flight response outright.</summary>
     public int EndOfSpeechSilenceMs { get; set; } = 500;
 
+    /// <summary>Whether Gemini leans towards deciding the caller has started talking.
+    ///
+    /// High, on measured evidence. Microphone edges logged alongside Gemini's transcripts show
+    /// recognition lag scaling inversely with how long the caller spoke: ~1.5 s for a two-second
+    /// sentence, but **7.3 s for a 200 ms "xeyr"** — answered 36 ms after the agent stopped. The
+    /// caller was never slow; a short burst simply was not being taken for speech.
+    ///
+    /// This was left on the default for two rounds out of a worry that a keener detector would
+    /// mistake the agent's own voice returning through the speakers for the caller. That worry
+    /// was reasonable and turned out to cost more than it saved — and the browser applies echo
+    /// cancellation on capture. If false barge-ins appear, this is the first thing to put back.</summary>
+    public bool EagerStartOfSpeech { get; set; } = true;
+
+    /// <summary>Audio kept from just before speech is detected, so the first syllable is not
+    /// clipped off the front of a short answer. Matches the OpenAI session's 300 ms.</summary>
+    public int PrefixPaddingMs { get; set; } = 300;
+
     /// <summary>How many tokens Gemini may spend thinking before it answers. Zero turns it off.
     ///
     /// Off by default, and this is the real cause of the long silences. The timings say so

@@ -107,14 +107,18 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 LanguageCodes = [_options.LanguageCode],
             },
 
-            // Start sensitivity is deliberately left alone. Making Gemini keener to hear speech
-            // begin would also make it keener to mistake its own voice coming back out of the
-            // speakers for the caller — the echo problem the OpenAI session fights with
-            // far-field noise reduction. Only the end of the turn is tightened.
+            // Both ends tuned, the start on measured evidence: a 200 ms "xeyr" took Gemini 7.3
+            // seconds to report, against ~1.5 s for a two-second sentence in the same call. The
+            // caller answered 36 ms after the agent stopped — the delay was entirely Gemini
+            // failing to take a short burst for speech.
             RealtimeInputConfig = new RealtimeInputConfig
             {
                 AutomaticActivityDetection = new AutomaticActivityDetection
                 {
+                    StartOfSpeechSensitivity = _options.EagerStartOfSpeech
+                        ? StartSensitivity.StartSensitivityHigh
+                        : StartSensitivity.StartSensitivityLow,
+                    PrefixPaddingMs = _options.PrefixPaddingMs,
                     EndOfSpeechSensitivity = EndSensitivity.EndSensitivityHigh,
                     SilenceDurationMs = _options.EndOfSpeechSilenceMs,
                 },
