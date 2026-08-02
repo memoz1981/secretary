@@ -120,6 +120,9 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 },
             },
 
+            // A caller hears deliberation as dead air. Off by default — see the option.
+            ThinkingConfig = new ThinkingConfig { ThinkingBudget = _options.ThinkingBudgetTokens },
+
             MaxOutputTokens = _options.MaxOutputTokens,
         };
 
@@ -172,11 +175,57 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 yield break;
             }
 
+            LogInbound(message);
+
             foreach (var translated in Translate(message))
             {
                 yield return translated;
             }
         }
+    }
+
+    /// <summary>Every inbound message, timestamped by the logger, with only its shape.
+    ///
+    /// Turn boundaries alone were not enough to find where a slow turn spends its time — twice
+    /// they pointed at the wrong culprit, because "response done" is when generation finished,
+    /// not when the caller heard it, and several distinct server messages were collapsing into
+    /// one log line. Interim transcripts in particular are otherwise invisible, and they are the
+    /// only signal that says when the caller was actually still speaking.
+    ///
+    /// Debug level: verbose per call, off unless Secretary.Voice.Google is turned up.</summary>
+    private void LogInbound(LiveServerMessage message)
+    {
+        if (!_logger.IsEnabled(LogLevel.Debug))
+        {
+            return;
+        }
+
+        var content = message.ServerContent;
+        var audioParts = content?.ModelTurn?.Parts?.Count(p => p.InlineData?.Data is { Length: > 0 }) ?? 0;
+
+        _logger.LogDebug(
+            "Gemini msg: interim={Interim} transcript={Transcript} audioParts={AudioParts} "
+            + "generationComplete={GenDone} turnComplete={TurnDone} interrupted={Interrupted} "
+            + "toolCalls={ToolCalls} usage={Usage} setup={Setup} goAway={GoAway} "
+            // The one measurement still missing: when the caller STARTED talking. Without it the
+            // gap between the agent finishing and the caller being transcribed cannot be split
+            // into "they were thinking" and "we were slow".
+            + "vad={Vad} activity={Activity}",
+            Trim(content?.InterimInputTranscription?.Text),
+            Trim(content?.InputTranscription?.Text),
+            audioParts,
+            content?.GenerationComplete,
+            content?.TurnComplete,
+            content?.Interrupted,
+            message.ToolCall?.FunctionCalls?.Count ?? 0,
+            message.UsageMetadata is null ? "-" : $"prompt={message.UsageMetadata.PromptTokenCount} response={message.UsageMetadata.ResponseTokenCount} thoughts={message.UsageMetadata.ThoughtsTokenCount}",
+            message.SetupComplete is not null,
+            message.GoAway is not null,
+            message.VoiceActivityDetectionSignal?.ToString() ?? "-",
+            message.VoiceActivity?.ToString() ?? "-");
+
+        static string Trim(string? text)
+            => string.IsNullOrWhiteSpace(text) ? "-" : text.Trim();
     }
 
     private IEnumerable<RealtimeEvent> Translate(LiveServerMessage message)

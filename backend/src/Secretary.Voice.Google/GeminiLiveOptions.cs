@@ -46,6 +46,19 @@ public sealed class GeminiLiveOptions
     /// mid-sentence. The OpenAI session sits at 700 ms, deliberately longer than its own
     /// default, because a false turn-end there kills the in-flight response outright.</summary>
     public int EndOfSpeechSilenceMs { get; set; } = 500;
+
+    /// <summary>How many tokens Gemini may spend thinking before it answers. Zero turns it off.
+    ///
+    /// Off by default, and this is the real cause of the long silences. The timings say so
+    /// plainly: a turn needing no decision came back in 1.2 seconds, while "xeyr" to "is there a
+    /// master preference" — which forces the model to pick a provider and go check availability —
+    /// took 8.3, with the transcript, the turn and the tool call all arriving in the same batch.
+    /// Nothing on our side was slow; the model was deliberating before it said anything.
+    ///
+    /// A receptionist has nothing to deliberate about. The reasoning that matters here is
+    /// choosing which tool to call, and the instructions already say when to call each one.
+    /// Raise it only if the agent starts making poor choices rather than slow ones.</summary>
+    public int ThinkingBudgetTokens { get; set; }
 }
 
 public enum GeminiBackend

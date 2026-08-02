@@ -128,7 +128,7 @@ public sealed class AppointmentTools
         [Description("The caller's phone number")] string callerPhoneNumber,
         [Description("The caller's name, if known — leave empty otherwise")] string? callerName,
         [Description("Exact service name, matching GetServiceCatalog")] string serviceName,
-        [Description("Exact provider name")] string providerName,
+        [Description("Exact provider name, or leave empty if the caller has no preference")] string? providerName,
         [Description("Appointment start, Azerbaijan local time, e.g. 2026-08-01 14:00")] string startLocal,
         [Description("Any notes the caller mentioned — leave empty if none")] string? notes)
     {
@@ -140,7 +140,20 @@ public sealed class AppointmentTools
         }
 
         var providers = await _providers.GetProvidersForServiceAsync(service.Id, default);
-        var provider = NameMatching.MatchByName(providers, p => p.Name, providerName);
+        if (providers.Count == 0)
+        {
+            return $"No provider currently performs {service.Name}.";
+        }
+
+        // No preference is a real answer, and the common one — most callers do not mind who cuts
+        // their hair. With nowhere to put it the model invented a provider called "Any", which
+        // then failed as "Any does not perform Saç kəsimi" AFTER the caller had been offered a
+        // time. CheckAvailability has always accepted an empty name; booking now matches it, and
+        // the literal words a model reaches for are treated as the same answer.
+        var provider = IsNoPreference(providerName)
+            ? providers[0]
+            : NameMatching.MatchByName(providers, p => p.Name, providerName!);
+
         if (provider is null)
         {
             return $"{providerName} does not perform {service.Name}. " +
@@ -181,6 +194,18 @@ public sealed class AppointmentTools
             return "BLOCKED_CALLER: this caller cannot be booked.";
         }
     }
+
+    /// <summary>"No preference" as the model is likely to express it. Empty is what the tool
+    /// description asks for, but a model told the caller does not mind reaches for a word — and
+    /// "Any" is the one it actually sent on a live call. Matching those words costs nothing and
+    /// turns a dead end into a booking; a real provider called "Any" would be matched by name
+    /// before this is consulted anyway.</summary>
+    private static bool IsNoPreference(string? providerName)
+        => string.IsNullOrWhiteSpace(providerName)
+        || providerName.Trim() is "any" or "Any" or "ANY" or "any provider" or "no preference"
+        || providerName.Trim().Equals("hər hansı", StringComparison.OrdinalIgnoreCase)
+        || providerName.Trim().Equals("farq etmez", StringComparison.OrdinalIgnoreCase)
+        || providerName.Trim().Equals("fərq etməz", StringComparison.OrdinalIgnoreCase);
 
     [Description("The caller's upcoming appointments, with the ids needed to reschedule or cancel one.")]
     public async Task<string> GetUpcomingAppointments([Description("The caller's phone number")] string callerPhoneNumber)
