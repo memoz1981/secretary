@@ -214,9 +214,34 @@ all deferred to their own change so the provider itself could land clean.
 | M2 | **A pause around provider selection**, just before or just after; the exact moment wasn't captured. | Almost certainly the tool round-trip. Reproduce against the session log, which records every tool call and result, and check whether the follow-up was swallowed or fired twice. Likely the same root cause as M3. |
 | M3 | **No goodbye.** The call sat silent for 5–10 seconds, then hung up. | **Probable cause, check this first:** the orchestrator handles `EndCall` by sending the tool output, then a dictated goodbye turn, and hangs up on the *next* `ResponseFinished`. But Gemini continues a turn by itself once a tool result lands — so that auto-continuation almost certainly produces the next `ResponseFinished`, and the hang-up fires on it before the goodbye has generated. `GeminiLiveSession.StartResponseAsync` deliberately does not swallow a dictated turn, but nothing stops the auto-turn racing it. |
 
-M3 is the one that matters: a call ending in silence reads as a dropped call. It is also the
-clearest evidence that "a tool result continues the turn" needed more than a one-shot
-suppression flag — the flag stops a double reply, but does not order the two turns.
+A fourth item surfaced from the same call log, and it was the serious one:
+
+| | symptom | cause |
+|---|---|---|
+| M4 | **A booking failed mid-call** with "A second operation was started on this context instance", after the caller's number was not recognised. | **Gemini asks for several tools at once** — its `toolCall` message carries a *list* of function calls — and the orchestrator runs each off the event loop without awaiting. Two then hit the one request-scoped `DbContext` simultaneously, and EF Core is not thread-safe. OpenAI sends function calls one at a time, which is why this never showed. |
+
+### All four fixed, 2026-08-02
+
+- **M1** — a pacing instruction appended to the system prompt for Gemini only. The SDK exposes no
+  speech rate, so it has to be asked for in words, and slowing OpenAI down would make it worse.
+  Lives as a constant in `GeminiLiveSession`; it belongs in a per-provider instruction file when
+  decision F3 is actually implemented.
+- **M2 / M3** — `IRealtimeSession.ContinuesTurnAfterToolResult`. The orchestrator now knows which
+  providers answer on their own, skips its own follow-up for those, and on the hang-up path sends
+  the farewell wording *with* the tool result so the automatic turn speaks it. Previously the
+  automatic turn raced the dictated goodbye, won, and the hang-up fired on its completion — five
+  seconds of silence instead of a farewell. The earlier one-shot suppression flag inside the
+  Gemini session is gone: it stopped a double reply but could not order two turns.
+- **M4** — `RealtimeToolInvoker` runs one tool at a time. A gate rather than a `DbContext` per
+  tool, because the toolset is resolved once per call; serial execution costs nothing measurable
+  while the caller is already hearing audio.
+- **Phone numbers are canonicalised** on write and on lookup (`PhoneNumberNormalizer`), which is
+  why the caller was not recognised: numbers arrive as speech and were stored verbatim, leaving
+  two "Mehdi" rows — `0535353535` and `055 250 58 32`.
+
+⚠️ **Existing rows were not back-filled.** Clients created before this keep their as-spoken
+number and will not match a normalised lookup. Fine for the demo data; a real deployment needs a
+one-off migration, and duplicates merged before any unique index goes on the column.
 
 ## L. Document map
 

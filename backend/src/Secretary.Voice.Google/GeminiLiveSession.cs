@@ -21,14 +21,31 @@ namespace Secretary.Voice.Google;
 ///    ResponseStarted and ResponseFinished are synthesised from the first model content of a
 ///    turn and from TurnComplete.
 /// 3. Sending a tool result automatically continues the turn, where OpenAI needs to be asked
-///    separately. The orchestrator asks either way; here the ask is swallowed once, so the model
-///    is not prompted twice for the same turn.</summary>
+///    separately. Declared through ContinuesTurnAfterToolResult so the orchestrator simply does
+///    not ask — it has to know, because on the hang-up path the automatic turn is the farewell
+///    rather than something racing it.</summary>
 public sealed class GeminiLiveSession : IRealtimeSession
 {
     /// <summary>Gemini resamples server-side from whatever the MIME type declares, so the
     /// browser's existing 24 kHz capture is sent unchanged rather than downsampled to Gemini's
     /// native 16 kHz. Its output is 24 kHz, which already matches what the page plays.</summary>
     private const string InputAudioMimeType = "audio/pcm;rate=24000";
+
+    /// <summary>Appended to the shared instructions, for this provider only.
+    ///
+    /// Gemini talks noticeably faster than OpenAI — pleasant to listen to, but on a phone line
+    /// the words start running together. SpeechConfig exposes no rate, so pace has to be asked
+    /// for in words. Kept here rather than in PhoneAgent.md because it is a Gemini problem and
+    /// slowing OpenAI down would make it worse.
+    ///
+    /// This is the thin end of decision F3 — a complete instruction file per (module ×
+    /// provider). When a second module lands, this belongs in
+    /// Modules/Appointment/Instructions/gemini.md instead of a constant here.</summary>
+    private const string PacingAddendum = """
+
+        DANIŞIQ TEMPİ: Sakit və aydın danışın. Tələsməyin. Rəqəmləri, saatları və adları
+        xüsusilə yavaş deyin — telefon xəttində sürətli nitq anlaşılmır.
+        """;
 
     private readonly GeminiLiveOptions _options;
     private readonly IReadOnlyList<AIFunction> _functions;
@@ -49,10 +66,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// so it can be attached to the ResponseFinished the loop actually acts on.</summary>
     private UsageMetadata? _pendingUsage;
 
-    /// <summary>Set when a tool result has been sent and Gemini will therefore continue the turn
-    /// by itself. Makes the orchestrator's follow-up request a no-op exactly once.</summary>
-    private bool _autoResponsePending;
-
     public GeminiLiveSession(IOptions<GeminiLiveOptions> options, IList<AITool> tools, ILogger<GeminiLiveSession> logger)
     {
         _options = options.Value;
@@ -65,6 +78,12 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// <summary>Gemini interrupts itself server-side and reports that it did. There is nothing
     /// to send, so barge-in cancellation is a no-op here.</summary>
     public bool SupportsExplicitCancel => false;
+
+    /// <summary>Gemini resumes the turn the moment a tool result lands. The orchestrator reads
+    /// this and skips its own follow-up rather than the session swallowing one — the difference
+    /// matters on the hang-up path, where the orchestrator has to know that the automatic turn
+    /// IS the farewell rather than something racing it.</summary>
+    public bool ContinuesTurnAfterToolResult => true;
 
     public async Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken)
     {
@@ -81,7 +100,7 @@ public sealed class GeminiLiveSession : IRealtimeSession
             SystemInstruction = new Content
             {
                 Role = "user",
-                Parts = [new Part { Text = instructions }],
+                Parts = [new Part { Text = instructions + PacingAddendum }],
             },
 
             SpeechConfig = new SpeechConfig
@@ -268,17 +287,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
 
     public async Task StartResponseAsync(string? instructions, CancellationToken cancellationToken)
     {
-        // Gemini continues the turn by itself once a tool result lands, so the orchestrator's
-        // follow-up would prompt it a second time — two replies to one question. Swallowed
-        // exactly once, and only for the ordinary follow-up: a dictated turn (the goodbye) is
-        // still sent, because its wording is the whole point.
-        if (instructions is null && _autoResponsePending)
-        {
-            _autoResponsePending = false;
-            _logger.LogDebug("Follow-up request skipped — Gemini resumes the turn on its own after a tool result.");
-            return;
-        }
-
         await _sendLock.WaitAsync(cancellationToken);
         try
         {
@@ -326,8 +334,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
                     ],
                 },
                 cancellationToken);
-
-            _autoResponsePending = true;
         }
         finally
         {

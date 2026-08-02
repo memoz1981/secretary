@@ -1,6 +1,7 @@
 using Secretary.Application.Abstractions.Persistence;
 using Secretary.Domain.Entities;
 using Secretary.Domain.Enums;
+using Secretary.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Secretary.Infrastructure.Persistence.Repositories;
@@ -24,8 +25,14 @@ internal sealed class ClientRepository : IClientRepository
 
     public void Remove(Client entity) => _db.Clients.Remove(entity);
 
+    /// <summary>Normalised here rather than at each call site, so every lookup matches the
+    /// canonical form Client stores — a caller who reads their number out differently on a
+    /// second call is still found. See PhoneNumberNormalizer.</summary>
     public async Task<Client?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken)
-        => await _db.Clients.FirstOrDefaultAsync(c => c.PhoneNumber == phoneNumber, cancellationToken);
+    {
+        var normalized = PhoneNumberNormalizer.Normalize(phoneNumber);
+        return await _db.Clients.FirstOrDefaultAsync(c => c.PhoneNumber == normalized, cancellationToken);
+    }
 
     public async Task<Client?> GetByIdAcrossAllTenantsAsync(int id, CancellationToken cancellationToken)
         => await _db.Clients.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, cancellationToken);

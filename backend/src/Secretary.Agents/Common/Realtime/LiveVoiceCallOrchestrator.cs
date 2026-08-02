@@ -303,7 +303,10 @@ public sealed class LiveVoiceCallOrchestrator
 
         try
         {
-            if (TryClaimFollowUp("tool"))
+            // Capability first, so the claim is not taken and the log does not announce a
+            // follow-up that never happens: a provider that resumes the turn on its own has
+            // already started answering by the time the result lands.
+            if (!_realtimeSession.ContinuesTurnAfterToolResult && TryClaimFollowUp("tool"))
             {
                 await _realtimeSession.StartResponseAsync(cancellationToken);
             }
@@ -530,23 +533,37 @@ public sealed class LiveVoiceCallOrchestrator
                         }
 
                         // The farewell is not the model's line to compose, so it always gets
-                        // said here — one final response whose instructions are only those
-                        // words. This used to be skipped whenever the EndCall turn had produced
-                        // audio of its own, on the assumption that the audio WAS the goodbye.
-                        // It isn't: asked to say nothing and hang up, the model said "bir anlıq
-                        // gözləyin" instead, and the call ended on "hold on a moment". Whatever
-                        // it says in that turn, the caller still gets a proper goodbye.
-                        // Safe to start immediately: the response that requested EndCall just
-                        // finished.
-                        await _realtimeSession.AddFunctionOutputAsync(pendingEndCallId, "CALL_ENDED.", cancellationToken);
-                        await _realtimeSession.StartResponseAsync(GoodbyeInstruction, cancellationToken);
+                        // said here. This used to be skipped whenever the EndCall turn had
+                        // produced audio of its own, on the assumption that the audio WAS the
+                        // goodbye. It isn't: asked to say nothing and hang up, the model said
+                        // "bir anlıq gözləyin" instead, and the call ended on "hold on a moment".
+                        //
+                        // How it gets said depends on the provider. Where a tool result does not
+                        // itself make the model speak, the wording goes in a response of its own.
+                        // Where it does — Gemini — a second request would race the automatic
+                        // turn, and the automatic one wins: the hang-up then fires on ITS
+                        // completion and the caller hears five seconds of silence instead of a
+                        // goodbye. So the wording rides along with the tool result and the
+                        // automatic turn speaks it.
+                        if (_realtimeSession.ContinuesTurnAfterToolResult)
+                        {
+                            await _realtimeSession.AddFunctionOutputAsync(
+                                pendingEndCallId, $"CALL_ENDED. {GoodbyeInstruction}", cancellationToken);
+                        }
+                        else
+                        {
+                            await _realtimeSession.AddFunctionOutputAsync(pendingEndCallId, "CALL_ENDED.", cancellationToken);
+                            await _realtimeSession.StartResponseAsync(GoodbyeInstruction, cancellationToken);
+                        }
+
                         hangUpAtNextResponseDone = true;
                         break;
                     }
 
                     // Whatever finishes last — this response, or the tools it asked for — is
-                    // what gets to ask the model to speak the result.
-                    if (TryClaimFollowUp("response-done"))
+                    // what gets to ask the model to speak the result. Skipped entirely for a
+                    // provider that resumes the turn on its own; see RunToolCallAsync.
+                    if (!_realtimeSession.ContinuesTurnAfterToolResult && TryClaimFollowUp("response-done"))
                     {
                         await _realtimeSession.StartResponseAsync(cancellationToken);
                         break;

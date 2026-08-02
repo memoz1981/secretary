@@ -1,4 +1,5 @@
 using Secretary.Domain.Abstractions;
+using Secretary.Domain.ValueObjects;
 using NodaTime;
 
 namespace Secretary.Domain.Entities;
@@ -14,10 +15,13 @@ public sealed class Client : BaseEntity
     public bool BlackListed { get; private set; }
     public string? BlackListReason { get; private set; }
 
+    /// <summary>The number is canonicalised on the way in, never stored as spoken — a caller who
+    /// reads it out differently on a second call is still the same client. See
+    /// PhoneNumberNormalizer; lookups normalise the same way.</summary>
     private Client(int tenantId, string phoneNumber, string? name, Instant now)
     {
         TenantId = tenantId;
-        PhoneNumber = phoneNumber;
+        PhoneNumber = PhoneNumberNormalizer.Normalize(phoneNumber);
         Name = name;
         InitBase(now);
     }
@@ -55,7 +59,7 @@ public sealed class Client : BaseEntity
             throw new ArgumentException("Phone number is required.", nameof(phoneNumber));
         }
 
-        PhoneNumber = phoneNumber;
+        PhoneNumber = PhoneNumberNormalizer.Normalize(phoneNumber);
         Name = string.IsNullOrWhiteSpace(name) ? null : name;
         Touch(now);
     }

@@ -20,6 +20,14 @@ public interface IRealtimeSession : IAsyncDisposable
     /// failure.</summary>
     bool SupportsExplicitCancel { get; }
 
+    /// <summary>True when handing back a tool result makes the model speak again on its own.
+    ///
+    /// OpenAI does not: the result is added to the conversation and a reply must be asked for
+    /// separately. Gemini does. The caller has to know which, because asking a provider that
+    /// already answered produces two replies to one question — and, worse, on the hang-up path
+    /// the automatic turn beats the dictated farewell and the call ends in silence.</summary>
+    bool ContinuesTurnAfterToolResult { get; }
+
     Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken);
 
     /// <summary>PCM16 captured from the caller's microphone. Both providers accept the browser's
