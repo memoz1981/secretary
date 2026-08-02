@@ -1,0 +1,55 @@
+# ─── .NET ────────────────────────────────────────────────────────────────────
+bin/
+obj/
+artifacts/
+TestResults/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userprefs
+*.nupkg
+*.snupkg
+project.lock.json
+*.received.*
+
+# Local configuration overrides. Real secrets live in user-secrets, never here.
+appsettings.*.local.json
+appsettings.Local.json
+
+# ─── Node / React / Vite ─────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.eslintcache
+
+# ─── Environment files ───────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Editors ─────────────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Plain text ──────────────────────────────────────────────────────────────
+# All .txt is ignored by request. Add a negation (e.g. !notes/keep-me.txt) if
+# a specific one ever needs tracking.
+*.txt
