@@ -249,6 +249,20 @@ A fourth item surfaced from the same call log, and it was the serious one:
 
   `EndCall` is now answered the moment it is asked, with the farewell wording riding along on the
   result, and the hang-up check no longer hangs off the deferred id.
+
+- **M2 — the pause was Gemini's end-of-turn detection, left on defaults.** The log ruled out
+  everything else: tools answered in 55–133 ms and first audio arrived within a second of the
+  turn opening. The wait was Gemini deciding the caller had finished — worst after a one-word
+  answer like "xeyr", where there is little speech to be confident about. `RealtimeInputConfig`
+  now sets `EndOfSpeechSensitivity = High` and a configurable `SilenceDurationMs`, default 500.
+
+  Start sensitivity is deliberately left alone: making Gemini keener to hear speech *begin* would
+  also make it keener to mistake its own voice returning through the speakers for the caller,
+  which is the echo problem the OpenAI session fights with far-field noise reduction.
+
+  `GeminiLive:EndOfSpeechSilenceMs` is configuration rather than a constant because it is a real
+  trade-off with no right answer from a desk — too long feels slow, too short talks over someone
+  drawing breath. Tune it from real calls.
 - **M4** — `RealtimeToolInvoker` runs one tool at a time. A gate rather than a `DbContext` per
   tool, because the toolset is resolved once per call; serial execution costs nothing measurable
   while the caller is already hearing audio.

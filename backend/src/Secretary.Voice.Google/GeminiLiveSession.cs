@@ -107,6 +107,19 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 LanguageCodes = [_options.LanguageCode],
             },
 
+            // Start sensitivity is deliberately left alone. Making Gemini keener to hear speech
+            // begin would also make it keener to mistake its own voice coming back out of the
+            // speakers for the caller — the echo problem the OpenAI session fights with
+            // far-field noise reduction. Only the end of the turn is tightened.
+            RealtimeInputConfig = new RealtimeInputConfig
+            {
+                AutomaticActivityDetection = new AutomaticActivityDetection
+                {
+                    EndOfSpeechSensitivity = EndSensitivity.EndSensitivityHigh,
+                    SilenceDurationMs = _options.EndOfSpeechSilenceMs,
+                },
+            },
+
             MaxOutputTokens = _options.MaxOutputTokens,
         };
 
