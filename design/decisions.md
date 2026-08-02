@@ -274,6 +274,23 @@ A fourth item surfaced from the same call log, and it was the serious one:
 number and will not match a normalised lookup. Fine for the demo data; a real deployment needs a
 one-off migration, and duplicates merged before any unique index goes on the column.
 
+### The verdict after a dozen calls
+
+**Gemini feels markedly more human than OpenAI** — the owner's judgement after tuning both, and
+the thing worth remembering when the numbers below are argued about. It still answers a very
+short question more slowly, and it is preferred anyway. That is the two-provider bet paying off:
+the question was never which is cheaper, it was whether the cheaper one is good enough, and it
+turned out to be better.
+
+### Still open, deliberately not in the tuning change
+
+| | what | why it was left |
+|---|---|---|
+| N1 | **Short answers still take ~3 s.** Down from 7.3 s, but a one-word "xeyr" still lags a sentence. | Everything measurable has been ruled out: thinking tokens (`thoughts` empty), our tools (55–133 ms), our relay (`first audio after 0 ms`), end-of-speech silence, turn pacing. What remains is Gemini's own speech detection, and it reports neither interim transcripts nor voice-activity signals, so it cannot be seen into. **The remaining lever is to stop using its VAD**: `AutomaticActivityDetection.Disabled` plus explicit `ActivityStart`/`ActivityEnd` driven by our own microphone detector, which fires within ~100 ms. That needs proper hangover smoothing first — the current detector chops continuous speech into fragments — so it is its own change. |
+| N2 | **Caller transcription is off**, which is what took the delay from ~4.5 s to ~3 s. | It cost the `Caller said:` line that makes a call reviewable, and on the OpenAI side pinning the caller's words as Azerbaijani text is what stops the model drifting into English after a barge-in. `GeminiLive:TranscribeCaller` restores it. Revisit once N1 removes the reason for having turned it off. |
+| N3 | **Business hours are hardcoded 09:00–21:00**, so the agent offered 20:30 today. | Availability is behaving as written: a 30-minute service starting 20:30 finishes exactly at close. Whether the real hours are shorter, and whether the last start should be pulled back so appointments finish *before* close rather than at it, are business questions. Per-tenant business hours were already deferred; this belongs there. |
+| N4 | **Pronunciation rules exist only for Gemini.** | Correct for now — "otuz otuz" and "albilerem" were only ever heard from Gemini. If OpenAI shows the same habits, the rule gets written into its own file then, from its own evidence. |
+
 ## L. Document map
 
 | file | holds |
