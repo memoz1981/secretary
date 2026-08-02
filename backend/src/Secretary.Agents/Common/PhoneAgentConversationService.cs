@@ -21,7 +21,9 @@ public sealed class PhoneAgentConversationService
 
     public async Task<string> RespondAsync(string callerMessage, CancellationToken cancellationToken)
     {
-        var instructions = _instructionContext.BuildPhoneAgentInstructions();
+        // The text path runs on OpenAI, so it reads OpenAI's instruction file — the speech rules
+        // in the other one are about how a model sounds, which does not apply here at all.
+        var instructions = _instructionContext.BuildPhoneAgentInstructions("openai");
         var agent = _agentFactory.Create(AgentProvider.OpenAi, instructions, _tools);
         var response = await agent.RunAsync(callerMessage, cancellationToken: cancellationToken);
         return response.Text;

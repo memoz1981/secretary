@@ -154,7 +154,9 @@ public sealed class LiveVoiceCallOrchestrator
         try
         {
             await _realtimeSession.ConnectAsync(
-                _instructionContext.BuildPhoneAgentInstructions(), modelOverride, cancellationToken);
+                _instructionContext.BuildPhoneAgentInstructions(_realtimeSession.ProviderKey),
+                modelOverride,
+                cancellationToken);
 
             var toOpenAi = RelayClientAudioToOpenAiAsync(clientSocket, cancellationToken);
             var toClient = RelayOpenAiEventsToClientAsync(clientSocket, cancellationToken);
@@ -303,7 +305,10 @@ public sealed class LiveVoiceCallOrchestrator
 
         try
         {
-            if (TryClaimFollowUp("tool"))
+            // Capability first, so the claim is not taken and the log does not announce a
+            // follow-up that never happens: a provider that resumes the turn on its own has
+            // already started answering by the time the result lands.
+            if (!_realtimeSession.ContinuesTurnAfterToolResult && TryClaimFollowUp("tool"))
             {
                 await _realtimeSession.StartResponseAsync(cancellationToken);
             }
@@ -366,6 +371,8 @@ public sealed class LiveVoiceCallOrchestrator
     private async Task RelayClientAudioToOpenAiAsync(WebSocket clientSocket, CancellationToken cancellationToken)
     {
         var buffer = new byte[8192];
+        var callerAudible = false;
+
         while (clientSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
             var result = await clientSocket.ReceiveAsync(buffer, cancellationToken);
@@ -376,9 +383,48 @@ public sealed class LiveVoiceCallOrchestrator
 
             if (result.MessageType == WebSocketMessageType.Binary)
             {
+                callerAudible = LogCallerAudioEdge(buffer.AsSpan(0, result.Count), callerAudible);
                 await _realtimeSession.SendAudioChunkAsync(buffer.AsMemory(0, result.Count), cancellationToken);
             }
         }
+    }
+
+    /// <summary>Marks, in the log, the moment the microphone goes loud and the moment it goes
+    /// quiet again.
+    ///
+    /// The only way left to time a turn honestly. Gemini reports neither interim transcripts nor
+    /// voice-activity signals — both come back empty — so the gap between the agent finishing and
+    /// the caller's transcript arriving cannot otherwise be split into "the caller was still
+    /// thinking" and "recognition was slow". Three theories about that gap have now been wrong,
+    /// each one plausible from turn boundaries alone.
+    ///
+    /// Crude on purpose: mean absolute amplitude over the chunk, one threshold, no smoothing.
+    /// It does not need to be a VAD, only to timestamp when someone started making noise.</summary>
+    private bool LogCallerAudioEdge(ReadOnlySpan<byte> pcm16, bool wasAudible)
+    {
+        if (!_logger.IsEnabled(LogLevel.Debug) || pcm16.Length < 2)
+        {
+            return wasAudible;
+        }
+
+        long total = 0;
+        var samples = pcm16.Length / 2;
+        for (var i = 0; i + 1 < pcm16.Length; i += 2)
+        {
+            total += Math.Abs(BitConverter.ToInt16(pcm16[i..(i + 2)]));
+        }
+
+        // ~1.5% of full scale. Above room tone, below speech, on the one microphone this was
+        // calibrated against — it is a log marker, not a decision anything depends on.
+        const long AudibleThreshold = 500;
+        var audible = total / samples > AudibleThreshold;
+
+        if (audible != wasAudible)
+        {
+            _logger.LogDebug("Caller mic: {State}.", audible ? "speaking" : "quiet");
+        }
+
+        return audible;
     }
 
     /// <summary>Sent as a WebSocket Text frame (audio itself is always Binary) to tell the
@@ -471,7 +517,28 @@ public sealed class LiveVoiceCallOrchestrator
                     if (functionCall.Name == nameof(Tools.CallControlTools.EndCall))
                     {
                         _logger.LogInformation("Model requested EndCall — hanging up after its goodbye is spoken.");
-                        pendingEndCallId = functionCall.CallId;
+
+                        if (_realtimeSession.ContinuesTurnAfterToolResult)
+                        {
+                            // Answered immediately, and the farewell wording rides along with
+                            // the result.
+                            //
+                            // Gemini does not complete a turn while a tool call is outstanding,
+                            // so deferring this to response-done deadlocks: the completion waits
+                            // on the result and the result waits on the completion. The call
+                            // then sat silent until something interrupted it — the reported
+                            // "waits 5-10 seconds and hangs up with no goodbye". OpenAI emits
+                            // response.done with a function call still unanswered, which is why
+                            // deferring works there and only there.
+                            await _realtimeSession.AddFunctionOutputAsync(
+                                functionCall.CallId, $"CALL_ENDED. {GoodbyeInstruction}", cancellationToken);
+                            hangUpAtNextResponseDone = true;
+                        }
+                        else
+                        {
+                            pendingEndCallId = functionCall.CallId;
+                        }
+
                         break;
                     }
 
@@ -513,31 +580,35 @@ public sealed class LiveVoiceCallOrchestrator
                         _answerCount++;
                     }
 
-                    if (pendingEndCallId is not null)
+                    // Checked before the deferred-id branch and independently of it: the
+                    // Gemini path answers EndCall the moment it is asked (see the tool-call
+                    // case), so by the time its farewell finishes there is no pending id left
+                    // to hang the check off.
+                    if (hangUpAtNextResponseDone)
                     {
-                        if (hangUpAtNextResponseDone)
+                        // The farewell has been fully relayed — tell the client to finish
+                        // playing what it has queued and hang up, and end this relay loop,
+                        // which ends the call.
+                        if (clientSocket.State == WebSocketState.Open)
                         {
-                            // The farewell has been fully relayed — tell the client to finish
-                            // playing what it has queued and hang up, and end this relay
-                            // loop, which ends the call.
-                            if (clientSocket.State == WebSocketState.Open)
-                            {
-                                var hangUp = System.Text.Encoding.UTF8.GetBytes(HangUpSignal);
-                                await clientSocket.SendAsync(hangUp, WebSocketMessageType.Text, true, cancellationToken);
-                            }
-
-                            return;
+                            var hangUp = System.Text.Encoding.UTF8.GetBytes(HangUpSignal);
+                            await clientSocket.SendAsync(hangUp, WebSocketMessageType.Text, true, cancellationToken);
                         }
 
+                        return;
+                    }
+
+                    if (pendingEndCallId is not null)
+                    {
                         // The farewell is not the model's line to compose, so it always gets
                         // said here — one final response whose instructions are only those
                         // words. This used to be skipped whenever the EndCall turn had produced
                         // audio of its own, on the assumption that the audio WAS the goodbye.
                         // It isn't: asked to say nothing and hang up, the model said "bir anlıq
-                        // gözləyin" instead, and the call ended on "hold on a moment". Whatever
-                        // it says in that turn, the caller still gets a proper goodbye.
-                        // Safe to start immediately: the response that requested EndCall just
-                        // finished.
+                        // gözləyin" instead, and the call ended on "hold on a moment".
+                        //
+                        // Only reached for a provider that does not resume on its own; the
+                        // other kind never sets a pending id.
                         await _realtimeSession.AddFunctionOutputAsync(pendingEndCallId, "CALL_ENDED.", cancellationToken);
                         await _realtimeSession.StartResponseAsync(GoodbyeInstruction, cancellationToken);
                         hangUpAtNextResponseDone = true;
@@ -545,8 +616,9 @@ public sealed class LiveVoiceCallOrchestrator
                     }
 
                     // Whatever finishes last — this response, or the tools it asked for — is
-                    // what gets to ask the model to speak the result.
-                    if (TryClaimFollowUp("response-done"))
+                    // what gets to ask the model to speak the result. Skipped entirely for a
+                    // provider that resumes the turn on its own; see RunToolCallAsync.
+                    if (!_realtimeSession.ContinuesTurnAfterToolResult && TryClaimFollowUp("response-done"))
                     {
                         await _realtimeSession.StartResponseAsync(cancellationToken);
                         break;

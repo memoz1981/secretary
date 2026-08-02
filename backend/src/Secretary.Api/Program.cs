@@ -90,6 +90,10 @@ builder.Services.AddGeminiLive(builder.Configuration);
 builder.Services.Configure<ModelPricingOptions>(builder.Configuration.GetSection(ModelPricingOptions.SectionName));
 ModelPricingGuard.EnsureConfiguredModelIsPriced(builder.Configuration);
 
+// Each provider reads its own instruction file. A missing one otherwise surfaces as silence on
+// the first call that picks that pipeline, not as a startup failure.
+InstructionFileGuard.EnsureEveryDialablePipelineHasInstructions();
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpCurrentTenantProvider>();
 builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

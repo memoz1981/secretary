@@ -37,10 +37,16 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
         _logger = logger;
     }
 
+    public string ProviderKey => "openai";
+
     public string Model { get; private set; } = string.Empty;
 
     /// <summary>OpenAI takes response.cancel, so barge-in is explicit here.</summary>
     public bool SupportsExplicitCancel => true;
+
+    /// <summary>Adding a function-call output does not make the model speak; response.create
+    /// does, and the orchestrator sends it once every tool of the turn has reported.</summary>
+    public bool ContinuesTurnAfterToolResult => false;
 
     public async Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken)
     {

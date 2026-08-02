@@ -10,6 +10,11 @@ namespace Secretary.Voice.Abstractions;
 /// provider, so it lives in <see cref="RealtimeToolInvoker"/> and is shared.</summary>
 public interface IRealtimeSession : IAsyncDisposable
 {
+    /// <summary>Which provider this is — "openai", "gemini". Used to pick the instruction file
+    /// written for this model; the two mishear and misspeak differently enough that a shared
+    /// file with patches was making one worse to fix the other.</summary>
+    string ProviderKey { get; }
+
     /// <summary>The model actually used, resolved after Connect — the pipeline may override the
     /// configured default. Recorded on the call so cost can be attributed to a rate card.</summary>
     string Model { get; }
@@ -19,6 +24,14 @@ public interface IRealtimeSession : IAsyncDisposable
     /// than accepting an instruction to stop. Callers must not treat a no-op cancel as a
     /// failure.</summary>
     bool SupportsExplicitCancel { get; }
+
+    /// <summary>True when handing back a tool result makes the model speak again on its own.
+    ///
+    /// OpenAI does not: the result is added to the conversation and a reply must be asked for
+    /// separately. Gemini does. The caller has to know which, because asking a provider that
+    /// already answered produces two replies to one question — and, worse, on the hang-up path
+    /// the automatic turn beats the dictated farewell and the call ends in silence.</summary>
+    bool ContinuesTurnAfterToolResult { get; }
 
     Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken);
 

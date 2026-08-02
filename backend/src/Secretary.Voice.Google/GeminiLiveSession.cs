@@ -21,8 +21,9 @@ namespace Secretary.Voice.Google;
 ///    ResponseStarted and ResponseFinished are synthesised from the first model content of a
 ///    turn and from TurnComplete.
 /// 3. Sending a tool result automatically continues the turn, where OpenAI needs to be asked
-///    separately. The orchestrator asks either way; here the ask is swallowed once, so the model
-///    is not prompted twice for the same turn.</summary>
+///    separately. Declared through ContinuesTurnAfterToolResult so the orchestrator simply does
+///    not ask — it has to know, because on the hang-up path the automatic turn is the farewell
+///    rather than something racing it.</summary>
 public sealed class GeminiLiveSession : IRealtimeSession
 {
     /// <summary>Gemini resamples server-side from whatever the MIME type declares, so the
@@ -49,10 +50,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// so it can be attached to the ResponseFinished the loop actually acts on.</summary>
     private UsageMetadata? _pendingUsage;
 
-    /// <summary>Set when a tool result has been sent and Gemini will therefore continue the turn
-    /// by itself. Makes the orchestrator's follow-up request a no-op exactly once.</summary>
-    private bool _autoResponsePending;
-
     public GeminiLiveSession(IOptions<GeminiLiveOptions> options, IList<AITool> tools, ILogger<GeminiLiveSession> logger)
     {
         _options = options.Value;
@@ -60,11 +57,19 @@ public sealed class GeminiLiveSession : IRealtimeSession
         _logger = logger;
     }
 
+    public string ProviderKey => "gemini";
+
     public string Model { get; private set; } = string.Empty;
 
     /// <summary>Gemini interrupts itself server-side and reports that it did. There is nothing
     /// to send, so barge-in cancellation is a no-op here.</summary>
     public bool SupportsExplicitCancel => false;
+
+    /// <summary>Gemini resumes the turn the moment a tool result lands. The orchestrator reads
+    /// this and skips its own follow-up rather than the session swallowing one — the difference
+    /// matters on the hang-up path, where the orchestrator has to know that the automatic turn
+    /// IS the farewell rather than something racing it.</summary>
+    public bool ContinuesTurnAfterToolResult => true;
 
     public async Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken)
     {
@@ -93,16 +98,37 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 LanguageCode = _options.LanguageCode,
             },
 
-            // The same reasoning as the OpenAI session: transcribing the caller pins each of
-            // their turns into the conversation as text, which is what stops the model drifting
-            // out of Azerbaijani after a clipped barge-in — and it makes calls reviewable.
-            InputAudioTranscription = new AudioTranscriptionConfig
+            // Transcribing the caller pins each of their turns into the conversation as text,
+            // which on the OpenAI side is what stops the model drifting out of Azerbaijani after
+            // a clipped barge-in — and it is what makes a call reviewable. Currently off while
+            // we find out whether it is also what a short answer is waiting on. See the option.
+            //
+            // Language pinned rather than auto-detected when it is on, for the same reason the
+            // OpenAI session pins whisper to "az": left to guess on half a second of speech,
+            // recognisers reach for English.
+            InputAudioTranscription = _options.TranscribeCaller
+                ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
+                : null,
+
+            // Both ends tuned, the start on measured evidence: a 200 ms "xeyr" took Gemini 7.3
+            // seconds to report, against ~1.5 s for a two-second sentence in the same call. The
+            // caller answered 36 ms after the agent stopped — the delay was entirely Gemini
+            // failing to take a short burst for speech.
+            RealtimeInputConfig = new RealtimeInputConfig
             {
-                // Pinned rather than auto-detected, for the same reason the OpenAI session pins
-                // whisper to "az": left to guess on a half-second of clipped speech, recognisers
-                // reach for English.
-                LanguageCodes = [_options.LanguageCode],
+                AutomaticActivityDetection = new AutomaticActivityDetection
+                {
+                    StartOfSpeechSensitivity = _options.EagerStartOfSpeech
+                        ? StartSensitivity.StartSensitivityHigh
+                        : StartSensitivity.StartSensitivityLow,
+                    PrefixPaddingMs = _options.PrefixPaddingMs,
+                    EndOfSpeechSensitivity = EndSensitivity.EndSensitivityHigh,
+                    SilenceDurationMs = _options.EndOfSpeechSilenceMs,
+                },
             },
+
+            // A caller hears deliberation as dead air. Off by default — see the option.
+            ThinkingConfig = new ThinkingConfig { ThinkingBudget = _options.ThinkingBudgetTokens },
 
             MaxOutputTokens = _options.MaxOutputTokens,
         };
@@ -156,11 +182,57 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 yield break;
             }
 
+            LogInbound(message);
+
             foreach (var translated in Translate(message))
             {
                 yield return translated;
             }
         }
+    }
+
+    /// <summary>Every inbound message, timestamped by the logger, with only its shape.
+    ///
+    /// Turn boundaries alone were not enough to find where a slow turn spends its time — twice
+    /// they pointed at the wrong culprit, because "response done" is when generation finished,
+    /// not when the caller heard it, and several distinct server messages were collapsing into
+    /// one log line. Interim transcripts in particular are otherwise invisible, and they are the
+    /// only signal that says when the caller was actually still speaking.
+    ///
+    /// Debug level: verbose per call, off unless Secretary.Voice.Google is turned up.</summary>
+    private void LogInbound(LiveServerMessage message)
+    {
+        if (!_logger.IsEnabled(LogLevel.Debug))
+        {
+            return;
+        }
+
+        var content = message.ServerContent;
+        var audioParts = content?.ModelTurn?.Parts?.Count(p => p.InlineData?.Data is { Length: > 0 }) ?? 0;
+
+        _logger.LogDebug(
+            "Gemini msg: interim={Interim} transcript={Transcript} audioParts={AudioParts} "
+            + "generationComplete={GenDone} turnComplete={TurnDone} interrupted={Interrupted} "
+            + "toolCalls={ToolCalls} usage={Usage} setup={Setup} goAway={GoAway} "
+            // The one measurement still missing: when the caller STARTED talking. Without it the
+            // gap between the agent finishing and the caller being transcribed cannot be split
+            // into "they were thinking" and "we were slow".
+            + "vad={Vad} activity={Activity}",
+            Trim(content?.InterimInputTranscription?.Text),
+            Trim(content?.InputTranscription?.Text),
+            audioParts,
+            content?.GenerationComplete,
+            content?.TurnComplete,
+            content?.Interrupted,
+            message.ToolCall?.FunctionCalls?.Count ?? 0,
+            message.UsageMetadata is null ? "-" : $"prompt={message.UsageMetadata.PromptTokenCount} response={message.UsageMetadata.ResponseTokenCount} thoughts={message.UsageMetadata.ThoughtsTokenCount}",
+            message.SetupComplete is not null,
+            message.GoAway is not null,
+            message.VoiceActivityDetectionSignal?.ToString() ?? "-",
+            message.VoiceActivity?.ToString() ?? "-");
+
+        static string Trim(string? text)
+            => string.IsNullOrWhiteSpace(text) ? "-" : text.Trim();
     }
 
     private IEnumerable<RealtimeEvent> Translate(LiveServerMessage message)
@@ -268,17 +340,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
 
     public async Task StartResponseAsync(string? instructions, CancellationToken cancellationToken)
     {
-        // Gemini continues the turn by itself once a tool result lands, so the orchestrator's
-        // follow-up would prompt it a second time — two replies to one question. Swallowed
-        // exactly once, and only for the ordinary follow-up: a dictated turn (the goodbye) is
-        // still sent, because its wording is the whole point.
-        if (instructions is null && _autoResponsePending)
-        {
-            _autoResponsePending = false;
-            _logger.LogDebug("Follow-up request skipped — Gemini resumes the turn on its own after a tool result.");
-            return;
-        }
-
         await _sendLock.WaitAsync(cancellationToken);
         try
         {
@@ -326,8 +387,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
                     ],
                 },
                 cancellationToken);
-
-            _autoResponsePending = true;
         }
         finally
         {

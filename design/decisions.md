@@ -214,9 +214,82 @@ all deferred to their own change so the provider itself could land clean.
 | M2 | **A pause around provider selection**, just before or just after; the exact moment wasn't captured. | Almost certainly the tool round-trip. Reproduce against the session log, which records every tool call and result, and check whether the follow-up was swallowed or fired twice. Likely the same root cause as M3. |
 | M3 | **No goodbye.** The call sat silent for 5–10 seconds, then hung up. | **Probable cause, check this first:** the orchestrator handles `EndCall` by sending the tool output, then a dictated goodbye turn, and hangs up on the *next* `ResponseFinished`. But Gemini continues a turn by itself once a tool result lands — so that auto-continuation almost certainly produces the next `ResponseFinished`, and the hang-up fires on it before the goodbye has generated. `GeminiLiveSession.StartResponseAsync` deliberately does not swallow a dictated turn, but nothing stops the auto-turn racing it. |
 
-M3 is the one that matters: a call ending in silence reads as a dropped call. It is also the
-clearest evidence that "a tool result continues the turn" needed more than a one-shot
-suppression flag — the flag stops a double reply, but does not order the two turns.
+A fourth item surfaced from the same call log, and it was the serious one:
+
+| | symptom | cause |
+|---|---|---|
+| M4 | **A booking failed mid-call** with "A second operation was started on this context instance", after the caller's number was not recognised. | **Gemini asks for several tools at once** — its `toolCall` message carries a *list* of function calls — and the orchestrator runs each off the event loop without awaiting. Two then hit the one request-scoped `DbContext` simultaneously, and EF Core is not thread-safe. OpenAI sends function calls one at a time, which is why this never showed. |
+
+### All four fixed, 2026-08-02
+
+- **M1 — the general slowdown was rejected, a narrow fix took its place.** A blanket pacing
+  instruction was written and reverted: the speed is good, and slowing the agent down would cost
+  the thing that makes Gemini feel better than OpenAI.
+
+  What is actually wrong is narrower. The agent said **"otuz otuz"** for 09:30 — the hour clipped
+  off — and then said "doqquz otuz" correctly when asked to repeat. It knows the value; it
+  swallows the first word at speed. So `PhoneAgent.md` gained a section covering times, prices
+  and phone numbers only: say both words of a time in full, never read a leading zero, read a
+  phone number in pairs. The rest of a sentence still moves at a normal pace.
+
+  Worth knowing if it recurs: `SpeechConfig` exposes no rate, so the remaining levers are wording
+  and a different prebuilt voice.
+- **M2 / M3** — `IRealtimeSession.ContinuesTurnAfterToolResult`. The orchestrator knows which
+  providers answer on their own and skips its own follow-up for those. The one-shot suppression
+  flag inside the Gemini session is gone: it stopped a double reply but could not order two turns.
+
+  **The first attempt at M3 was wrong and the second call proved it.** The theory was that the
+  automatic turn raced the dictated goodbye and won. The real fault was one link earlier:
+  **Gemini does not complete a turn while a tool call is outstanding**, and the orchestrator
+  deferred `EndCall`'s result until response-done. The completion waited on the result, the
+  result waited on the completion, and the call sat silent until something interrupted it — the
+  log shows `status=Cancelled, reason=interrupted` after 10.9 seconds. OpenAI emits
+  `response.done` with a function call still unanswered, which is why deferring works there and
+  only there.
+
+  `EndCall` is now answered the moment it is asked, with the farewell wording riding along on the
+  result, and the hang-up check no longer hangs off the deferred id.
+
+- **M2 — the pause was Gemini's end-of-turn detection, left on defaults.** The log ruled out
+  everything else: tools answered in 55–133 ms and first audio arrived within a second of the
+  turn opening. The wait was Gemini deciding the caller had finished — worst after a one-word
+  answer like "xeyr", where there is little speech to be confident about. `RealtimeInputConfig`
+  now sets `EndOfSpeechSensitivity = High` and a configurable `SilenceDurationMs`, default 500.
+
+  Start sensitivity is deliberately left alone: making Gemini keener to hear speech *begin* would
+  also make it keener to mistake its own voice returning through the speakers for the caller,
+  which is the echo problem the OpenAI session fights with far-field noise reduction.
+
+  `GeminiLive:EndOfSpeechSilenceMs` is configuration rather than a constant because it is a real
+  trade-off with no right answer from a desk — too long feels slow, too short talks over someone
+  drawing breath. Tune it from real calls.
+- **M4** — `RealtimeToolInvoker` runs one tool at a time. A gate rather than a `DbContext` per
+  tool, because the toolset is resolved once per call; serial execution costs nothing measurable
+  while the caller is already hearing audio.
+- **Phone numbers are canonicalised** on write and on lookup (`PhoneNumberNormalizer`), which is
+  why the caller was not recognised: numbers arrive as speech and were stored verbatim, leaving
+  two "Mehdi" rows — `0535353535` and `055 250 58 32`.
+
+⚠️ **Existing rows were not back-filled.** Clients created before this keep their as-spoken
+number and will not match a normalised lookup. Fine for the demo data; a real deployment needs a
+one-off migration, and duplicates merged before any unique index goes on the column.
+
+### The verdict after a dozen calls
+
+**Gemini feels markedly more human than OpenAI** — the owner's judgement after tuning both, and
+the thing worth remembering when the numbers below are argued about. It still answers a very
+short question more slowly, and it is preferred anyway. That is the two-provider bet paying off:
+the question was never which is cheaper, it was whether the cheaper one is good enough, and it
+turned out to be better.
+
+### Still open, deliberately not in the tuning change
+
+| | what | why it was left |
+|---|---|---|
+| N1 | **Short answers still take ~3 s.** Down from 7.3 s, but a one-word "xeyr" still lags a sentence. | Everything measurable has been ruled out: thinking tokens (`thoughts` empty), our tools (55–133 ms), our relay (`first audio after 0 ms`), end-of-speech silence, turn pacing. What remains is Gemini's own speech detection, and it reports neither interim transcripts nor voice-activity signals, so it cannot be seen into. **The remaining lever is to stop using its VAD**: `AutomaticActivityDetection.Disabled` plus explicit `ActivityStart`/`ActivityEnd` driven by our own microphone detector, which fires within ~100 ms. That needs proper hangover smoothing first — the current detector chops continuous speech into fragments — so it is its own change. |
+| N2 | **Caller transcription is off**, which is what took the delay from ~4.5 s to ~3 s. | It cost the `Caller said:` line that makes a call reviewable, and on the OpenAI side pinning the caller's words as Azerbaijani text is what stops the model drifting into English after a barge-in. `GeminiLive:TranscribeCaller` restores it. Revisit once N1 removes the reason for having turned it off. |
+| N3 | **Business hours are hardcoded 09:00–21:00**, so the agent offered 20:30 today. | Availability is behaving as written: a 30-minute service starting 20:30 finishes exactly at close. Whether the real hours are shorter, and whether the last start should be pulled back so appointments finish *before* close rather than at it, are business questions. Per-tenant business hours were already deferred; this belongs there. |
+| N4 | **Pronunciation rules exist only for Gemini.** | Correct for now — "otuz otuz" and "albilerem" were only ever heard from Gemini. If OpenAI shows the same habits, the rule gets written into its own file then, from its own evidence. |
 
 ## L. Document map
 

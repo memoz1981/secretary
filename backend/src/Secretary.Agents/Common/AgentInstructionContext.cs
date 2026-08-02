@@ -16,11 +16,18 @@ public sealed class AgentInstructionContext
 
     public AgentInstructionContext(IClock clock) => _clock = clock;
 
-    public string BuildPhoneAgentInstructions()
+    /// <summary>One complete instruction file per provider, not a shared file with per-provider
+    /// patches. The two models mishear and misspeak differently — Gemini clips the first word of
+    /// a time, OpenAI does not — and a rule written for one is dead weight or actively harmful in
+    /// the other. There is no compiler and no test to catch a shared edit regressing the model
+    /// you were not listening to, which is exactly why the files are kept whole and separate.
+    ///
+    /// They start as copies and diverge; duplication is the cheaper mistake here.</summary>
+    public string BuildPhoneAgentInstructions(string providerKey)
     {
         var local = _clock.GetCurrentInstant().InZone(AzerbaijanTime.Zone).LocalDateTime;
 
-        return InstructionLoader.Load("PhoneAgent") +
+        return InstructionLoader.Load($"PhoneAgent.{providerKey}") +
                "\n\n## Right now\n\n" +
                $"- The current date and time is {LocalPattern.Format(local)} (Azerbaijan time).\n" +
                "- Every time you hear, say, pass to a tool, or read from a tool result is Azerbaijan " +

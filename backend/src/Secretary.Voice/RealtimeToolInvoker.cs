@@ -21,6 +21,21 @@ public sealed class RealtimeToolInvoker
     /// this, the tool output gets a note telling it to thank the caller for waiting.</summary>
     private static readonly TimeSpan LongWaitThreshold = TimeSpan.FromSeconds(5);
 
+    /// <summary>One tool at a time, across the whole call.
+    ///
+    /// The orchestrator runs each tool off the event loop so audio and barge-in keep flowing,
+    /// which is right — but Gemini asks for several at once (its toolCall message carries a
+    /// LIST of function calls), and those would then run concurrently against the one
+    /// request-scoped DbContext the tools share. EF Core is not thread-safe, and the result was
+    /// a real booking failing mid-call with "A second operation was started on this context
+    /// instance". OpenAI never exposed it because it sends function calls one at a time.
+    ///
+    /// A gate rather than a DbContext per tool: the tools are resolved once into the toolset for
+    /// the call, so giving each invocation its own scope would mean rebuilding the toolset per
+    /// call. Serial execution costs a live call nothing measurable — the tools are single
+    /// queries, and the caller is already hearing audio while they run.</summary>
+    private readonly SemaphoreSlim _oneAtATime = new(1, 1);
+
     private readonly IReadOnlyList<AIFunction> _functions;
     private readonly ILogger<RealtimeToolInvoker> _logger;
 
@@ -31,6 +46,19 @@ public sealed class RealtimeToolInvoker
     }
 
     public async Task<string> ExecuteFunctionAsync(string functionName, string argumentsJson, CancellationToken cancellationToken)
+    {
+        await _oneAtATime.WaitAsync(cancellationToken);
+        try
+        {
+            return await ExecuteCoreAsync(functionName, argumentsJson, cancellationToken);
+        }
+        finally
+        {
+            _oneAtATime.Release();
+        }
+    }
+
+    private async Task<string> ExecuteCoreAsync(string functionName, string argumentsJson, CancellationToken cancellationToken)
     {
         // Logged verbatim on purpose — when a live call misbehaves ("that slot is taken", wrong
         // provider, wrong time), the exact arguments the model sent are the evidence.
