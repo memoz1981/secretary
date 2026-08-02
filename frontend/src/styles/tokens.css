@@ -1,0 +1,235 @@
+/*
+  Design tokens — "Ledger" direction
+  AI Appointment Platform · Stage 3
+
+  Consumed directly by front-end-software-developer. Fonts are loaded by the
+  app shell via @font-face / a font-loading strategy of the front end's
+  choosing — Manrope 700, Source Sans 3 400/600, IBM Plex Mono 500.
+*/
+
+:root {
+  /* ---- Color: surfaces & text ---- */
+  --color-ink: #241f18;          /* primary text */
+  --color-muted: #6b6558;        /* secondary text, captions, placeholders */
+  --color-canvas: #f6f4f0;       /* page background */
+  --color-surface: #ffffff;      /* cards, panels, table rows */
+  --color-surface-sunken: #f1ede5; /* sidebar, nav rail, input backgrounds */
+  --color-nav-active: #e4dfd2;   /* active nav item background */
+  --color-border: #ded7cd;       /* hairlines, card borders, table rules */
+  --color-focus-ring: #2f6e63;
+
+  /* ---- Color: accent (actions + live/escalation indicator only) ---- */
+  --color-accent: #2f6e63;
+  --color-accent-hover: #24564d;
+  --color-accent-ink: #ffffff;
+  --color-accent-subtle: #e3ebe8; /* accent-tinted backgrounds, e.g. selected day */
+
+  /* ---- Color: semantic status (call outcomes, appointment state) ----
+     Fixed regardless of visual direction — never reuse --color-accent for these. */
+  --color-success: #3f8a4f;
+  --color-success-bg: #e5f0e6;
+  --color-warning: #b3872f;
+  --color-warning-bg: #f5ecd9;
+  --color-critical: #a8402f;
+  --color-critical-bg: #f5e2de;
+
+  /* ---- Typography ---- */
+  --font-display: 'Manrope', 'Segoe UI', system-ui, sans-serif;   /* page titles, h1/h2 */
+  --font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif; /* everything else */
+  --font-mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace; /* durations, timestamps, KPI numbers */
+
+  --text-xs: 11px;   /* micro-labels, tags */
+  --text-sm: 12.5px; /* table cells, nav items, secondary labels */
+  --text-base: 14px; /* default body/UI text */
+  --text-md: 15.5px; /* emphasized body text, form values */
+  --text-lg: 18px;   /* card/section headings */
+  --text-xl: 22px;   /* page titles */
+  --text-2xl: 28px;  /* rare — login, empty-state headlines */
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* ---- Spacing scale (px) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+
+  /* ---- Shape & elevation ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(36, 31, 24, 0.07);
+  --shadow-md: 0 4px 16px rgba(36, 31, 24, 0.10);
+
+  --sidebar-width: 220px;
+
+  /* ---- Calendar provider identity colors ----
+     Eight far-apart hues assigned per provider (see lib/providerColors.ts). Defined as
+     tokens rather than hardcoded in JS so every theme can tune them — dark themes need
+     dark fills with bright edges, or the appointment text becomes unreadable. */
+  --provider-1-border: hsl(215, 65%, 46%); --provider-1-bg: hsl(215, 65%, 93%);
+  --provider-2-border: hsl(150, 45%, 36%); --provider-2-bg: hsl(150, 45%, 91%);
+  --provider-3-border: hsl(28, 80%, 45%);  --provider-3-bg: hsl(28, 85%, 91%);
+  --provider-4-border: hsl(270, 45%, 50%); --provider-4-bg: hsl(270, 50%, 94%);
+  --provider-5-border: hsl(188, 55%, 36%); --provider-5-bg: hsl(188, 55%, 91%);
+  --provider-6-border: hsl(335, 60%, 46%); --provider-6-bg: hsl(335, 60%, 94%);
+  --provider-7-border: hsl(80, 45%, 34%);  --provider-7-bg: hsl(80, 45%, 90%);
+  --provider-8-border: hsl(20, 40%, 40%);  --provider-8-bg: hsl(20, 40%, 92%);
+}
+
+/* ============================================================================
+   Themes
+   The base :root above is "Ledger" (light); index.html always sets data-theme
+   before first paint, so one of the blocks below is always in effect — see
+   theme/themes.ts for the ids. Each theme redeclares the full color set, and a
+   DARK theme must also restate the provider colors and shadows (light themes
+   inherit those from :root — a dark theme that forgets them ends up with light
+   appointment blocks under light text, i.e. invisible).
+   ============================================================================ */
+
+/* ---- Ledger (light) — the original warm paper + teal ---- */
+:root[data-theme='ledger'],
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-ink: #241f18;
+  --color-muted: #6b6558;
+  --color-canvas: #f6f4f0;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f1ede5;
+  --color-nav-active: #e4dfd2;
+  --color-border: #ded7cd;
+  --color-focus-ring: #2f6e63;
+  --color-accent: #2f6e63;
+  --color-accent-hover: #24564d;
+  --color-accent-ink: #ffffff;
+  --color-accent-subtle: #e3ebe8;
+  --color-success: #3f8a4f;
+  --color-success-bg: #e5f0e6;
+  --color-warning: #b3872f;
+  --color-warning-bg: #f5ecd9;
+  --color-critical: #a8402f;
+  --color-critical-bg: #f5e2de;
+}
+
+/* ---- Ledger, after hours (dark) ---- */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-ink: #ede8de;
+  --color-muted: #a69c89;
+  --color-canvas: #1c1912;
+  --color-surface: #262219;
+  --color-surface-sunken: #211d16;
+  --color-nav-active: #322c1f;
+  --color-border: #3a352a;
+  --color-focus-ring: #5fa394;
+  --color-accent: #5fa394;
+  --color-accent-hover: #74b3a5;
+  --color-accent-ink: #12211d;
+  --color-accent-subtle: #223531;
+  --color-success: #6ab476;
+  --color-success-bg: #223224;
+  --color-warning: #d1a052;
+  --color-warning-bg: #332a19;
+  --color-critical: #c9705d;
+  --color-critical-bg: #34211d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  --provider-1-border: hsl(215, 70%, 62%); --provider-1-bg: hsl(215, 32%, 23%);
+  --provider-2-border: hsl(150, 50%, 52%); --provider-2-bg: hsl(150, 26%, 20%);
+  --provider-3-border: hsl(28, 80%, 58%);  --provider-3-bg: hsl(28, 32%, 22%);
+  --provider-4-border: hsl(270, 60%, 68%); --provider-4-bg: hsl(270, 28%, 25%);
+  --provider-5-border: hsl(188, 60%, 52%); --provider-5-bg: hsl(188, 30%, 20%);
+  --provider-6-border: hsl(335, 65%, 64%); --provider-6-bg: hsl(335, 30%, 24%);
+  --provider-7-border: hsl(80, 45%, 52%);  --provider-7-bg: hsl(80, 24%, 19%);
+  --provider-8-border: hsl(20, 45%, 58%);  --provider-8-bg: hsl(20, 26%, 22%);
+}
+
+/* ---- Forest (light) — green tones ---- */
+:root[data-theme='forest'] {
+  color-scheme: light;
+  --color-ink: #10201a;
+  --color-muted: #4a6354;
+  --color-canvas: #dfeee3;
+  --color-surface: #f2faf4;
+  --color-surface-sunken: #cee3d4;
+  --color-nav-active: #b3d4bc;
+  --color-border: #aecdb7;
+  --color-focus-ring: #145c33;
+  --color-accent: #145c33;
+  --color-accent-hover: #0d4526;
+  --color-accent-ink: #ffffff;
+  --color-accent-subtle: #c3ddca;
+  --color-success: #1f6b3d;
+  --color-success-bg: #c8e2d0;
+  --color-warning: #8a6718;
+  --color-warning-bg: #eee3c6;
+  --color-critical: #98392a;
+  --color-critical-bg: #eed6d1;
+}
+
+/* ---- Graphite (dark) — neutral gray with a yellow accent ---- */
+:root[data-theme='graphite'] {
+  color-scheme: dark;
+  --color-ink: #eceef0;
+  --color-muted: #99a1a9;
+  --color-canvas: #16181b;
+  --color-surface: #1e2125;
+  --color-surface-sunken: #1a1d20;
+  --color-nav-active: #2a2e33;
+  --color-border: #32373d;
+  --color-focus-ring: #e2b53f;
+  --color-accent: #e2b53f;
+  --color-accent-hover: #f0c65a;
+  --color-accent-ink: #1a1508;
+  --color-accent-subtle: #322b16;
+  --color-success: #62b877;
+  --color-success-bg: #1e2f23;
+  --color-warning: #e59355;
+  --color-warning-bg: #332118;
+  --color-critical: #d1705c;
+  --color-critical-bg: #33201d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+  --provider-1-border: hsl(215, 70%, 62%); --provider-1-bg: hsl(215, 30%, 23%);
+  --provider-2-border: hsl(150, 50%, 52%); --provider-2-bg: hsl(150, 24%, 20%);
+  --provider-3-border: hsl(28, 80%, 58%);  --provider-3-bg: hsl(28, 30%, 22%);
+  --provider-4-border: hsl(270, 60%, 68%); --provider-4-bg: hsl(270, 26%, 25%);
+  --provider-5-border: hsl(188, 60%, 52%); --provider-5-bg: hsl(188, 28%, 20%);
+  --provider-6-border: hsl(335, 65%, 64%); --provider-6-bg: hsl(335, 28%, 24%);
+  --provider-7-border: hsl(80, 45%, 52%);  --provider-7-bg: hsl(80, 22%, 19%);
+  --provider-8-border: hsl(20, 45%, 58%);  --provider-8-bg: hsl(20, 24%, 22%);
+}
+
+/* ---- Ocean (light) — cool blue ---- */
+:root[data-theme='ocean'] {
+  color-scheme: light;
+  --color-ink: #0d1c2b;
+  --color-muted: #45607a;
+  --color-canvas: #dbe8f5;
+  --color-surface: #f0f7fd;
+  --color-surface-sunken: #c7dbee;
+  --color-nav-active: #aacbe6;
+  --color-border: #a6c5e1;
+  --color-focus-ring: #114b7d;
+  --color-accent: #114b7d;
+  --color-accent-hover: #0a3760;
+  --color-accent-ink: #ffffff;
+  --color-accent-subtle: #bcd6ec;
+  --color-success: #1f6b4a;
+  --color-success-bg: #c6e0d5;
+  --color-warning: #8a6718;
+  --color-warning-bg: #eee3c6;
+  --color-critical: #98392a;
+  --color-critical-bg: #eed6d1;
+}

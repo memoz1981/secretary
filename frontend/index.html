@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- lang is the default only: LanguageProvider overwrites it on mount with the language the
+     user actually chose. See i18n/LanguageContext.tsx for why it has to be right. -->
+<html lang="az">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#2f6e63" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" />
+    <title>sekretar.az</title>
+    <script>
+      // Applies the saved theme before first paint, so a reload on a dark theme never
+      // flashes the light default. Kept in sync with theme/themes.ts.
+      (function () {
+        try {
+          var stored = localStorage.getItem("ai-appointment.theme");
+          var known = ["ledger", "dark", "forest", "graphite", "ocean"];
+          document.documentElement.setAttribute("data-theme", known.indexOf(stored) >= 0 ? stored : "ledger");
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "ledger");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
