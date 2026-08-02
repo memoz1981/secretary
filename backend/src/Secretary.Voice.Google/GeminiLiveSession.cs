@@ -31,22 +31,6 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// native 16 kHz. Its output is 24 kHz, which already matches what the page plays.</summary>
     private const string InputAudioMimeType = "audio/pcm;rate=24000";
 
-    /// <summary>Appended to the shared instructions, for this provider only.
-    ///
-    /// Gemini talks noticeably faster than OpenAI — pleasant to listen to, but on a phone line
-    /// the words start running together. SpeechConfig exposes no rate, so pace has to be asked
-    /// for in words. Kept here rather than in PhoneAgent.md because it is a Gemini problem and
-    /// slowing OpenAI down would make it worse.
-    ///
-    /// This is the thin end of decision F3 — a complete instruction file per (module ×
-    /// provider). When a second module lands, this belongs in
-    /// Modules/Appointment/Instructions/gemini.md instead of a constant here.</summary>
-    private const string PacingAddendum = """
-
-        DANIŞIQ TEMPİ: Sakit və aydın danışın. Tələsməyin. Rəqəmləri, saatları və adları
-        xüsusilə yavaş deyin — telefon xəttində sürətli nitq anlaşılmır.
-        """;
-
     private readonly GeminiLiveOptions _options;
     private readonly IReadOnlyList<AIFunction> _functions;
     private readonly ILogger<GeminiLiveSession> _logger;
@@ -100,7 +84,7 @@ public sealed class GeminiLiveSession : IRealtimeSession
             SystemInstruction = new Content
             {
                 Role = "user",
-                Parts = [new Part { Text = instructions + PacingAddendum }],
+                Parts = [new Part { Text = instructions }],
             },
 
             SpeechConfig = new SpeechConfig

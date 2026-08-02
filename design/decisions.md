@@ -222,10 +222,11 @@ A fourth item surfaced from the same call log, and it was the serious one:
 
 ### All four fixed, 2026-08-02
 
-- **M1** — a pacing instruction appended to the system prompt for Gemini only. The SDK exposes no
-  speech rate, so it has to be asked for in words, and slowing OpenAI down would make it worse.
-  Lives as a constant in `GeminiLiveSession`; it belongs in a per-provider instruction file when
-  decision F3 is actually implemented.
+- **M1 — not fixed, deliberately.** A pacing instruction was written and then reverted: on more
+  listening the speed is good, and slowing the agent down would cost the thing that makes Gemini
+  feel better than OpenAI. Revisit only if real callers struggle. Worth knowing for that day:
+  `SpeechConfig` exposes no rate, so pace can only be asked for in words or changed by trying a
+  different prebuilt voice.
 - **M2 / M3** — `IRealtimeSession.ContinuesTurnAfterToolResult`. The orchestrator now knows which
   providers answer on their own, skips its own follow-up for those, and on the hang-up path sends
   the farewell wording *with* the tool result so the automatic turn speaks it. Previously the
