@@ -1,12 +1,14 @@
 #pragma warning disable OPENAI002 // OpenAI.Realtime is still an evolving/preview surface of the OpenAI SDK.
 using System.ComponentModel;
-using Secretary.Agents.Realtime;
+using Secretary.Domain.ValueObjects;
+using Secretary.Voice;
+using Secretary.Voice.OpenAi;
 using Microsoft.Extensions.AI;
 using OpenAI.Realtime;
 using Shouldly;
 using Xunit;
 
-namespace Secretary.Agents.Tests;
+namespace Secretary.Voice.Tests;
 
 public sealed class RealtimeToolSchemaTests
 {
@@ -18,7 +20,7 @@ public sealed class RealtimeToolSchemaTests
     {
         var tools = new List<AITool> { AIFunctionFactory.Create(SampleTool) };
 
-        var schema = RealtimeToolSchema.FromTools(tools).ToList();
+        var schema = OpenAiRealtimeToolSchema.FromTools(tools).ToList();
 
         schema.Count.ShouldBe(1);
         var tool = schema[0].ShouldBeOfType<RealtimeFunctionTool>();

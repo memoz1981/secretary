@@ -5,6 +5,7 @@ using Secretary.Application.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Secretary.Voice;
 
 namespace Secretary.Agents;
 
@@ -13,7 +14,6 @@ public static class AgentsServiceCollectionExtensions
     public static IServiceCollection AddAgents(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AgentProviderOptions>(configuration.GetSection(AgentProviderOptions.SectionName));
-        services.Configure<RealtimeOptions>(configuration.GetSection(RealtimeOptions.SectionName));
         services.AddSingleton<IAgentFactory, AgentFactory>();
 
         // Overrides Application's no-op default — must be registered after AddApplicationServices()
@@ -37,8 +37,10 @@ public static class AgentsServiceCollectionExtensions
         services.AddScoped<AgentInstructionContext>();
         services.AddScoped<PhoneAgentConversationService>();
 
-        // Transient: a fresh WebSocket session per live call, never reused across calls.
-        services.AddTransient<RealtimeVoiceSession>();
+        // Provider-neutral: running a tool and adding up tokens are the same whichever model
+        // asked. The sessions themselves are registered by their own provider packages.
+        services.AddScoped<RealtimeToolInvoker>();
+        services.AddScoped<RealtimeSessionResolver>();
         services.AddScoped<LiveVoiceCallOrchestrator>();
 
         return services;

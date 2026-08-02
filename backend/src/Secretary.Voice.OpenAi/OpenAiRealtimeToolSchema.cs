@@ -2,14 +2,12 @@
 using Microsoft.Extensions.AI;
 using OpenAI.Realtime;
 
-namespace Secretary.Agents.Realtime;
+namespace Secretary.Voice.OpenAi;
 
-/// <summary>Converts the same AIFunction/AITool objects used everywhere else in this skill
-/// (see Tools/PhoneAgentToolset.cs) into the Realtime SDK's RealtimeFunctionTool shape. The
-/// tool *definition* (name, description, parameters) is provider-agnostic; only this adapter
-/// and the surrounding transport differ from PhoneAgentConversationService's text-based
-/// ChatClientAgent path.</summary>
-public static class RealtimeToolSchema
+/// <summary>Converts the same AIFunction/AITool objects used everywhere else (see
+/// PhoneAgentToolset) into the Realtime SDK's shape. The tool *definition* — name, description,
+/// parameters — is provider-agnostic; only this adapter differs. Gemini has its own.</summary>
+public static class OpenAiRealtimeToolSchema
 {
     public static IEnumerable<RealtimeTool> FromTools(IEnumerable<AITool> tools)
         => tools.OfType<AIFunction>().Select(ToRealtimeTool);

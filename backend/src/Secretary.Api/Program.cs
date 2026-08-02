@@ -14,6 +14,7 @@ using Secretary.Application;
 using Secretary.Application.Abstractions;
 using Secretary.Application.Pricing;
 using Secretary.Infrastructure;
+using Secretary.Voice.OpenAi;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -78,6 +79,10 @@ builder.Services.AddApplicationServices();
 // After AddApplicationServices() so AddAgents()'s IServiceCatalogChangeNotifier implementation
 // wins over Application's no-op default (see Secretary.Application.DependencyInjection).
 builder.Services.AddAgents(builder.Configuration);
+
+// Realtime providers. Each registers its own session factory; the resolver picks by pipeline,
+// so adding one never edits a switch statement.
+builder.Services.AddOpenAiRealtime(builder.Configuration);
 
 // What every call costs is tracked, not estimated — see backend/README.md, "What a call costs".
 builder.Services.Configure<ModelPricingOptions>(builder.Configuration.GetSection(ModelPricingOptions.SectionName));
