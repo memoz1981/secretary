@@ -44,12 +44,12 @@ export const PIPELINE_INFO: Record<CallPipeline, PipelineInfo> = {
       en: "Gemini Live handles the audio directly — a separate wire protocol.",
     },
     tradeOff: {
-      az: "Təxminən dörd dəfə ucuz. Azərbaycan dili yoxlanılmayıb — hələ aktiv deyil.",
-      ru: "Примерно вчетверо дешевле. Азербайджанский не проверен — пока не включён.",
-      en: "Roughly four times cheaper. Azerbaijani unverified — not enabled yet.",
+      az: "Təxminən dörd dəfə ucuz. Azərbaycan dili hələ yoxlanılmayıb.",
+      ru: "Примерно вчетверо дешевле. Азербайджанский пока не проверен.",
+      en: "Roughly four times cheaper. Azerbaijani quality still unverified.",
     },
     costPerMinute: "~$0.025",
-    enabled: false,
+    enabled: true,
   },
   Unknown: {
     short: "—",

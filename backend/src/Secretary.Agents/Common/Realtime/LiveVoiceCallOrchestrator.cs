@@ -1,13 +1,12 @@
-#pragma warning disable OPENAI002 // OpenAI.Realtime is still an evolving/preview surface of the OpenAI SDK.
 using System.Net.WebSockets;
 using Secretary.Application.Dtos;
 using Secretary.Application.Pricing;
 using Secretary.Application.Services;
 using Secretary.Domain.Enums;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using NodaTime;
-using OpenAI.Realtime;
+using Secretary.Voice;
+using Secretary.Voice.Abstractions;
 
 namespace Secretary.Agents.Realtime;
 
@@ -24,22 +23,26 @@ public sealed class LiveVoiceCallOrchestrator
     /// required and non-blank).</summary>
     private const string LocalDeviceCallerIdentifier = "local-device-call";
 
-    private readonly RealtimeVoiceSession _realtimeSession;
+    private readonly RealtimeSessionResolver _sessionResolver;
+    private readonly RealtimeToolInvoker _toolInvoker;
     private readonly CallService _callService;
     private readonly AgentInstructionContext _instructionContext;
     private readonly IClock _clock;
-    private readonly RealtimeOptions _realtimeOptions;
     private readonly ILogger<LiveVoiceCallOrchestrator> _logger;
 
+    /// <summary>Assigned at the top of RunAsync, once the pipeline says which provider answers.
+    /// Not injected, because which implementation is wanted is a per-call decision.</summary>
+    private IRealtimeSession _realtimeSession = null!;
+
     public LiveVoiceCallOrchestrator(
-        RealtimeVoiceSession realtimeSession, CallService callService, AgentInstructionContext instructionContext,
-        IClock clock, IOptions<RealtimeOptions> realtimeOptions, ILogger<LiveVoiceCallOrchestrator> logger)
+        RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker, CallService callService,
+        AgentInstructionContext instructionContext, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
     {
-        _realtimeSession = realtimeSession;
+        _sessionResolver = sessionResolver;
+        _toolInvoker = toolInvoker;
         _callService = callService;
         _instructionContext = instructionContext;
         _clock = clock;
-        _realtimeOptions = realtimeOptions.Value;
         _logger = logger;
     }
 
@@ -144,6 +147,9 @@ public sealed class LiveVoiceCallOrchestrator
     {
         var startedAt = _clock.GetCurrentInstant();
         var outcome = CallOutcome.ResolvedByAgent;
+
+        // Which provider answers is the pipeline's decision, resolved here rather than injected.
+        _realtimeSession = _sessionResolver.Create(pipeline);
 
         try
         {
@@ -270,7 +276,7 @@ public sealed class LiveVoiceCallOrchestrator
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var toolOutput = await _realtimeSession.ExecuteFunctionAsync(functionName, argumentsJson, cancellationToken);
+            var toolOutput = await _toolInvoker.ExecuteFunctionAsync(functionName, argumentsJson, cancellationToken);
             _logger.LogInformation("Turn: tool {Function} took {Ms} ms.", functionName, stopwatch.ElapsedMilliseconds);
             UpdateClassification(functionName, toolOutput);
             await _realtimeSession.AddFunctionOutputAsync(callId, toolOutput, cancellationToken);
@@ -315,9 +321,19 @@ public sealed class LiveVoiceCallOrchestrator
     /// the turn (their own turn produces the next response) or we cancelled on barge-in. Re-
     /// asking in those cases is what produced bursts of doomed 50-millisecond responses while
     /// the caller was still talking.</summary>
-    private static bool ShouldRecoverFromSilence(RealtimeResponseStatusReason? reason)
-        => reason != RealtimeResponseStatusReason.TurnDetected
-        && reason != RealtimeResponseStatusReason.ClientCancelled;
+    private static bool ShouldRecoverFromSilence(string? reason)
+        => !IsReason(reason, "turn_detected") && !IsReason(reason, "client_cancelled");
+
+    /// <summary>Providers report the reason as a wire string, and the two in play here are
+    /// OpenAI's. Matched loosely — with and without underscores, either casing — because the
+    /// SDK's extensible-enum ToString() has given both "turn_detected" and "TurnDetected"
+    /// across versions, and getting this wrong reintroduces the doomed-retry burst rather than
+    /// failing loudly. A provider that reports no reason (Gemini) falls through to true, which
+    /// is the right default: an unexplained silent turn IS worth re-asking.</summary>
+    private static bool IsReason(string? reason, string wireName)
+        => reason is not null
+        && string.Equals(reason.Replace("_", string.Empty), wireName.Replace("_", string.Empty),
+            StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Re-asks for a reply that never came, but only if the wait didn't make the
     /// question moot — see <see cref="VoiceTurnState.CanRetrySilentResponse"/>.</summary>
@@ -408,11 +424,11 @@ public sealed class LiveVoiceCallOrchestrator
         var firstAudioLogged = false;
         var currentGeneration = 0;
 
-        await foreach (var update in _realtimeSession.ReceiveUpdatesAsync(cancellationToken))
+        await foreach (var update in _realtimeSession.ReceiveEventsAsync(cancellationToken))
         {
             switch (update)
             {
-                case RealtimeServerUpdateResponseCreated:
+                case RealtimeEvent.ResponseStarted:
                     currentGeneration = _turn.BeginResponse();
                     _logger.LogInformation("Turn: response created (pendingTools={Pending}).", _turn.PendingToolCalls);
 
@@ -425,18 +441,18 @@ public sealed class LiveVoiceCallOrchestrator
                 // Only logged, never acted on: the transcript is what makes a recorded call
                 // reviewable afterwards, and it is how we can tell a real caller turn from the
                 // microphone tripping over background noise or the agent's own voice.
-                case RealtimeServerUpdateConversationItemInputAudioTranscriptionCompleted transcription:
-                    _logger.LogInformation("Caller said: {Transcript}", transcription.Transcript?.Trim());
+                case RealtimeEvent.CallerTranscript transcription:
+                    _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
                     break;
 
-                case RealtimeServerUpdateConversationItemInputAudioTranscriptionFailed transcriptionFailure:
+                case RealtimeEvent.CallerTranscriptFailed transcriptionFailure:
                     // Not fatal: the model still has the audio itself. Worth knowing about,
                     // because losing the transcript is what weakens its grip on the language.
-                    _logger.LogWarning("Caller transcription failed: {Message}", transcriptionFailure.Error?.Message);
+                    _logger.LogWarning("Caller transcription failed: {Message}", transcriptionFailure.Message);
                     break;
 
-                case RealtimeServerUpdateResponseOutputAudioDelta delta:
-                    var bytes = delta.Delta.ToArray();
+                case RealtimeEvent.AudioOut delta:
+                    var bytes = delta.Pcm16;
                     if (bytes.Length > 0 && clientSocket.State == WebSocketState.Open)
                     {
                         if (!firstAudioLogged)
@@ -451,8 +467,8 @@ public sealed class LiveVoiceCallOrchestrator
 
                     break;
 
-                case RealtimeServerUpdateResponseFunctionCallArgumentsDone functionCall:
-                    if (functionCall.FunctionName == nameof(Tools.CallControlTools.EndCall))
+                case RealtimeEvent.ToolCallRequested functionCall:
+                    if (functionCall.Name == nameof(Tools.CallControlTools.EndCall))
                     {
                         _logger.LogInformation("Model requested EndCall — hanging up after its goodbye is spoken.");
                         pendingEndCallId = functionCall.CallId;
@@ -465,27 +481,25 @@ public sealed class LiveVoiceCallOrchestrator
                     // Deliberately not awaited: the loop must keep relaying audio and handling
                     // barge-in while the tool runs. RunToolCallAsync owns its own errors.
                     _ = RunToolCallAsync(
-                        functionCall.CallId, functionCall.FunctionName, functionCall.FunctionArguments.ToString(), cancellationToken);
+                        functionCall.CallId, functionCall.Name, functionCall.ArgumentsJson, cancellationToken);
                     break;
 
-                case RealtimeServerUpdateResponseDone responseDone:
+                case RealtimeEvent.ResponseFinished responseDone:
                     _turn.EndResponse();
-                    var status = responseDone.Response?.Status;
-                    var statusReason = responseDone.Response?.StatusDetails?.Reason;
+                    var status = responseDone.Outcome;
+                    var statusReason = responseDone.Reason;
 
                     // Billed whether or not the caller got anything useful out of it — a reply
                     // cut short by barge-in still consumed the whole conversation as input — so
                     // usage is tallied for every response that reports any, including the
                     // cancelled and failed ones.
-                    _usage.Add(responseDone.Response?.Usage);
+                    _usage.Add(responseDone.Usage);
                     _logger.LogInformation(
                         "Turn: response done after {Ms} ms (status={Status}, reason={Reason}, audio={HadAudio}, toolCall={HadTool}, pendingTools={Pending}).",
                         responseStarted.ElapsedMilliseconds, status, statusReason, audioInCurrentResponse,
                         toolCallInCurrentResponse, _turn.PendingToolCalls);
 
-                    var failureMessage = status == RealtimeResponseStatus.Failed
-                        ? responseDone.Response?.StatusDetails?.Error?.Message
-                        : null;
+                    var failureMessage = responseDone.FailureMessage;
                     if (failureMessage is not null)
                     {
                         // A failed response throws nothing and closes nothing — without this the
@@ -494,7 +508,7 @@ public sealed class LiveVoiceCallOrchestrator
                         _logger.LogError("Response generation failed: {Message}", failureMessage);
                     }
 
-                    if (status == RealtimeResponseStatus.Completed)
+                    if (status == RealtimeResponseOutcome.Completed)
                     {
                         _answerCount++;
                     }
@@ -559,7 +573,7 @@ public sealed class LiveVoiceCallOrchestrator
                     _ = RetrySilentResponseAsync(currentGeneration, retryDelay, cancellationToken);
                     break;
 
-                case RealtimeServerUpdateInputAudioBufferSpeechStarted:
+                case RealtimeEvent.CallerSpeechStarted:
                     // A question, for the call's question/answer count. Server VAD is what
                     // decides the caller took the turn, which is the same signal the model
                     // itself acts on — so this counts exactly the turns the model responded to.
@@ -584,12 +598,12 @@ public sealed class LiveVoiceCallOrchestrator
 
                     break;
 
-                case RealtimeServerUpdateInputAudioBufferSpeechStopped:
+                case RealtimeEvent.CallerSpeechStopped:
                     _turn.EndCallerSpeech();
                     break;
 
-                case RealtimeServerUpdateError error:
-                    if (error.Error.Code == "response_cancel_not_active")
+                case RealtimeEvent.SessionError error:
+                    if (error.Code == "response_cancel_not_active")
                     {
                         // Benign race: with server VAD, OpenAI often auto-cancels the active
                         // response on speech-started before our explicit cancel lands. Not a
@@ -599,7 +613,7 @@ public sealed class LiveVoiceCallOrchestrator
                     }
 
                     _sawErrorEvent = true;
-                    _logger.LogWarning("Realtime API error event: {Code} {Message}", error.Error.Code, error.Error.Message);
+                    _logger.LogWarning("Realtime API error event: {Code} {Message}", error.Code, error.Message);
                     break;
             }
         }

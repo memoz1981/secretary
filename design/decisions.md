@@ -190,7 +190,7 @@ Step 4 is deliberately early: if `IRealtimeSession` can't absorb Gemini Live cle
 | | question | blocks |
 |---|---|---|
 | K1 | ~~SQL Server or Postgres?~~ ✅ **Resolved — Postgres. See C5.** | — |
-| K2 | **Gemini's Azerbaijani quality** — completely unverified, and Azerbaijani is what killed the chained pipelines. One spike answers it. | step 4 value |
+| K2 | ~~Gemini's Azerbaijani quality~~ ✅ **Answered by a real call, 2026-08-02: it works, and the quality is better than OpenAI's.** That was the question the whole two-provider design existed to settle. Tuning items below. | — |
 | K3 | **Gemini paid-tier concurrency** — free tier is 3 sessions. Need the paid number before load testing means anything. | production |
 | K4 | **+994 carrier interconnect** — see the carrier checklist. | step 6 only |
 | K5 | **Voice option per tenant, or per tenant × module?** Per-tenant now; outbound campaigns will eventually want a cheaper model than inbound booking. | later |
@@ -202,6 +202,21 @@ Step 4 is deliberately early: if `IRealtimeSession` can't absorb Gemini Live cle
 
 ⚠️ **K8–K10 belong in the same Twilio conversation as K4.** The answers could reorder the path to
 production — if WhatsApp is available and the carrier interconnect is slow, WhatsApp ships first.
+
+## M. Gemini tuning — found on the first real call
+
+Gemini Live works, and on Azerbaijani it sounds better than OpenAI. Three things need fixing,
+all deferred to their own change so the provider itself could land clean.
+
+| | symptom | where to look |
+|---|---|---|
+| M1 | **Speaks too fast** — words run together and stop being clear, though the voice itself is better than OpenAI's. | Try the instruction first, it costs nothing. If prompting won't hold the pace, check whether `SpeechConfig` exposes a rate, and try other prebuilt voices — `Aoede` was chosen without evidence. |
+| M2 | **A pause around provider selection**, just before or just after; the exact moment wasn't captured. | Almost certainly the tool round-trip. Reproduce against the session log, which records every tool call and result, and check whether the follow-up was swallowed or fired twice. Likely the same root cause as M3. |
+| M3 | **No goodbye.** The call sat silent for 5–10 seconds, then hung up. | **Probable cause, check this first:** the orchestrator handles `EndCall` by sending the tool output, then a dictated goodbye turn, and hangs up on the *next* `ResponseFinished`. But Gemini continues a turn by itself once a tool result lands — so that auto-continuation almost certainly produces the next `ResponseFinished`, and the hang-up fires on it before the goodbye has generated. `GeminiLiveSession.StartResponseAsync` deliberately does not swallow a dictated turn, but nothing stops the auto-turn racing it. |
+
+M3 is the one that matters: a call ending in silence reads as a dropped call. It is also the
+clearest evidence that "a tool result continues the turn" needed more than a one-shot
+suppression flag — the flag stops a double reply, but does not order the two turns.
 
 ## L. Document map
 

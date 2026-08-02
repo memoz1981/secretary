@@ -1,23 +1,32 @@
 #pragma warning disable OPENAI002 // OpenAI.Realtime is still an evolving/preview surface of the OpenAI SDK.
 using System.ClientModel.Primitives;
-using Secretary.Agents.Realtime;
+using Secretary.Domain.ValueObjects;
+using Secretary.Voice;
+using Secretary.Voice.OpenAi;
 using OpenAI.Realtime;
 using Shouldly;
 using Xunit;
 
-namespace Secretary.Agents.Tests;
+namespace Secretary.Voice.Tests;
 
 /// <summary>What a call cost is only as trustworthy as this addition. The usage objects here are
 /// built from the wire JSON OpenAI actually sends, rather than from hand-made stubs, so the
 /// field-name assumptions the tally depends on are part of what's under test.</summary>
 public sealed class RealtimeUsageTallyTests
 {
-    private static RealtimeResponseUsage Usage(string json)
+    private static RealtimeResponseUsage RawUsage(string json)
         => ModelReaderWriter.Read<RealtimeResponseUsage>(BinaryData.FromString(json))!;
+
+    /// <summary>The tally now takes neutral TokenUsage — deciding how OpenAI's token breakdown
+    /// maps onto text/audio/cached moved to OpenAiUsageTranslator when Gemini arrived. Both are
+    /// still exercised together here, because it is the pair that has to be right for a call's
+    /// recorded cost to mean anything.</summary>
+    private static TokenUsage? Usage(string json)
+        => OpenAiUsageTranslator.ToTokenUsage(RawUsage(json));
 
     /// <summary>One response's usage in OpenAI's shape: the input text/audio counts INCLUDE
     /// their cached portions, which is the detail that makes or breaks the price.</summary>
-    private static RealtimeResponseUsage Response(
+    private static TokenUsage? Response(
         int inputText, int inputAudio, int cachedText, int cachedAudio, int outputText, int outputAudio)
         => Usage($$"""
         {
