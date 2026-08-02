@@ -18,6 +18,7 @@ using Secretary.Voice.Google;
 using Secretary.Voice.OpenAi;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -152,7 +153,9 @@ builder.Services
             },
         };
     });
-builder.Services.AddAuthorization();
+// Roles say who the caller is; module policies say what their tenant bought. Both apply.
+builder.Services.AddAuthorization(options => options.AddModulePolicies());
+builder.Services.AddScoped<IAuthorizationHandler, ModuleAuthorizationHandler>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

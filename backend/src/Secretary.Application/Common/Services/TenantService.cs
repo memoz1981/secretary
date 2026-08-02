@@ -51,6 +51,12 @@ public sealed class TenantService
         var agent = Account.CreateAgent(tenant.Id, _passwordHasher.Hash(agentApiKey), now);
         await _uow.Accounts.AddAsync(agent, cancellationToken);
 
+        // Appointment on by default, because it is the only module that exists and a tenant with
+        // none can log in and reach nothing at all. The platform admin adds and removes the rest.
+        // Revisit when a second module ships and "which did they buy" becomes a real question.
+        await _uow.TenantModules.AddAsync(
+            TenantModule.Grant(tenant.Id, Module.Appointment, now), cancellationToken);
+
         await _uow.SaveChangesAsync(cancellationToken);
         return new CreateTenantResult(ToResponse(tenant), owner.Id, agent.Id, agentApiKey);
     }

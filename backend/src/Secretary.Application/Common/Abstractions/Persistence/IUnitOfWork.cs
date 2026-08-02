@@ -11,6 +11,7 @@ public interface IUnitOfWork
     IAppointmentRepository Appointments { get; }
     ICallRepository Calls { get; }
     IEscalationRepository Escalations { get; }
+    ITenantModuleRepository TenantModules { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -66,12 +66,18 @@ public sealed class AuthService
             ?? throw new NotFoundException(nameof(Account), accountId);
 
         string? tenantName = null;
+        IReadOnlyList<Module> enabledModules = [];
+
+        // Read from the account's own tenant rather than the ambient one: /me is answered for
+        // whoever is asking, and a platform admin has no tenant to read modules for.
         if (account.TenantId is { } tenantId)
         {
             var tenant = await _uow.Tenants.GetByIdAsync(tenantId, cancellationToken);
             tenantName = tenant?.Name;
+            enabledModules = await _uow.TenantModules.GetEnabledModulesAsync(tenantId, cancellationToken);
         }
 
-        return new MeResponse(account.Id, account.Name, account.Email, account.Role, account.TenantId, tenantName);
+        return new MeResponse(
+            account.Id, account.Name, account.Email, account.Role, account.TenantId, tenantName, enabledModules);
     }
 }
