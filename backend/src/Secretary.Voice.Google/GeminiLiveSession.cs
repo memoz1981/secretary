@@ -96,16 +96,17 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 LanguageCode = _options.LanguageCode,
             },
 
-            // The same reasoning as the OpenAI session: transcribing the caller pins each of
-            // their turns into the conversation as text, which is what stops the model drifting
-            // out of Azerbaijani after a clipped barge-in — and it makes calls reviewable.
-            InputAudioTranscription = new AudioTranscriptionConfig
-            {
-                // Pinned rather than auto-detected, for the same reason the OpenAI session pins
-                // whisper to "az": left to guess on a half-second of clipped speech, recognisers
-                // reach for English.
-                LanguageCodes = [_options.LanguageCode],
-            },
+            // Transcribing the caller pins each of their turns into the conversation as text,
+            // which on the OpenAI side is what stops the model drifting out of Azerbaijani after
+            // a clipped barge-in — and it is what makes a call reviewable. Currently off while
+            // we find out whether it is also what a short answer is waiting on. See the option.
+            //
+            // Language pinned rather than auto-detected when it is on, for the same reason the
+            // OpenAI session pins whisper to "az": left to guess on half a second of speech,
+            // recognisers reach for English.
+            InputAudioTranscription = _options.TranscribeCaller
+                ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
+                : null,
 
             // Both ends tuned, the start on measured evidence: a 200 ms "xeyr" took Gemini 7.3
             // seconds to report, against ~1.5 s for a two-second sentence in the same call. The

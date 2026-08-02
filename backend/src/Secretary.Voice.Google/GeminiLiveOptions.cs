@@ -64,6 +64,20 @@ public sealed class GeminiLiveOptions
     /// clipped off the front of a short answer. Matches the OpenAI session's 300 ms.</summary>
     public int PrefixPaddingMs { get; set; } = 300;
 
+    /// <summary>Whether to ask Gemini to transcribe the caller.
+    ///
+    /// Off, and this is an experiment rather than a settled choice. Making start-of-speech eager
+    /// took a short answer from 7.3 s to about 4.5 s but did not fix it, and transcription is the
+    /// last thing left on the critical path that we put there ourselves: the caller's transcript
+    /// and the model's first audio arrive in the same instant, every time, which is consistent
+    /// with the reply waiting on the transcription.
+    ///
+    /// It is not free to turn off. The transcript is what makes a call reviewable afterwards, and
+    /// on the OpenAI side pinning the caller's words as Azerbaijani text is what stops the model
+    /// drifting into English after a clipped barge-in. If this does not visibly help, turn it
+    /// back on — the debuggability is worth more than a guess.</summary>
+    public bool TranscribeCaller { get; set; }
+
     /// <summary>How many tokens Gemini may spend thinking before it answers. Zero turns it off.
     ///
     /// Off by default, and this is the real cause of the long silences. The timings say so
