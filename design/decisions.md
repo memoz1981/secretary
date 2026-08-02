@@ -38,13 +38,23 @@ Companion documents: [`telephony-carrier-checklist.md`](./telephony-carrier-chec
 | C2 | **`Secretary.*` namespaces.** | `AiAppointment.Modules.Feedback` names the solution after one module. |
 | C3 | `Secretary.Voice` holds the provider-agnostic voice layer; **no vendor SDK** in `Secretary.Voice` or `Secretary.Agents`. | This is the test that the layering is real. Today's `Agents` project references OpenAI. |
 | C4 | `Secretary.Api` is the only composition root referencing provider and gateway projects. | |
-| C5 | **PostgreSQL**, not SQL Server. `Npgsql.EntityFrameworkCore.PostgreSQL`. | Greenfield was the only cheap moment to decide. Managed SQL Server is expensive everywhere except Azure, which pinned hosting to one vendor; Postgres is cheap on every host and reopens Neon, Fly, Hetzner and DigitalOcean. |
+| C5 | **PostgreSQL is the target, SQL Server runs locally until the production deploy.** Both EF providers are referenced; `Infrastructure/DependencyInjection.cs` picks. | Greenfield was the only cheap moment to commit to Postgres: managed SQL Server is expensive everywhere except Azure, which pinned hosting to one vendor, while Postgres is cheap on every host. Staying on SQL Server for now keeps local development on a stack that is already installed and working, and the switch is deliberately kept to one line. |
 | C6 | **Start from an empty migration.** No data is carried over from the Appointment system; the first migration is generated from the new model. | New project. Inheriting the old schema would import the very structure this rebuild exists to replace, including its one-way int-PK migration history. |
 
-Postgres conventions to settle in step 1, all cheap now and tedious later: **snake_case**
-(`EFCore.NamingConventions`), **`timestamptz` with UTC at the boundary** and Baku time only for
-display and the agent, **`citext`** for email so uniqueness is case-insensitive, and
-`Npgsql.NodaTime` if NodaTime stays in the stack.
+**Switching at deploy** is `UseSqlServer` → `UseNpgsql`, plus `Hangfire.SqlServer` →
+`Hangfire.PostgreSql`. A PostgreSQL `InitialCreate` is already generated and parked at
+`Common/Persistence/Migrations.Postgres`, excluded from the build via `<Compile Remove>` so its
+PostgreSQL-specific SQL can never be applied to SQL Server by accident.
+
+Nothing in the data layer is provider-specific: no column types are hardcoded (nine properties
+that pinned `datetime2(7)` were cleared), and index filters double-quote their identifiers —
+the one form SQL Server, PostgreSQL and SQLite all accept. Unquoted, PostgreSQL folds the name
+to lowercase and cannot match EF's PascalCase columns.
+
+Postgres conventions still to settle at the switch, all cheap then and tedious later:
+**snake_case** (`EFCore.NamingConventions`), **`timestamptz` with UTC at the boundary** and Baku
+time only for display and the agent, **`citext`** for email so uniqueness is case-insensitive,
+and `Npgsql.NodaTime` if NodaTime stays in the stack.
 
 Projects: `Domain`, `Application`, `Infrastructure`, `Api`, `Voice`, `Voice.OpenAi`, `Voice.Google`, `Telephony.Browser`, `Telephony.Twilio`, `Agents` — plus mirrored test projects.
 
