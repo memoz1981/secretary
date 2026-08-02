@@ -154,7 +154,9 @@ public sealed class LiveVoiceCallOrchestrator
         try
         {
             await _realtimeSession.ConnectAsync(
-                _instructionContext.BuildPhoneAgentInstructions(), modelOverride, cancellationToken);
+                _instructionContext.BuildPhoneAgentInstructions(_realtimeSession.ProviderKey),
+                modelOverride,
+                cancellationToken);
 
             var toOpenAi = RelayClientAudioToOpenAiAsync(clientSocket, cancellationToken);
             var toClient = RelayOpenAiEventsToClientAsync(clientSocket, cancellationToken);

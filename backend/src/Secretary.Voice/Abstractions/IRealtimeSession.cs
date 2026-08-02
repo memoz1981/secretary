@@ -10,6 +10,11 @@ namespace Secretary.Voice.Abstractions;
 /// provider, so it lives in <see cref="RealtimeToolInvoker"/> and is shared.</summary>
 public interface IRealtimeSession : IAsyncDisposable
 {
+    /// <summary>Which provider this is — "openai", "gemini". Used to pick the instruction file
+    /// written for this model; the two mishear and misspeak differently enough that a shared
+    /// file with patches was making one worse to fix the other.</summary>
+    string ProviderKey { get; }
+
     /// <summary>The model actually used, resolved after Connect — the pipeline may override the
     /// configured default. Recorded on the call so cost can be attributed to a rate card.</summary>
     string Model { get; }

@@ -13,9 +13,12 @@ public static class VoicePipelineCatalog
     /// <param name="Enabled">False for an option that is listed but cannot be dialled yet. The
     /// Call page shows it greyed out rather than hiding it, so the roadmap is visible and the
     /// legend does not silently change shape the day it ships.</param>
+    /// <param name="ProviderKey">Matches IRealtimeSession.ProviderKey, and names the instruction
+    /// file this pipeline reads — Instructions/PhoneAgent.{ProviderKey}.md.</param>
     public sealed record Entry(
         CallPipeline Pipeline,
         string Label,
+        string ProviderKey,
         string RealtimeModel,
         bool Enabled = true);
 
@@ -24,6 +27,7 @@ public static class VoicePipelineCatalog
         new(
             CallPipeline.OpenAiRealtime_2_1,
             "OpenAI · realtime 2.1",
+            ProviderKey: "openai",
             RealtimeModel: "gpt-realtime-2.1"),
 
         // Roughly four times cheaper than OpenAI. Whether Azerbaijani survives it is the whole
@@ -31,6 +35,7 @@ public static class VoicePipelineCatalog
         new(
             CallPipeline.GeminiLive_3_1,
             "Gemini · Live 3.1",
+            ProviderKey: "gemini",
             RealtimeModel: "gemini-3.1-flash-live-preview"),
     ];
 

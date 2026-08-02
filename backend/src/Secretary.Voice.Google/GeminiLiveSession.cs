@@ -57,6 +57,8 @@ public sealed class GeminiLiveSession : IRealtimeSession
         _logger = logger;
     }
 
+    public string ProviderKey => "gemini";
+
     public string Model { get; private set; } = string.Empty;
 
     /// <summary>Gemini interrupts itself server-side and reports that it did. There is nothing

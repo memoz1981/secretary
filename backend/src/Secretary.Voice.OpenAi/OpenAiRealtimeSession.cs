@@ -37,6 +37,8 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
         _logger = logger;
     }
 
+    public string ProviderKey => "openai";
+
     public string Model { get; private set; } = string.Empty;
 
     /// <summary>OpenAI takes response.cancel, so barge-in is explicit here.</summary>
