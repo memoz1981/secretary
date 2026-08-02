@@ -15,7 +15,6 @@ using Secretary.Application.Abstractions;
 using Secretary.Application.Pricing;
 using Secretary.Infrastructure;
 using Hangfire;
-using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -94,13 +93,12 @@ builder.Services.AddHostedService<EscalationTimeoutService>();
 // Flow E's 9am reminder job — a calendar-scheduled recurring job is exactly what Hangfire is
 // for, rather than a hand-rolled BackgroundService with its own polling/timing logic (unlike
 // EscalationTimeoutService above, which genuinely needs a short poll interval, not a
-// once-a-day schedule). Reuses the same PostgreSQL database as the rest of the app.
+// once-a-day schedule). Reuses the same database as the rest of the app.
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default"))));
+    .UseSqlServerStorage(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddHangfireServer();
 builder.Services.AddScoped<ReminderSchedulerJob>();
 
@@ -158,6 +156,10 @@ if (app.Environment.IsDevelopment())
     // must never be exposed outside Development.
     app.UseHangfireDashboard("/hangfire");
 }
+
+// A freshly migrated database has no account and no way to create one — see DevDataSeeder.
+// Development only, and only when the Accounts table is empty.
+await DevDataSeeder.SeedAsync(app.Services, app.Environment, app.Logger);
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();

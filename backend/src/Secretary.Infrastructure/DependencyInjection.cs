@@ -16,7 +16,11 @@ public static class InfrastructureServiceCollectionExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("Default")));
+            // SQL Server until the production deploy, then UseNpgsql and the parked migration
+            // in Common/Persistence/Migrations.Postgres. Nothing else in the layer is
+            // provider-specific — no column types are hardcoded and index filters are
+            // double-quoted, which SQL Server, PostgreSQL and SQLite all accept.
+            options.UseSqlServer(configuration.GetConnectionString("Default")));
 
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
