@@ -369,6 +369,8 @@ public sealed class LiveVoiceCallOrchestrator
     private async Task RelayClientAudioToOpenAiAsync(WebSocket clientSocket, CancellationToken cancellationToken)
     {
         var buffer = new byte[8192];
+        var callerAudible = false;
+
         while (clientSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
             var result = await clientSocket.ReceiveAsync(buffer, cancellationToken);
@@ -379,9 +381,48 @@ public sealed class LiveVoiceCallOrchestrator
 
             if (result.MessageType == WebSocketMessageType.Binary)
             {
+                callerAudible = LogCallerAudioEdge(buffer.AsSpan(0, result.Count), callerAudible);
                 await _realtimeSession.SendAudioChunkAsync(buffer.AsMemory(0, result.Count), cancellationToken);
             }
         }
+    }
+
+    /// <summary>Marks, in the log, the moment the microphone goes loud and the moment it goes
+    /// quiet again.
+    ///
+    /// The only way left to time a turn honestly. Gemini reports neither interim transcripts nor
+    /// voice-activity signals — both come back empty — so the gap between the agent finishing and
+    /// the caller's transcript arriving cannot otherwise be split into "the caller was still
+    /// thinking" and "recognition was slow". Three theories about that gap have now been wrong,
+    /// each one plausible from turn boundaries alone.
+    ///
+    /// Crude on purpose: mean absolute amplitude over the chunk, one threshold, no smoothing.
+    /// It does not need to be a VAD, only to timestamp when someone started making noise.</summary>
+    private bool LogCallerAudioEdge(ReadOnlySpan<byte> pcm16, bool wasAudible)
+    {
+        if (!_logger.IsEnabled(LogLevel.Debug) || pcm16.Length < 2)
+        {
+            return wasAudible;
+        }
+
+        long total = 0;
+        var samples = pcm16.Length / 2;
+        for (var i = 0; i + 1 < pcm16.Length; i += 2)
+        {
+            total += Math.Abs(BitConverter.ToInt16(pcm16[i..(i + 2)]));
+        }
+
+        // ~1.5% of full scale. Above room tone, below speech, on the one microphone this was
+        // calibrated against — it is a log marker, not a decision anything depends on.
+        const long AudibleThreshold = 500;
+        var audible = total / samples > AudibleThreshold;
+
+        if (audible != wasAudible)
+        {
+            _logger.LogDebug("Caller mic: {State}.", audible ? "speaking" : "quiet");
+        }
+
+        return audible;
     }
 
     /// <summary>Sent as a WebSocket Text frame (audio itself is always Binary) to tell the
