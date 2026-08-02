@@ -474,7 +474,28 @@ public sealed class LiveVoiceCallOrchestrator
                     if (functionCall.Name == nameof(Tools.CallControlTools.EndCall))
                     {
                         _logger.LogInformation("Model requested EndCall — hanging up after its goodbye is spoken.");
-                        pendingEndCallId = functionCall.CallId;
+
+                        if (_realtimeSession.ContinuesTurnAfterToolResult)
+                        {
+                            // Answered immediately, and the farewell wording rides along with
+                            // the result.
+                            //
+                            // Gemini does not complete a turn while a tool call is outstanding,
+                            // so deferring this to response-done deadlocks: the completion waits
+                            // on the result and the result waits on the completion. The call
+                            // then sat silent until something interrupted it — the reported
+                            // "waits 5-10 seconds and hangs up with no goodbye". OpenAI emits
+                            // response.done with a function call still unanswered, which is why
+                            // deferring works there and only there.
+                            await _realtimeSession.AddFunctionOutputAsync(
+                                functionCall.CallId, $"CALL_ENDED. {GoodbyeInstruction}", cancellationToken);
+                            hangUpAtNextResponseDone = true;
+                        }
+                        else
+                        {
+                            pendingEndCallId = functionCall.CallId;
+                        }
+
                         break;
                     }
 
@@ -516,46 +537,37 @@ public sealed class LiveVoiceCallOrchestrator
                         _answerCount++;
                     }
 
+                    // Checked before the deferred-id branch and independently of it: the
+                    // Gemini path answers EndCall the moment it is asked (see the tool-call
+                    // case), so by the time its farewell finishes there is no pending id left
+                    // to hang the check off.
+                    if (hangUpAtNextResponseDone)
+                    {
+                        // The farewell has been fully relayed — tell the client to finish
+                        // playing what it has queued and hang up, and end this relay loop,
+                        // which ends the call.
+                        if (clientSocket.State == WebSocketState.Open)
+                        {
+                            var hangUp = System.Text.Encoding.UTF8.GetBytes(HangUpSignal);
+                            await clientSocket.SendAsync(hangUp, WebSocketMessageType.Text, true, cancellationToken);
+                        }
+
+                        return;
+                    }
+
                     if (pendingEndCallId is not null)
                     {
-                        if (hangUpAtNextResponseDone)
-                        {
-                            // The farewell has been fully relayed — tell the client to finish
-                            // playing what it has queued and hang up, and end this relay
-                            // loop, which ends the call.
-                            if (clientSocket.State == WebSocketState.Open)
-                            {
-                                var hangUp = System.Text.Encoding.UTF8.GetBytes(HangUpSignal);
-                                await clientSocket.SendAsync(hangUp, WebSocketMessageType.Text, true, cancellationToken);
-                            }
-
-                            return;
-                        }
-
                         // The farewell is not the model's line to compose, so it always gets
-                        // said here. This used to be skipped whenever the EndCall turn had
-                        // produced audio of its own, on the assumption that the audio WAS the
-                        // goodbye. It isn't: asked to say nothing and hang up, the model said
-                        // "bir anlıq gözləyin" instead, and the call ended on "hold on a moment".
+                        // said here — one final response whose instructions are only those
+                        // words. This used to be skipped whenever the EndCall turn had produced
+                        // audio of its own, on the assumption that the audio WAS the goodbye.
+                        // It isn't: asked to say nothing and hang up, the model said "bir anlıq
+                        // gözləyin" instead, and the call ended on "hold on a moment".
                         //
-                        // How it gets said depends on the provider. Where a tool result does not
-                        // itself make the model speak, the wording goes in a response of its own.
-                        // Where it does — Gemini — a second request would race the automatic
-                        // turn, and the automatic one wins: the hang-up then fires on ITS
-                        // completion and the caller hears five seconds of silence instead of a
-                        // goodbye. So the wording rides along with the tool result and the
-                        // automatic turn speaks it.
-                        if (_realtimeSession.ContinuesTurnAfterToolResult)
-                        {
-                            await _realtimeSession.AddFunctionOutputAsync(
-                                pendingEndCallId, $"CALL_ENDED. {GoodbyeInstruction}", cancellationToken);
-                        }
-                        else
-                        {
-                            await _realtimeSession.AddFunctionOutputAsync(pendingEndCallId, "CALL_ENDED.", cancellationToken);
-                            await _realtimeSession.StartResponseAsync(GoodbyeInstruction, cancellationToken);
-                        }
-
+                        // Only reached for a provider that does not resume on its own; the
+                        // other kind never sets a pending id.
+                        await _realtimeSession.AddFunctionOutputAsync(pendingEndCallId, "CALL_ENDED.", cancellationToken);
+                        await _realtimeSession.StartResponseAsync(GoodbyeInstruction, cancellationToken);
                         hangUpAtNextResponseDone = true;
                         break;
                     }

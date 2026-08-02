@@ -222,17 +222,33 @@ A fourth item surfaced from the same call log, and it was the serious one:
 
 ### All four fixed, 2026-08-02
 
-- **M1 — not fixed, deliberately.** A pacing instruction was written and then reverted: on more
-  listening the speed is good, and slowing the agent down would cost the thing that makes Gemini
-  feel better than OpenAI. Revisit only if real callers struggle. Worth knowing for that day:
-  `SpeechConfig` exposes no rate, so pace can only be asked for in words or changed by trying a
-  different prebuilt voice.
-- **M2 / M3** — `IRealtimeSession.ContinuesTurnAfterToolResult`. The orchestrator now knows which
-  providers answer on their own, skips its own follow-up for those, and on the hang-up path sends
-  the farewell wording *with* the tool result so the automatic turn speaks it. Previously the
-  automatic turn raced the dictated goodbye, won, and the hang-up fired on its completion — five
-  seconds of silence instead of a farewell. The earlier one-shot suppression flag inside the
-  Gemini session is gone: it stopped a double reply but could not order two turns.
+- **M1 — the general slowdown was rejected, a narrow fix took its place.** A blanket pacing
+  instruction was written and reverted: the speed is good, and slowing the agent down would cost
+  the thing that makes Gemini feel better than OpenAI.
+
+  What is actually wrong is narrower. The agent said **"otuz otuz"** for 09:30 — the hour clipped
+  off — and then said "doqquz otuz" correctly when asked to repeat. It knows the value; it
+  swallows the first word at speed. So `PhoneAgent.md` gained a section covering times, prices
+  and phone numbers only: say both words of a time in full, never read a leading zero, read a
+  phone number in pairs. The rest of a sentence still moves at a normal pace.
+
+  Worth knowing if it recurs: `SpeechConfig` exposes no rate, so the remaining levers are wording
+  and a different prebuilt voice.
+- **M2 / M3** — `IRealtimeSession.ContinuesTurnAfterToolResult`. The orchestrator knows which
+  providers answer on their own and skips its own follow-up for those. The one-shot suppression
+  flag inside the Gemini session is gone: it stopped a double reply but could not order two turns.
+
+  **The first attempt at M3 was wrong and the second call proved it.** The theory was that the
+  automatic turn raced the dictated goodbye and won. The real fault was one link earlier:
+  **Gemini does not complete a turn while a tool call is outstanding**, and the orchestrator
+  deferred `EndCall`'s result until response-done. The completion waited on the result, the
+  result waited on the completion, and the call sat silent until something interrupted it — the
+  log shows `status=Cancelled, reason=interrupted` after 10.9 seconds. OpenAI emits
+  `response.done` with a function call still unanswered, which is why deferring works there and
+  only there.
+
+  `EndCall` is now answered the moment it is asked, with the farewell wording riding along on the
+  result, and the hang-up check no longer hangs off the deferred id.
 - **M4** — `RealtimeToolInvoker` runs one tool at a time. A gate rather than a `DbContext` per
   tool, because the toolset is resolved once per call; serial execution costs nothing measurable
   while the caller is already hearing audio.
