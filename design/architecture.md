@@ -260,11 +260,15 @@ frontend/                              module manifest registry — see decision
 
 ---
 
-## 6. Persistence — PostgreSQL, clean start
+## 6. Persistence — SQL Server now, PostgreSQL at deploy
 
-**PostgreSQL** (decision C5), and the database **starts empty** (decision C6) — no data is carried
-over from the Appointment system, and the first migration is generated from the new model rather
-than inherited.
+**PostgreSQL is the target, SQL Server runs locally** (decision C5), and the database **starts
+empty** (decision C6) — no data is carried over from the Appointment system, and the first
+migration is generated from the new model rather than inherited.
+
+Local development uses SQL Server database `secretary` — its own, not the old solution's
+`ai_assist`, so the two run side by side. The PostgreSQL `InitialCreate` is already generated
+and parked at `Common/Persistence/Migrations.Postgres`, excluded from the build.
 
 Practical notes:
 
