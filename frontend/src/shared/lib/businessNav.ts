@@ -1,14 +1,26 @@
 import type { NavItem } from "@/shared/components/AppShell";
-import type { AccountRole } from "@/shared/api/types";
+import type { AccountRole, Module } from "@/shared/api/types";
 import type { TranslationKey } from "@/shared/i18n/translations";
+import { MODULE_REGISTRY, usableModules } from "@/modules/registry";
 
-export function businessNavItems(role: AccountRole | null, t: (key: TranslationKey) => string): NavItem[] {
-  const items: NavItem[] = [
-    { label: t("navCalendar"), to: "/calendar" },
-    { label: t("navServices"), to: "/services" },
-    { label: t("navProviders"), to: "/providers" },
-    { label: t("navClients"), to: "/clients" },
-  ];
+/** The sidebar: the current module's own pages, then the tenant-level ones.
+ *
+ * Which module is "current" comes from the URL rather than from state, so a deep link, a
+ * refresh and the back button all agree without anything having to be kept in sync.
+ *
+ * Clients, the Call Log and the Dashboard are deliberately not per-module. A tenant has one
+ * customer list and one phone line however many modules they hold, and splitting those would
+ * mean three copies of the same person. Only what a module genuinely owns sits above them. */
+export function businessNavItems(
+  role: AccountRole | null,
+  t: (key: TranslationKey) => string,
+  pathname: string,
+  enabledModules: Module[],
+): NavItem[] {
+  const active = MODULE_REGISTRY.find((m) => pathname.startsWith(m.pathPrefix));
+  const items: NavItem[] = active ? [...active.nav(role, t)] : [];
+
+  items.push({ label: t("navClients"), to: "/clients" });
   if (role === "Owner") {
     // Demo live call to the AI agent — Owner only, matching the /voice/live-call policy.
     items.push({ label: t("navCall"), to: "/call" });
@@ -16,8 +28,15 @@ export function businessNavItems(role: AccountRole | null, t: (key: TranslationK
   items.push({ label: t("navCallLog"), to: "/calls" });
   items.push({ label: t("navDashboard"), to: "/dashboard" });
   if (role === "Owner") {
-    // Tenant self-service: business details + accounts (the old Komanda page's account half).
+    // Tenant self-service: business details + accounts.
     items.push({ label: t("navAdmin"), to: "/admin" });
   }
+
+  // Only worth offering when there is somewhere else to go. A tenant with one module should
+  // never meet the concept at all.
+  if (usableModules(enabledModules).length > 1) {
+    items.push({ label: t("navSwitchModule"), to: "/app" });
+  }
+
   return items;
 }

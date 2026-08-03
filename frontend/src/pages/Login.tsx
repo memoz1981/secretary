@@ -36,7 +36,10 @@ export function LoginPage() {
       if (result.role === "PlatformAdmin") {
         navigate("/admin/tenants");
       } else {
-        navigate("/calendar");
+        // /app decides: one module goes straight through, several show the picker. Login does
+        // not need to know which — and putting that here would duplicate it for refresh and
+        // deep links too.
+        navigate("/app");
       }
     } catch (err) {
       setError(err instanceof ApiError ? t("invalidCredentials") : t("somethingWentWrong"));

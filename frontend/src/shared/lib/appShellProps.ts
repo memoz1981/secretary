@@ -1,3 +1,4 @@
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
@@ -9,13 +10,15 @@ import { businessNavItems } from "@/shared/lib/businessNav";
 export function useBusinessShell() {
   const { role, me } = useAuth();
   const { language, t } = useLanguage();
+  const { pathname } = useLocation();
   const roleLabel = role ? translateEnum(accountRoleLabels, role, language) : "";
 
   return {
     brand: me?.tenantName ?? t("brandGeneric"),
     domainLabel: roleLabel,
     whoText: me ? `${me.name} · ${roleLabel}` : roleLabel,
-    navItems: businessNavItems(role, t),
+    // Which module's pages appear comes from the URL — see businessNavItems.
+    navItems: businessNavItems(role, t, pathname, me?.enabledModules ?? []),
   };
 }
 

@@ -48,6 +48,13 @@ export interface LoginResponse {
   role: AccountRole;
   tenantId: number | null;
 }
+/** What a tenant can be granted. Hardcoded on both sides — a module is code, not data. Mirrors
+ *  Domain/Common/Enums/Module.cs; the names are the wire values. */
+export type Module = "Appointment" | "Information" | "Reminder" | "Feedback" | "Order" | "Survey";
+
+/** Display order for the admin screen and the picker. */
+export const MODULES: Module[] = ["Appointment", "Information", "Reminder", "Feedback", "Order", "Survey"];
+
 export interface MeResponse {
   id: number;
   name: string;
@@ -55,6 +62,14 @@ export interface MeResponse {
   role: AccountRole;
   tenantId: number | null;
   tenantName: string | null;
+  /** What this tenant holds. Empty for a platform admin, who administers grants rather than
+   *  holding any. One module routes straight through; several show the picker. */
+  enabledModules: Module[];
+}
+
+export interface TenantModuleResponse {
+  module: Module;
+  enabled: boolean;
 }
 
 // ---- Tenant ----
