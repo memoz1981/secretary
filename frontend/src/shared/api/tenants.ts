@@ -1,5 +1,13 @@
 import { apiFetch, toQueryString } from "@/shared/api/client";
-import type { AccountResponse, CreateTenantRequest, CreateTenantResult, TenantResponse, UpdateTenantRequest } from "@/shared/api/types";
+import type {
+  AccountResponse,
+  CreateTenantRequest,
+  CreateTenantResult,
+  Module,
+  TenantModuleResponse,
+  TenantResponse,
+  UpdateTenantRequest,
+} from "@/shared/api/types";
 
 export function getTenants(token: string, search?: string) {
   return apiFetch<TenantResponse[]>(`/api/tenants${toQueryString({ search })}`, { token });
@@ -27,6 +35,20 @@ export function deactivateTenant(token: string, id: number) {
 
 export function reactivateTenant(token: string, id: number) {
   return apiFetch<void>(`/api/tenants/${id}/reactivate`, { method: "POST", token });
+}
+
+/** Every module with whether this tenant holds it — the full set, not only what was granted
+ *  before, so the screen can render a switch per module. */
+export function getTenantModules(token: string, id: number) {
+  return apiFetch<TenantModuleResponse[]>(`/api/tenants/${id}/modules`, { token });
+}
+
+export function setTenantModule(token: string, id: number, module: Module, enabled: boolean) {
+  return apiFetch<TenantModuleResponse>(`/api/tenants/${id}/modules`, {
+    method: "PUT",
+    body: { module, enabled },
+    token,
+  });
 }
 
 // ---- Tenant self-service (the business's own Admin page, no id needed) ----

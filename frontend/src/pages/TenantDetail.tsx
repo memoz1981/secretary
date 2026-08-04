@@ -8,10 +8,20 @@ import { DataTable } from "@/shared/components/DataTable";
 import { TextField, SelectField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
-import { deactivateTenant, getTenant, getTenantOwnerAccounts, reactivateTenant, updateTenant } from "@/shared/api/tenants";
+import {
+  deactivateTenant,
+  getTenant,
+  getTenantModules,
+  getTenantOwnerAccounts,
+  reactivateTenant,
+  setTenantModule,
+  updateTenant,
+} from "@/shared/api/tenants";
+import type { Module } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountStatusLabels, translateEnum } from "@/shared/i18n/translations";
+import { accountStatusLabels, moduleLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
+import { findModule } from "@/modules/registry";
 
 export function TenantDetailPage() {
   const { token } = useAuth();
@@ -23,6 +33,11 @@ export function TenantDetailPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const state = useApiData(() => getTenant(token!, tenantId), [token, id, refreshKey]);
   const ownerAccountsState = useApiData(() => getTenantOwnerAccounts(token!, tenantId), [token, id, refreshKey]);
+  const modulesState = useApiData(() => getTenantModules(token!, tenantId), [token, id, refreshKey]);
+
+  // Which module is mid-flight, so every switch locks while one saves rather than letting a
+  // second click race the first.
+  const [savingModule, setSavingModule] = useState<Module | null>(null);
 
   const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
@@ -35,6 +50,16 @@ export function TenantDetailPage() {
     if (!form) return;
     await updateTenant(token!, tenantId, { name: form.name, timezone: form.timezone, phoneLine: form.phoneLine || null });
     setRefreshKey((k) => k + 1);
+  }
+
+  async function handleToggleModule(module: Module, enabled: boolean) {
+    setSavingModule(module);
+    try {
+      await setTenantModule(token!, tenantId, module, enabled);
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setSavingModule(null);
+    }
   }
 
   async function handleToggleStatus() {
@@ -97,6 +122,33 @@ export function TenantDetailPage() {
                 },
               ]}
             />
+          </Card>
+          <Card>
+            <h2 style={{ marginBottom: "var(--space-2)" }}>{t("tenantModules")}</h2>
+            <p className="sub" style={{ marginBottom: "var(--space-3)" }}>{t("tenantModulesHint")}</p>
+            {modulesState.status === "error" && <div className="field-error">{t("somethingWentWrong")}</div>}
+            {modulesState.status === "success" &&
+              modulesState.data.map((row) => {
+                // Granting a module the front end cannot render yet would put a tenant in a
+                // picker with a tile that goes nowhere. The switch stays, because the grant is
+                // still a real record, but it is disabled and says why.
+                const built = findModule(row.module) !== undefined;
+                return (
+                  <label
+                    key={row.module}
+                    style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={row.enabled}
+                      disabled={!built || savingModule !== null}
+                      onChange={(e) => handleToggleModule(row.module, e.target.checked)}
+                    />
+                    <span>{translateEnum(moduleLabels, row.module, language)}</span>
+                    {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
+                  </label>
+                );
+              })}
           </Card>
           <div className="actions">
             <Button variant="secondary" onClick={() => navigate("/admin/tenants")}>
