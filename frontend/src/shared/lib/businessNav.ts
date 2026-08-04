@@ -17,13 +17,27 @@ export function businessNavItems(
   pathname: string,
   enabledModules: Module[],
 ): NavItem[] {
+  // The picker and the no-modules notice get no sidebar at all. You are choosing where to work,
+  // not working — and offering the tenant-level links there was a way round the choice: a
+  // tenant holding nothing could still reach the Call Log and the Dashboard from it.
+  if (pathname.startsWith("/app")) {
+    return [];
+  }
+
   // Held as well as matched. Without the second check, landing on a module's URL — typed, or
   // from a bookmark predating a revocation — built a sidebar full of that module's links for a
   // tenant who no longer has it.
   const active = MODULE_REGISTRY.find(
     (m) => pathname.startsWith(m.pathPrefix) && enabledModules.includes(m.key),
   );
-  const items: NavItem[] = active ? [...active.nav(role, t)] : [];
+
+  // Outside any module the tenant holds, there is nothing to show. Every remaining entry below
+  // is tenant-level, and reaching them without a module means something has gone wrong.
+  if (!active) {
+    return [];
+  }
+
+  const items: NavItem[] = [...active.nav(role, t)];
 
   items.push({ label: t("navClients"), to: "/clients" });
   if (role === "Owner") {

@@ -9,15 +9,13 @@ import { createTenant, setTenantModule } from "@/shared/api/tenants";
 import { MODULES, type Module } from "@/shared/api/types";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
-import { findModule } from "@/modules/registry";
-import { Pill } from "@/shared/components/Pill";
+import { ModuleToggle } from "@/shared/components/ModuleToggle";
 
 export function CreateTenantPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("Asia/Baku");
@@ -28,10 +26,9 @@ export function CreateTenantPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Appointment pre-ticked because the API grants it on creation regardless — a tenant with no
-  // module can log in and reach nothing, and it is the only module built. Shown rather than
-  // hidden so the default is visible instead of surprising.
-  const [modules, setModules] = useState<Record<string, boolean>>({ Appointment: true });
+  // Nothing ticked. Choosing what a client gets is the point of the screen, and a pre-tick is
+  // a decision made on the admin's behalf that they then have to notice to undo.
+  const [modules, setModules] = useState<Record<string, boolean>>({});
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -104,12 +101,16 @@ export function CreateTenantPage() {
             onChange={(e) => setOwnerName(e.target.value)}
             error={errors.ownerName}
           />
+          {/* The browser reads these as its own sign-in fields and fills them with the admin's
+              saved credentials, which is how a tenant nearly got created under the admin's
+              email. "new-password" is the one value browsers honour for "this is not a login". */}
           <TextField
             label={t("ownerEmail")}
             placeholder="owner@business.com"
             value={ownerEmail}
             onChange={(e) => setOwnerEmail(e.target.value)}
             error={errors.ownerEmail}
+            autoComplete="off"
           />
           <TextField
             label={t("ownerPassword")}
@@ -117,26 +118,18 @@ export function CreateTenantPage() {
             value={ownerPassword}
             onChange={(e) => setOwnerPassword(e.target.value)}
             error={errors.ownerPassword}
+            autoComplete="new-password"
           />
           <div className="section-label">{t("tenantModules")}</div>
-          {MODULES.map((module: Module) => {
-            const built = findModule(module) !== undefined;
-            return (
-              <label
-                key={module}
-                style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={modules[module] ?? false}
-                  disabled={!built || submitting}
-                  onChange={(e) => setModules({ ...modules, [module]: e.target.checked })}
-                />
-                <span>{translateEnum(moduleLabels, module, language)}</span>
-                {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
-              </label>
-            );
-          })}
+          {MODULES.map((module: Module) => (
+            <ModuleToggle
+              key={module}
+              module={module}
+              checked={modules[module] ?? false}
+              disabled={submitting}
+              onChange={(next) => setModules({ ...modules, [module]: next })}
+            />
+          ))}
           <div className="actions">
             <Button type="submit" loading={submitting}>
               {t("createTenant")}

@@ -18,9 +18,9 @@ import {
   updateTenant,
 } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountStatusLabels, moduleLabels, translateEnum } from "@/shared/i18n/translations";
+import { accountStatusLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
-import { findModule } from "@/modules/registry";
+import { ModuleToggle } from "@/shared/components/ModuleToggle";
 
 export function TenantDetailPage() {
   const { token } = useAuth();
@@ -148,28 +148,15 @@ export function TenantDetailPage() {
             {modulesState.status === "error" && <div className="field-error">{t("somethingWentWrong")}</div>}
             {serverModules && moduleDraft && (
               <>
-                {serverModules.map((row) => {
-                  // Granting a module the front end cannot render yet would drop the tenant into
-                  // a picker holding a tile that goes nowhere. The row stays, because the grant
-                  // is a real record, but it cannot be set from here until there is something
-                  // behind it.
-                  const built = findModule(row.module) !== undefined;
-                  return (
-                    <label
-                      key={row.module}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={moduleDraft[row.module] ?? false}
-                        disabled={!built || savingModules}
-                        onChange={(e) => setModuleDraft({ ...moduleDraft, [row.module]: e.target.checked })}
-                      />
-                      <span>{translateEnum(moduleLabels, row.module, language)}</span>
-                      {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
-                    </label>
-                  );
-                })}
+                {serverModules.map((row) => (
+                  <ModuleToggle
+                    key={row.module}
+                    module={row.module}
+                    checked={moduleDraft[row.module] ?? false}
+                    disabled={savingModules}
+                    onChange={(next) => setModuleDraft({ ...moduleDraft, [row.module]: next })}
+                  />
+                ))}
                 <div className="actions" style={{ marginTop: "var(--space-3)" }}>
                   <Button type="button" onClick={handleSaveModules} disabled={moduleChanges.length === 0 || savingModules}>
                     {t("saveChanges")}
