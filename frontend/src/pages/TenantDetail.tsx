@@ -17,7 +17,6 @@ import {
   setTenantModule,
   updateTenant,
 } from "@/shared/api/tenants";
-import type { Module } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountStatusLabels, moduleLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
@@ -35,9 +34,20 @@ export function TenantDetailPage() {
   const ownerAccountsState = useApiData(() => getTenantOwnerAccounts(token!, tenantId), [token, id, refreshKey]);
   const modulesState = useApiData(() => getTenantModules(token!, tenantId), [token, id, refreshKey]);
 
-  // Which module is mid-flight, so every switch locks while one saves rather than letting a
-  // second click race the first.
-  const [savingModule, setSavingModule] = useState<Module | null>(null);
+  // Staged, not live. Toggling used to save on the spot, which meant idly clicking through the
+  // switches to see what was there silently changed what a paying client could use. Nothing
+  // leaves the page until Save.
+  const [moduleDraft, setModuleDraft] = useState<Record<string, boolean> | null>(null);
+  const [savingModules, setSavingModules] = useState(false);
+
+  const serverModules = modulesState.status === "success" ? modulesState.data : null;
+  if (serverModules && !moduleDraft) {
+    setModuleDraft(Object.fromEntries(serverModules.map((m) => [m.module, m.enabled])));
+  }
+
+  const moduleChanges = serverModules && moduleDraft
+    ? serverModules.filter((m) => moduleDraft[m.module] !== m.enabled)
+    : [];
 
   const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
@@ -52,13 +62,22 @@ export function TenantDetailPage() {
     setRefreshKey((k) => k + 1);
   }
 
-  async function handleToggleModule(module: Module, enabled: boolean) {
-    setSavingModule(module);
+  async function handleSaveModules() {
+    if (moduleChanges.length === 0) return;
+    setSavingModules(true);
     try {
-      await setTenantModule(token!, tenantId, module, enabled);
+      // One request per change rather than a bulk endpoint: the changes are a handful at most,
+      // and each one is independently meaningful in the audit trail.
+      for (const changed of moduleChanges) {
+        await setTenantModule(token!, tenantId, changed.module, moduleDraft![changed.module]);
+      }
+
+      // Re-read rather than trusting the draft — the server is what decides, and clearing the
+      // draft makes the refreshed response repopulate it.
+      setModuleDraft(null);
       setRefreshKey((k) => k + 1);
     } finally {
-      setSavingModule(null);
+      setSavingModules(false);
     }
   }
 
@@ -127,28 +146,42 @@ export function TenantDetailPage() {
             <h2 style={{ marginBottom: "var(--space-2)" }}>{t("tenantModules")}</h2>
             <p className="sub" style={{ marginBottom: "var(--space-3)" }}>{t("tenantModulesHint")}</p>
             {modulesState.status === "error" && <div className="field-error">{t("somethingWentWrong")}</div>}
-            {modulesState.status === "success" &&
-              modulesState.data.map((row) => {
-                // Granting a module the front end cannot render yet would put a tenant in a
-                // picker with a tile that goes nowhere. The switch stays, because the grant is
-                // still a real record, but it is disabled and says why.
-                const built = findModule(row.module) !== undefined;
-                return (
-                  <label
-                    key={row.module}
-                    style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={row.enabled}
-                      disabled={!built || savingModule !== null}
-                      onChange={(e) => handleToggleModule(row.module, e.target.checked)}
-                    />
-                    <span>{translateEnum(moduleLabels, row.module, language)}</span>
-                    {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
-                  </label>
-                );
-              })}
+            {serverModules && moduleDraft && (
+              <>
+                {serverModules.map((row) => {
+                  // Granting a module the front end cannot render yet would drop the tenant into
+                  // a picker holding a tile that goes nowhere. The row stays, because the grant
+                  // is a real record, but it cannot be set from here until there is something
+                  // behind it.
+                  const built = findModule(row.module) !== undefined;
+                  return (
+                    <label
+                      key={row.module}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={moduleDraft[row.module] ?? false}
+                        disabled={!built || savingModules}
+                        onChange={(e) => setModuleDraft({ ...moduleDraft, [row.module]: e.target.checked })}
+                      />
+                      <span>{translateEnum(moduleLabels, row.module, language)}</span>
+                      {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
+                    </label>
+                  );
+                })}
+                <div className="actions" style={{ marginTop: "var(--space-3)" }}>
+                  <Button type="button" onClick={handleSaveModules} disabled={moduleChanges.length === 0 || savingModules}>
+                    {t("saveChanges")}
+                  </Button>
+                  {moduleChanges.length > 0 && (
+                    <Button type="button" variant="secondary" onClick={() => setModuleDraft(null)} disabled={savingModules}>
+                      {t("cancel")}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </Card>
           <div className="actions">
             <Button variant="secondary" onClick={() => navigate("/admin/tenants")}>
