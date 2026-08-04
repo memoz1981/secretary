@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import type { AccountRole, MeResponse } from "@/shared/api/types";
 import { getMe } from "@/shared/api/auth";
 
@@ -35,15 +36,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [decoded, setDecoded] = useState<DecodedToken | null>(null);
   const [me, setMe] = useState<MeResponse | null>(null);
+  const { pathname } = useLocation();
+
+  // Re-read on every navigation, not just at login.
+  //
+  // /me carries enabledModules, and the guards route on it. Fetched once, a tenant who was in
+  // the app when an admin revoked a module kept the old answer for the rest of their session:
+  // the sidebar still offered the module and its pages still opened. The API refused every
+  // request underneath, so nothing leaked — but the app disagreed with the server about what
+  // the tenant had, which is exactly the confusion the per-request lookup on the server side
+  // exists to avoid.
+  //
+  // One small request per navigation is a fair price for the client and the server agreeing.
+  useEffect(() => {
+    if (!token) return;
+    getMe(token)
+      .then(setMe)
+      .catch(() => {
+        /* non-fatal — the shell falls back to showing the role */
+      });
+  }, [token, pathname]);
 
   function login(newToken: string) {
     setToken(newToken);
     setDecoded(decode(newToken));
-    getMe(newToken)
-      .then(setMe)
-      .catch(() => {
-        /* non-fatal — the sidebar/topbar just fall back to showing the role */
-      });
   }
 
   function logout() {
