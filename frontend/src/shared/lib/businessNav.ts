@@ -17,7 +17,12 @@ export function businessNavItems(
   pathname: string,
   enabledModules: Module[],
 ): NavItem[] {
-  const active = MODULE_REGISTRY.find((m) => pathname.startsWith(m.pathPrefix));
+  // Held as well as matched. Without the second check, landing on a module's URL — typed, or
+  // from a bookmark predating a revocation — built a sidebar full of that module's links for a
+  // tenant who no longer has it.
+  const active = MODULE_REGISTRY.find(
+    (m) => pathname.startsWith(m.pathPrefix) && enabledModules.includes(m.key),
+  );
   const items: NavItem[] = active ? [...active.nav(role, t)] : [];
 
   items.push({ label: t("navClients"), to: "/clients" });

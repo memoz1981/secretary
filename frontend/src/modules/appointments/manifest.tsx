@@ -1,5 +1,6 @@
 import { Route } from "react-router-dom";
 import { RequireRole } from "@/shared/auth/RequireRole";
+import { RequireModule } from "@/shared/auth/RequireModule";
 import { CalendarPage } from "@/modules/appointments/pages/Calendar";
 import { ServicesPage } from "@/modules/appointments/pages/Services";
 import { ProvidersPage } from "@/modules/appointments/pages/Providers";
@@ -22,13 +23,17 @@ export const appointmentsModule: ModuleManifest = {
     { label: t("navProviders"), to: "/appointments/providers" },
   ],
 
+  // Role says who you are, module says what your tenant bought. Both guard every page, the same
+  // pairing the API applies.
   routes: (
     <Route path="/appointments">
       <Route
         path="calendar"
         element={
           <RequireRole roles={["Owner", "Staff"]}>
-            <CalendarPage />
+            <RequireModule module="Appointment">
+              <CalendarPage />
+            </RequireModule>
           </RequireRole>
         }
       />
@@ -36,7 +41,9 @@ export const appointmentsModule: ModuleManifest = {
         path="services"
         element={
           <RequireRole roles={["Owner", "Staff"]}>
-            <ServicesPage />
+            <RequireModule module="Appointment">
+              <ServicesPage />
+            </RequireModule>
           </RequireRole>
         }
       />
@@ -44,7 +51,9 @@ export const appointmentsModule: ModuleManifest = {
         path="providers"
         element={
           <RequireRole roles={["Owner", "Staff"]}>
-            <ProvidersPage />
+            <RequireModule module="Appointment">
+              <ProvidersPage />
+            </RequireModule>
           </RequireRole>
         }
       />
