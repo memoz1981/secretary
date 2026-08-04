@@ -3,6 +3,7 @@ import type { AccountRole, Module } from "@/shared/api/types";
 import type { NavItem } from "@/shared/components/AppShell";
 import type { TranslationKey } from "@/shared/i18n/translations";
 import { appointmentsModule } from "@/modules/appointments/manifest";
+import { informationModule } from "@/modules/information/manifest";
 
 /** Everything a module has to declare to exist in the app.
  *
@@ -31,10 +32,14 @@ export interface ModuleManifest {
 
 /** The modules that actually exist in the front end.
  *
- * Deliberately shorter than the Module union: the API can grant Information or Feedback today,
- * because the grant model shipped before the modules did, but nothing here can render them. The
- * picker shows such a grant greyed out rather than pretending — see ModulePicker. */
-export const MODULE_REGISTRY: ModuleManifest[] = [appointmentsModule];
+ * Deliberately shorter than the Module union: the API can grant Reminder or Feedback today,
+ * because the grant model shipped before those modules did, but nothing here can render them.
+ * The admin screen shows such a row disabled rather than pretending.
+ *
+ * Information has one placeholder page behind it. It earns its place by making the
+ * multi-module paths reachable — the picker and the sidebar switcher only appear for a tenant
+ * holding two, so until there was a second, both were written and never seen. */
+export const MODULE_REGISTRY: ModuleManifest[] = [appointmentsModule, informationModule];
 
 export function findModule(key: Module): ModuleManifest | undefined
 {

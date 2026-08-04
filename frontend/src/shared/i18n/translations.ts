@@ -225,6 +225,17 @@ export const translations = {
     en: "Controls which modules this client can use.",
   },
   moduleNotBuiltYet: { az: "Hazırlanır", ru: "В разработке", en: "Not built yet" },
+  navInfoOverview: { az: "İcmal", ru: "Обзор", en: "Overview" },
+  modulePlaceholderTitle: {
+    az: "Bu bölmə hələ hazırlanır",
+    ru: "Этот раздел ещё в разработке",
+    en: "This module is still being built",
+  },
+  modulePlaceholderBody: {
+    az: "Bölmə mövcuddur və sizə təyin edilib, lakin içindəki funksiyalar hələ hazır deyil.",
+    ru: "Раздел существует и назначен вам, но его функции ещё не готовы.",
+    en: "The module exists and is assigned to you, but what goes inside it is not ready yet.",
+  },
   signOut: { az: "Çıxış", ru: "Выйти", en: "Sign out" },
 
   // ---- Live call page ----
