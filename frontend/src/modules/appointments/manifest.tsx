@@ -11,8 +11,10 @@ export const appointmentsModule: ModuleManifest = {
   key: "Appointment",
   pathPrefix: "/appointments",
   home: "/appointments/calendar",
-  titleKey: "moduleAppointment",
-  descriptionKey: "moduleAppointmentDescription",
+  // The landing page's own copy, reused rather than duplicated: a tenant meeting the picker has
+  // already read these words on the way in, and one set means the two cannot drift.
+  titleKey: "moduleAppointmentsTitle",
+  descriptionKey: "moduleAppointmentsText",
 
   nav: (_role, t) => [
     { label: t("navCalendar"), to: "/appointments/calendar" },
