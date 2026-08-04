@@ -5,15 +5,19 @@ import { Card } from "@/shared/components/Card";
 import { Button } from "@/shared/components/Button";
 import { TextField, SelectField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
-import { createTenant } from "@/shared/api/tenants";
+import { createTenant, setTenantModule } from "@/shared/api/tenants";
+import { MODULES, type Module } from "@/shared/api/types";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
+import { findModule } from "@/modules/registry";
+import { Pill } from "@/shared/components/Pill";
 
 export function CreateTenantPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("Asia/Baku");
@@ -23,6 +27,11 @@ export function CreateTenantPage() {
   const [ownerPassword, setOwnerPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Appointment pre-ticked because the API grants it on creation regardless — a tenant with no
+  // module can log in and reach nothing, and it is the only module built. Shown rather than
+  // hidden so the default is visible instead of surprising.
+  const [modules, setModules] = useState<Record<string, boolean>>({ Appointment: true });
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -44,6 +53,16 @@ export function CreateTenantPage() {
         ownerEmail,
         ownerPassword,
       });
+      // Creation grants Appointment and nothing else, so only the differences are sent. Done
+      // after the tenant exists because a module is granted TO something.
+      for (const module of MODULES) {
+        const wanted = modules[module] ?? false;
+        const granted = module === "Appointment";
+        if (wanted !== granted) {
+          await setTenantModule(token!, result.tenant.id, module, wanted);
+        }
+      }
+
       navigate(`/admin/tenants/${result.tenant.id}`);
     } finally {
       setSubmitting(false);
@@ -99,6 +118,25 @@ export function CreateTenantPage() {
             onChange={(e) => setOwnerPassword(e.target.value)}
             error={errors.ownerPassword}
           />
+          <div className="section-label">{t("tenantModules")}</div>
+          {MODULES.map((module: Module) => {
+            const built = findModule(module) !== undefined;
+            return (
+              <label
+                key={module}
+                style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={modules[module] ?? false}
+                  disabled={!built || submitting}
+                  onChange={(e) => setModules({ ...modules, [module]: e.target.checked })}
+                />
+                <span>{translateEnum(moduleLabels, module, language)}</span>
+                {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
+              </label>
+            );
+          })}
           <div className="actions">
             <Button type="submit" loading={submitting}>
               {t("createTenant")}
