@@ -3,10 +3,13 @@ using Secretary.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Owner,Staff")]
 [Route("api/dashboard")]
 public sealed class DashboardController : ControllerBase

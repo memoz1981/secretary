@@ -3,12 +3,15 @@ using Secretary.Application.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
 /// <summary>Call Log + Call Detail (Owner/Staff read) and the Agent's end-of-call log write.
 /// There is deliberately no delete endpoint — calls are a permanent record.</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Route("api/calls")]
 public sealed class CallsController : ControllerBase
 {

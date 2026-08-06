@@ -1,6 +1,7 @@
 using Secretary.Api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Secretary.Domain.Enums;
 
 namespace Secretary.Api.Hubs;
 
@@ -8,6 +9,7 @@ namespace Secretary.Api.Hubs;
 /// Owner/Staff client for a tenant (page-inventory.md's global overlay note — any of them
 /// can accept). Connections join a per-tenant group on connect so a broadcast never crosses
 /// tenants; EscalationsController raises the actual broadcasts after each state change.</summary>
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Owner,Staff")]
 public sealed class EscalationHub : Hub
 {

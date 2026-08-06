@@ -8,6 +8,7 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
 {
     public void Configure(EntityTypeBuilder<Appointment> builder)
     {
+        builder.ToTable("Appointments", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(a => a.Notes).HasMaxLength(2000);
         builder.Property(a => a.IdempotencyKey).HasMaxLength(200);

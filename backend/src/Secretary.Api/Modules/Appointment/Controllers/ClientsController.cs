@@ -3,12 +3,17 @@ using Secretary.Application.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
 /// <summary>Clients page (list/add/edit/remove + blacklist) for Owner/Staff, plus the
-/// phone-number lookups the AI agent uses mid-call.</summary>
+/// phone-number lookups the AI agent uses mid-call. Clients belong to the Appointment
+/// module rather than the tenant — a future Information module keeps its own callers in
+/// its own schema, so this endpoint is module-gated like the rest.</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Owner,Staff,Agent")]
 [Route("api/clients")]
 public sealed class ClientsController : ControllerBase
