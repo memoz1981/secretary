@@ -53,6 +53,12 @@ export function setTenantModule(token: string, id: number, module: Module, enabl
 
 // ---- Tenant self-service (the business's own Admin page, no id needed) ----
 
+/** Every module and whether this tenant holds it. The full catalogue, so the picker can show a
+ *  business what exists beside what they bought. */
+export function getMyModules(token: string) {
+  return apiFetch<TenantModuleResponse[]>("/api/tenant/modules", { token });
+}
+
 export function getCurrentTenant(token: string) {
   return apiFetch<TenantResponse>("/api/tenant", { token });
 }

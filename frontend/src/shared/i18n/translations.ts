@@ -225,6 +225,8 @@ export const translations = {
     en: "Controls which modules this client can use.",
   },
   moduleNotBuiltYet: { az: "Hazırlanır", ru: "В разработке", en: "Not built yet" },
+  /** On the picker, for a module the platform sells that this tenant has not bought. */
+  moduleNoAccess: { az: "Giriş yoxdur", ru: "Нет доступа", en: "No access" },
   navInfoOverview: { az: "İcmal", ru: "Обзор", en: "Overview" },
   modulePlaceholderTitle: {
     az: "Bu bölmə hələ hazırlanır",

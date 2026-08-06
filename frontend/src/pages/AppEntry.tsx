@@ -38,7 +38,7 @@ export function AppEntryPage() {
   }
 
   if (available.length > 1) {
-    return <ModulePicker modules={available} />;
+    return <ModulePicker />;
   }
 
   // Either nothing granted, or everything granted is a module the front end cannot render yet.
