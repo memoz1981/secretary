@@ -8,7 +8,7 @@ import { TextField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
-import { blackListClient, createClient, getClients, removeClient, undoBlackListClient, updateClient } from "@/shared/api/clients";
+import { blackListClient, createClient, getClients, removeClient, undoBlackListClient, updateClient } from "@/modules/appointments/api/clients";
 import { ApiError } from "@/shared/api/client";
 import type { ClientResponse } from "@/shared/api/types";
 import { isRequired } from "@/shared/lib/validation";

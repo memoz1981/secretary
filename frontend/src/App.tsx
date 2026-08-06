@@ -1,25 +1,27 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AuthProvider } from "@/shared/auth/AuthContext";
 import { RequireRole } from "@/shared/auth/RequireRole";
-import { EscalationOverlay } from "@/shared/components/EscalationOverlay";
 import { LandingPage } from "@/pages/Landing";
 import { LoginPage } from "@/pages/Login";
 import { AppEntryPage } from "@/pages/AppEntry";
 import { TenantListPage } from "@/pages/TenantList";
 import { CreateTenantPage } from "@/pages/CreateTenant";
 import { TenantDetailPage } from "@/pages/TenantDetail";
-import { ClientsPage } from "@/pages/Clients";
 import { AdminPage } from "@/pages/Admin";
-import { CallLogPage } from "@/pages/CallLog";
-import { CallPage } from "@/pages/Call";
-import { CallDetailPage } from "@/pages/CallDetail";
-import { DashboardPage } from "@/pages/Dashboard";
 import { MODULE_REGISTRY } from "@/modules/registry";
+import { ModuleOverlays } from "@/modules/ModuleOverlays";
+
+/** The one old URL that carries something worth keeping — a bookmarked call should land on that
+ *  call, not on the top of the list. */
+function RedirectToCallDetail() {
+  const { id } = useParams();
+  return <Navigate to={`/appointments/calls/${id}`} replace />;
+}
 
 export function App() {
   return (
     <AuthProvider>
-      <EscalationOverlay />
+      <ModuleOverlays />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -57,53 +59,15 @@ export function App() {
             folder and one line in the registry — nothing changes in this file. */}
         {MODULE_REGISTRY.map((module) => module.routes)}
 
-        {/* Tenant-level, owned by no module: one customer list, one phone line, one bill and
-            one set of business details, however many modules the tenant holds. */}
-        <Route
-          path="/clients"
-          element={
-            <RequireRole roles={["Owner", "Staff"]}>
-              <ClientsPage />
-            </RequireRole>
-          }
-        />
+        {/* Tenant-level, owned by no module and the only such page left: one set of business
+            details and one list of staff accounts, however many modules the tenant holds.
+            Everything else that used to live here turned out to belong to a module — see the
+            appointments manifest. */}
         <Route
           path="/admin"
           element={
             <RequireRole roles={["Owner"]}>
               <AdminPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/call"
-          element={
-            <RequireRole roles={["Owner"]}>
-              <CallPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/calls"
-          element={
-            <RequireRole roles={["Owner", "Staff"]}>
-              <CallLogPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/calls/:id"
-          element={
-            <RequireRole roles={["Owner", "Staff"]}>
-              <CallDetailPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <RequireRole roles={["Owner", "Staff"]}>
-              <DashboardPage />
             </RequireRole>
           }
         />
@@ -114,6 +78,11 @@ export function App() {
         <Route path="/calendar" element={<Navigate to="/appointments/calendar" replace />} />
         <Route path="/services" element={<Navigate to="/appointments/services" replace />} />
         <Route path="/providers" element={<Navigate to="/appointments/providers" replace />} />
+        <Route path="/clients" element={<Navigate to="/appointments/clients" replace />} />
+        <Route path="/call" element={<Navigate to="/appointments/call" replace />} />
+        <Route path="/calls" element={<Navigate to="/appointments/calls" replace />} />
+        <Route path="/calls/:id" element={<RedirectToCallDetail />} />
+        <Route path="/dashboard" element={<Navigate to="/appointments/dashboard" replace />} />
 
         {/* An unknown URL lands on the front door, not on a login form — a stray link is far
             more likely to be a visitor than a locked-out customer. */}

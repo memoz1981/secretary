@@ -9,7 +9,7 @@ import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
-import { getCallDetail } from "@/shared/api/calls";
+import { getCallDetail } from "@/modules/appointments/api/calls";
 import type { CallOutcome, CallResponse } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { callClassificationLabels, callOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
@@ -163,7 +163,7 @@ export function CallDetailPage() {
               </div>
             </Card>
             <div className="actions">
-              <Button variant="secondary" onClick={() => navigate("/calls")}>
+              <Button variant="secondary" onClick={() => navigate("/appointments/calls")}>
                 {t("backToCallLog")}
               </Button>
             </div>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { useAuth } from "@/shared/auth/AuthContext";
-import { acceptEscalation, endEscalationCall, getRingingEscalations } from "@/shared/api/escalations";
+import { acceptEscalation, endEscalationCall, getRingingEscalations } from "@/modules/appointments/api/escalations";
 import type { EscalationResponse } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 

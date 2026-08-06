@@ -28,6 +28,11 @@ export interface ModuleManifest {
 
   /** <Route> elements, spread into the router by App. */
   routes: ReactNode;
+
+  /** Anything the module needs mounted outside the router — the escalation toast is the one
+   *  case so far. Rendered only while the tenant holds the module, so a module's live
+   *  connections never open for a tenant who does not have it. */
+  overlay?: ReactNode;
 }
 
 /** The modules that actually exist in the front end.
