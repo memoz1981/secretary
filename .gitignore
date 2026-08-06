@@ -49,6 +49,10 @@ pnpm-debug.log*
 Thumbs.db
 desktop.ini
 
+# ─── Scratch ─────────────────────────────────────────────────────────────────
+# Screenshots, notes, anything handed over for a look but not part of the project.
+ignored/
+
 # ─── Plain text ──────────────────────────────────────────────────────────────
 # All .txt is ignored by request. Add a negation (e.g. !notes/keep-me.txt) if
 # a specific one ever needs tracking.

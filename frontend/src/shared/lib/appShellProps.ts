@@ -1,27 +1,33 @@
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
 import { businessNavItems } from "@/shared/lib/businessNav";
 import { useActiveModule } from "@/modules/useActiveModule";
 import { usableModules } from "@/modules/registry";
 
-/** Shared AppShell props for the tenant/business pages (Calendar, Services, Team, Call Log,
- * Call Detail, Dashboard) — identical across all six, so it's factored out once rather than
- * repeated. Falls back to just the role label until GET /api/auth/me resolves. */
+/** Shared AppShell props for every tenant-facing page — identical across all of them, so it is
+ * factored out once rather than repeated. */
 export function useBusinessShell() {
   const { role, me } = useAuth();
-  const { language, t } = useLanguage();
-  const roleLabel = role ? translateEnum(accountRoleLabels, role, language) : "";
+  const { t } = useLanguage();
+  const { pathname } = useLocation();
   const activeModule = useActiveModule();
   const moduleCount = usableModules(me?.enabledModules ?? []).length;
 
+  // The picker gets no sidebar. You are choosing where to work, not working — and leaving the
+  // links there was a way straight past the choice: from the picker you could open Appointments
+  // without picking it, and from inside Information reach appointment pages the same way.
+  const choosing = pathname.startsWith("/app");
+
   return {
     brand: me?.tenantName ?? t("brandGeneric"),
-    // The module replaces the role here. "Owner" told the user something they already knew;
-    // which module they are in is the thing that actually changes underneath them.
-    domainLabel: activeModule ? t(activeModule.titleKey) : roleLabel,
-    whoText: me ? `${me.name} · ${roleLabel}` : roleLabel,
-    navItems: businessNavItems(role, t, activeModule, moduleCount),
+    // The module, or nothing. It used to fall back to the role, which is how a tenant holding
+    // no modules ended up with "OWNER" as the only thing under their name — a label for a
+    // sidebar that had nothing in it.
+    domainLabel: !choosing && activeModule ? t(activeModule.titleKey) : "",
+    // Just who they are. The role was on screen twice and told them nothing they did not know.
+    whoText: me?.name ?? "",
+    navItems: choosing ? [] : businessNavItems(role, t, activeModule, moduleCount),
   };
 }
 
