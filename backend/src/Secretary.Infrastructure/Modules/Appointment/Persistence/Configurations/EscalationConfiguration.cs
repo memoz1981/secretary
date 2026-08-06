@@ -8,6 +8,7 @@ public sealed class EscalationConfiguration : IEntityTypeConfiguration<Escalatio
 {
     public void Configure(EntityTypeBuilder<Escalation> builder)
     {
+        builder.ToTable("Escalations", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(e => e.Reason).HasMaxLength(500).IsRequired();
 

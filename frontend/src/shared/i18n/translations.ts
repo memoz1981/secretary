@@ -202,6 +202,42 @@ export const translations = {
   navCall: { az: "Zəng et", ru: "Позвонить", en: "Make a call" },
   navDashboard: { az: "Göstəricilər", ru: "Показатели", en: "Dashboard" },
   navTenants: { az: "Müştərilər", ru: "Клиенты", en: "Clients" },
+
+  // ---- Modules ----
+  /** Only ever shown to a tenant holding more than one, which by design is the rare case. */
+  navSwitchModule: { az: "Bölmələr", ru: "Разделы", en: "Modules" },
+  pickerTitle: {
+    az: "Hansı bölmə ilə işləyəcəksiniz?",
+    ru: "С каким разделом работать?",
+    en: "Which module do you want?",
+  },
+  noModulesTitle: { az: "Aktiv bölmə yoxdur", ru: "Нет активных разделов", en: "No modules enabled" },
+  noModulesBody: {
+    az: "Hesabınıza hələ heç bir bölmə təyin edilməyib. Zəhmət olmasa bizimlə əlaqə saxlayın.",
+    ru: "Вашей учётной записи пока не назначен ни один раздел. Пожалуйста, свяжитесь с нами.",
+    en: "No module has been assigned to your account yet. Please get in touch with us.",
+  },
+  /** Platform-admin tenant detail. */
+  tenantModules: { az: "Bölmələr", ru: "Разделы", en: "Modules" },
+  tenantModulesHint: {
+    az: "Müştərinin hansı bölmələrə girişi olduğunu buradan idarə edin.",
+    ru: "Здесь настраивается, к каким разделам у клиента есть доступ.",
+    en: "Controls which modules this client can use.",
+  },
+  moduleNotBuiltYet: { az: "Hazırlanır", ru: "В разработке", en: "Not built yet" },
+  /** On the picker, for a module the platform sells that this tenant has not bought. */
+  moduleNoAccess: { az: "Giriş yoxdur", ru: "Нет доступа", en: "No access" },
+  navInfoOverview: { az: "İcmal", ru: "Обзор", en: "Overview" },
+  modulePlaceholderTitle: {
+    az: "Bu bölmə hələ hazırlanır",
+    ru: "Этот раздел ещё в разработке",
+    en: "This module is still being built",
+  },
+  modulePlaceholderBody: {
+    az: "Bölmə mövcuddur və sizə təyin edilib, lakin içindəki funksiyalar hələ hazır deyil.",
+    ru: "Раздел существует и назначен вам, но его функции ещё не готовы.",
+    en: "The module exists and is assigned to you, but what goes inside it is not ready yet.",
+  },
   signOut: { az: "Çıxış", ru: "Выйти", en: "Sign out" },
 
   // ---- Live call page ----
@@ -678,6 +714,18 @@ export const themeLabels: Record<string, Dict> = {
 export const accountStatusLabels: Record<string, Dict> = {
   Active: { az: "Aktiv", ru: "Активен", en: "Active" },
   Inactive: { az: "Deaktiv", ru: "Неактивен", en: "Inactive" },
+};
+
+/** Module names for the admin grant screen. The landing page's moduleXxxTitle keys say the same
+ *  things, but they are page copy — this map is keyed by the wire value the API sends, so the
+ *  admin screen can render a switch per module without a lookup table of its own. */
+export const moduleLabels: Record<string, Dict> = {
+  Appointment: { az: "Randevu", ru: "Запись на приём", en: "Appointments" },
+  Information: { az: "Məlumat xətti", ru: "Информационная линия", en: "Information line" },
+  Reminder: { az: "Xatırlatma", ru: "Напоминания", en: "Reminders" },
+  Feedback: { az: "Rəy və məmnuniyyət", ru: "Отзывы и удовлетворённость", en: "Feedback" },
+  Order: { az: "Sifariş qəbulu", ru: "Приём заказов", en: "Order taking" },
+  Survey: { az: "Sorğu və araşdırma", ru: "Опросы и исследования", en: "Surveys" },
 };
 
 export const accountRoleLabels: Record<string, Dict> = {

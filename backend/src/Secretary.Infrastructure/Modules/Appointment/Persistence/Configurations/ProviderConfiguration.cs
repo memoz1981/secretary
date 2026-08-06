@@ -8,6 +8,7 @@ public sealed class ProviderConfiguration : IEntityTypeConfiguration<Provider>
 {
     public void Configure(EntityTypeBuilder<Provider> builder)
     {
+        builder.ToTable("Providers", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
         builder.HasIndex(p => p.TenantId);

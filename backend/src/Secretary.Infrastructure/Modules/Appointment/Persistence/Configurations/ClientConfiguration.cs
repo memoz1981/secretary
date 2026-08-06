@@ -8,6 +8,7 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
 {
     public void Configure(EntityTypeBuilder<Client> builder)
     {
+        builder.ToTable("Clients", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(c => c.PhoneNumber).HasMaxLength(32).IsRequired();
         builder.Property(c => c.Name).HasMaxLength(200);

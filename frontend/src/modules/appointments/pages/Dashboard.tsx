@@ -9,7 +9,7 @@ import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatTokens, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { CALL_PIPELINES } from "@/shared/api/types";
-import { getDashboardSummary } from "@/shared/api/dashboard";
+import { getDashboardSummary } from "@/modules/appointments/api/dashboard";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 
 type RangeOption = "today" | "week" | "month";

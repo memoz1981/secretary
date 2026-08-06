@@ -12,13 +12,18 @@ namespace Secretary.Api.Controllers;
 public sealed class TenantsController : ControllerBase
 {
     private readonly TenantService _tenantService;
+    private readonly TenantModuleService _moduleService;
     private readonly IValidator<CreateTenantRequest> _createValidator;
     private readonly IValidator<UpdateTenantRequest> _updateValidator;
 
     public TenantsController(
-        TenantService tenantService, IValidator<CreateTenantRequest> createValidator, IValidator<UpdateTenantRequest> updateValidator)
+        TenantService tenantService,
+        TenantModuleService moduleService,
+        IValidator<CreateTenantRequest> createValidator,
+        IValidator<UpdateTenantRequest> updateValidator)
     {
         _tenantService = tenantService;
+        _moduleService = moduleService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
     }
@@ -63,4 +68,15 @@ public sealed class TenantsController : ControllerBase
         await _tenantService.ReactivateAsync(id, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>Every module with whether this tenant holds it — the full set, so the admin
+    /// screen renders a switch per module rather than only what was granted before.</summary>
+    [HttpGet("{id:int}/modules")]
+    public async Task<ActionResult<IReadOnlyList<TenantModuleResponse>>> GetModules(int id, CancellationToken cancellationToken)
+        => Ok(await _moduleService.ListAsync(id, cancellationToken));
+
+    [HttpPut("{id:int}/modules")]
+    public async Task<ActionResult<TenantModuleResponse>> SetModule(
+        [FromRoute] int id, SetTenantModuleRequest request, CancellationToken cancellationToken)
+        => Ok(await _moduleService.SetAsync(id, request, cancellationToken));
 }

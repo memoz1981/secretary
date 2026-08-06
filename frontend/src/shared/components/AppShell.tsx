@@ -44,7 +44,9 @@ export function AppShell({ brand, domainLabel, navItems, whoText, children }: Ap
       {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
       <div className={menuOpen ? "sidebar open" : "sidebar"}>
         <div className="brand">{brand}</div>
-        <div className="domain-label">{domainLabel}</div>
+        {/* Empty when there is no module to name — an empty div still takes its margin, which
+            left a gap under the brand that read as a missing heading. */}
+        {domainLabel && <div className="domain-label">{domainLabel}</div>}
         <nav>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? "active" : "")}>

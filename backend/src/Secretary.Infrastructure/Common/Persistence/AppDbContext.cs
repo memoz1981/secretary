@@ -24,6 +24,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Call> Calls => Set<Call>();
     public DbSet<Escalation> Escalations => Set<Escalation>();
+    public DbSet<TenantModule> TenantModules => Set<TenantModule>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -46,5 +47,11 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Appointment>().HasQueryFilter(a => a.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Call>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Escalation>().HasQueryFilter(e => e.TenantId == _currentTenant.TenantId);
+
+        // TenantModule is deliberately absent from this list. The platform admin who grants and
+        // revokes module access has no TenantId at all, so a filter of the shape above would
+        // return nothing for the one account allowed to administer the table — it would look
+        // like no tenant had ever been granted anything. Scoping is explicit in
+        // TenantModuleRepository, where every method takes the tenant as an argument.
     }
 }

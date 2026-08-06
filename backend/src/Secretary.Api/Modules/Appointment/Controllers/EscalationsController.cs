@@ -6,6 +6,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Secretary.Domain.Enums;
 
 namespace Secretary.Api.Controllers;
 
@@ -14,6 +15,7 @@ namespace Secretary.Api.Controllers;
 /// over the EscalationHub SignalR channel, so the overlay updates live rather than needing
 /// a poll.</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Route("api/escalations")]
 public sealed class EscalationsController : ControllerBase
 {

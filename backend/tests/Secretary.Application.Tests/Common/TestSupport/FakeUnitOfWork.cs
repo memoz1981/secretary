@@ -16,6 +16,7 @@ public sealed class FakeUnitOfWork
     public Mock<IAppointmentRepository> Appointments { get; } = new();
     public Mock<ICallRepository> Calls { get; } = new();
     public Mock<IEscalationRepository> Escalations { get; } = new();
+    public Mock<ITenantModuleRepository> TenantModules { get; } = new();
 
     public Mock<IUnitOfWork> UnitOfWork { get; }
 
@@ -31,6 +32,14 @@ public sealed class FakeUnitOfWork
         UnitOfWork.SetupGet(u => u.Appointments).Returns(Appointments.Object);
         UnitOfWork.SetupGet(u => u.Calls).Returns(Calls.Object);
         UnitOfWork.SetupGet(u => u.Escalations).Returns(Escalations.Object);
+        UnitOfWork.SetupGet(u => u.TenantModules).Returns(TenantModules.Object);
+
+        // Moq returns null for an unconfigured Task-returning method, which every caller of this
+        // one then dereferences. Defaulted to "no modules" so a test that does not care about
+        // modules does not have to say so.
+        TenantModules
+            .Setup(r => r.GetEnabledModulesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     public IUnitOfWork Object => UnitOfWork.Object;

@@ -8,6 +8,7 @@ public sealed class ProviderServiceOfferingConfiguration : IEntityTypeConfigurat
 {
     public void Configure(EntityTypeBuilder<ProviderServiceOffering> builder)
     {
+        builder.ToTable("ProviderServiceOfferings", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
 
         // One row per provider×offering pair — the checkbox state lives in Status.

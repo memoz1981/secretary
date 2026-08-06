@@ -6,12 +6,14 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
 /// <summary>Calendar + Appointment Panel (Owner/Staff, Flow F) and the same endpoints under
 /// an Agent-role JWT for the AI voice agent (Flows A/B/C, agent-developer's consumer).</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Owner,Staff,Agent")]
 [Route("api/appointments")]
 public sealed class AppointmentsController : ControllerBase

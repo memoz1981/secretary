@@ -3,12 +3,15 @@ using Secretary.Application.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
 /// <summary>Services page — Owner read/write, Staff read-only (page-inventory.md /
 /// component-specs.md's cross-cutting note: same page, controls just absent for Staff).</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Owner,Staff")]
 [Route("api/service-offerings")]
 public sealed class ServiceOfferingsController : ControllerBase

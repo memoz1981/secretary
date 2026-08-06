@@ -8,10 +8,19 @@ import { DataTable } from "@/shared/components/DataTable";
 import { TextField, SelectField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
-import { deactivateTenant, getTenant, getTenantOwnerAccounts, reactivateTenant, updateTenant } from "@/shared/api/tenants";
+import {
+  deactivateTenant,
+  getTenant,
+  getTenantModules,
+  getTenantOwnerAccounts,
+  reactivateTenant,
+  setTenantModule,
+  updateTenant,
+} from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountStatusLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
+import { ModuleToggle } from "@/shared/components/ModuleToggle";
 
 export function TenantDetailPage() {
   const { token } = useAuth();
@@ -23,6 +32,22 @@ export function TenantDetailPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const state = useApiData(() => getTenant(token!, tenantId), [token, id, refreshKey]);
   const ownerAccountsState = useApiData(() => getTenantOwnerAccounts(token!, tenantId), [token, id, refreshKey]);
+  const modulesState = useApiData(() => getTenantModules(token!, tenantId), [token, id, refreshKey]);
+
+  // Staged, not live. Toggling used to save on the spot, which meant idly clicking through the
+  // switches to see what was there silently changed what a paying client could use. Nothing
+  // leaves the page until Save.
+  const [moduleDraft, setModuleDraft] = useState<Record<string, boolean> | null>(null);
+  const [savingModules, setSavingModules] = useState(false);
+
+  const serverModules = modulesState.status === "success" ? modulesState.data : null;
+  if (serverModules && !moduleDraft) {
+    setModuleDraft(Object.fromEntries(serverModules.map((m) => [m.module, m.enabled])));
+  }
+
+  const moduleChanges = serverModules && moduleDraft
+    ? serverModules.filter((m) => moduleDraft[m.module] !== m.enabled)
+    : [];
 
   const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
@@ -35,6 +60,25 @@ export function TenantDetailPage() {
     if (!form) return;
     await updateTenant(token!, tenantId, { name: form.name, timezone: form.timezone, phoneLine: form.phoneLine || null });
     setRefreshKey((k) => k + 1);
+  }
+
+  async function handleSaveModules() {
+    if (moduleChanges.length === 0) return;
+    setSavingModules(true);
+    try {
+      // One request per change rather than a bulk endpoint: the changes are a handful at most,
+      // and each one is independently meaningful in the audit trail.
+      for (const changed of moduleChanges) {
+        await setTenantModule(token!, tenantId, changed.module, moduleDraft![changed.module]);
+      }
+
+      // Re-read rather than trusting the draft — the server is what decides, and clearing the
+      // draft makes the refreshed response repopulate it.
+      setModuleDraft(null);
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setSavingModules(false);
+    }
   }
 
   async function handleToggleStatus() {
@@ -97,6 +141,34 @@ export function TenantDetailPage() {
                 },
               ]}
             />
+          </Card>
+          <Card>
+            <h2 style={{ marginBottom: "var(--space-2)" }}>{t("tenantModules")}</h2>
+            <p className="sub" style={{ marginBottom: "var(--space-3)" }}>{t("tenantModulesHint")}</p>
+            {modulesState.status === "error" && <div className="field-error">{t("somethingWentWrong")}</div>}
+            {serverModules && moduleDraft && (
+              <>
+                {serverModules.map((row) => (
+                  <ModuleToggle
+                    key={row.module}
+                    module={row.module}
+                    checked={moduleDraft[row.module] ?? false}
+                    disabled={savingModules}
+                    onChange={(next) => setModuleDraft({ ...moduleDraft, [row.module]: next })}
+                  />
+                ))}
+                <div className="actions" style={{ marginTop: "var(--space-3)" }}>
+                  <Button type="button" onClick={handleSaveModules} disabled={moduleChanges.length === 0 || savingModules}>
+                    {t("saveChanges")}
+                  </Button>
+                  {moduleChanges.length > 0 && (
+                    <Button type="button" variant="secondary" onClick={() => setModuleDraft(null)} disabled={savingModules}>
+                      {t("cancel")}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </Card>
           <div className="actions">
             <Button variant="secondary" onClick={() => navigate("/admin/tenants")}>

@@ -31,6 +31,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<ICallRepository, CallRepository>();
         services.AddScoped<IEscalationRepository, EscalationRepository>();
+        services.AddScoped<ITenantModuleRepository, TenantModuleRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddSingleton<IClock>(SystemClock.Instance);

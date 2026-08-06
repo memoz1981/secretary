@@ -3,6 +3,8 @@ using Secretary.Application.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
@@ -10,6 +12,7 @@ namespace Secretary.Api.Controllers;
 /// checkbox matrix. Reads are open to Staff and the Agent (the agent needs providers
 /// filtered by offering); mutations are Owner-only.</summary>
 [ApiController]
+[RequireModule(Module.Appointment)]
 [Route("api/providers")]
 public sealed class ProvidersController : ControllerBase
 {

@@ -1,6 +1,8 @@
 using Secretary.Agents;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Secretary.Domain.Enums;
+using Secretary.Api.Auth;
 
 namespace Secretary.Api.Controllers;
 
@@ -10,6 +12,9 @@ namespace Secretary.Api.Controllers;
 /// that's expected to be superseded by the real voice session's own state management, not
 /// patched onto this stopgap endpoint.</summary>
 [ApiController]
+// The agent behind it books appointments, so it is the Appointment module's endpoint even
+// though the file sits with the shared plumbing.
+[RequireModule(Module.Appointment)]
 [Authorize(Roles = "Agent")]
 [Route("api/agent")]
 public sealed class AgentTestController : ControllerBase

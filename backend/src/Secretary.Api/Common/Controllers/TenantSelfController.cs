@@ -1,3 +1,4 @@
+using Secretary.Application.Abstractions;
 using Secretary.Application.Dtos;
 using Secretary.Application.Services;
 using FluentValidation;
@@ -14,11 +15,19 @@ namespace Secretary.Api.Controllers;
 public sealed class TenantSelfController : ControllerBase
 {
     private readonly TenantService _tenantService;
+    private readonly TenantModuleService _moduleService;
+    private readonly ICurrentTenantProvider _currentTenant;
     private readonly IValidator<UpdateTenantRequest> _updateValidator;
 
-    public TenantSelfController(TenantService tenantService, IValidator<UpdateTenantRequest> updateValidator)
+    public TenantSelfController(
+        TenantService tenantService,
+        TenantModuleService moduleService,
+        ICurrentTenantProvider currentTenant,
+        IValidator<UpdateTenantRequest> updateValidator)
     {
         _tenantService = tenantService;
+        _moduleService = moduleService;
+        _currentTenant = currentTenant;
         _updateValidator = updateValidator;
     }
 
@@ -26,6 +35,25 @@ public sealed class TenantSelfController : ControllerBase
     [Authorize(Roles = "Owner,Staff")]
     public async Task<ActionResult<TenantResponse>> Get(CancellationToken cancellationToken)
         => Ok(await _tenantService.GetCurrentAsync(cancellationToken));
+
+    /// <summary>Every module and whether this tenant holds it — the same shape the admin screen
+    /// reads, for the tenant's own tenant.
+    ///
+    /// The full set, not only what was granted, so the module picker can show a business what
+    /// else exists alongside what they bought. That is the difference between a picker and a
+    /// menu: one of them tells you there is more.
+    ///
+    /// Read-only, and safe to be: it reveals the platform's module catalogue, which the public
+    /// landing page already advertises in full.</summary>
+    [HttpGet("modules")]
+    [Authorize(Roles = "Owner,Staff")]
+    public async Task<ActionResult<IReadOnlyList<TenantModuleResponse>>> GetModules(CancellationToken cancellationToken)
+    {
+        var tenantId = _currentTenant.TenantId
+            ?? throw new InvalidOperationException("This endpoint requires a tenant-scoped caller.");
+
+        return Ok(await _moduleService.ListAsync(tenantId, cancellationToken));
+    }
 
     [HttpPut]
     [Authorize(Roles = "Owner")]

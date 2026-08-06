@@ -7,7 +7,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
-import { searchCalls } from "@/shared/api/calls";
+import { searchCalls } from "@/modules/appointments/api/calls";
 import { CALL_PIPELINES, type CallClassification, type CallOutcome, type CallPipeline } from "@/shared/api/types";
 import { PIPELINE_INFO, pipelineLabel } from "@/shared/lib/pipelines";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
@@ -96,7 +96,7 @@ export function CallLogPage() {
         loading={state.status === "loading"}
         rows={rows}
         rowKey={(c) => c.id}
-        onRowClick={(c) => navigate(`/calls/${c.id}`)}
+        onRowClick={(c) => navigate(`/appointments/calls/${c.id}`)}
         emptyMessage={classification || outcome || pipeline ? t("noCallsMatchFilters") : t("noCallsYet")}
         columns={[
           { header: t("colDateTime"), render: (c) => new Date(c.startedAt).toLocaleString(), className: "mono" },

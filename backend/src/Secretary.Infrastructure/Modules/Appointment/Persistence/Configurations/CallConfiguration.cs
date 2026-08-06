@@ -8,6 +8,7 @@ public sealed class CallConfiguration : IEntityTypeConfiguration<Call>
 {
     public void Configure(EntityTypeBuilder<Call> builder)
     {
+        builder.ToTable("Calls", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(c => c.CallerPhoneNumber).HasMaxLength(32).IsRequired();
         builder.Property(c => c.RecordingUrl).IsRequired();

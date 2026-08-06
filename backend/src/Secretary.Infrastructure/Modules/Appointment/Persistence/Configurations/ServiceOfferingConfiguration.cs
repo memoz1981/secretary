@@ -8,6 +8,7 @@ public sealed class ServiceOfferingConfiguration : IEntityTypeConfiguration<Serv
 {
     public void Configure(EntityTypeBuilder<ServiceOffering> builder)
     {
+        builder.ToTable("ServiceOfferings", DbSchemas.Appointment);
         builder.ConfigureBaseEntity();
         builder.Property(s => s.Name).HasMaxLength(200).IsRequired();
         builder.Property(s => s.Price).HasColumnType("decimal(10,2)");

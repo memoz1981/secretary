@@ -289,13 +289,38 @@ a usable free tier) if the demo phase should cost nothing; see decisions.md §H.
 
 ## 7. Tenant + module authorization
 
-Enforced in three places, deliberately redundant:
+Enforced in five places, deliberately redundant:
 
 1. **`TenantModule` table** — `(Id, TenantId, Module, Status, EnabledAt, DisabledAt)`, unique on
    `(TenantId, Module)`. Source of truth, toggled by platform admin.
-2. **Endpoint policy** — every `/api/{module}/*` route carries `RequireModule("appointment")`. A
-   tenant without the module gets 403, not an empty list.
-3. **Query filter** — module entities filter on tenant.
+2. **Endpoint policy** — every module route carries `[RequireModule(Module.Appointment)]`. A
+   tenant without the module gets 403, not an empty list. The SignalR hub and the
+   `/voice/live-call` WebSocket carry it too, on the handshake, so the socket is never opened.
+3. **The voice orchestrator** checks again once it holds a socket. Not redundant with the point
+   above: a telephony bridge will one day hand it a call that never passed through an HTTP
+   endpoint at all, and the agent then calls application services in-process, past every policy.
+4. **Query filter** — module entities filter on tenant.
+5. **The front end** — a module guard on the route subtree, and the sidebar built from the
+   active module's manifest. This one is cosmetic by design; it exists so a refusal looks like
+   "you do not have this" instead of an empty calendar that reads as a quiet week.
+
+### A schema per module
+
+Module tables live in a schema of their own — `app` for Appointment, `inf` for Information when
+it is built — and `dbo` holds only what is genuinely tenant-level: `Tenants`, `Accounts`,
+`TenantModules`.
+
+`Clients`, `Calls` and `Escalations` are in `app`, not `dbo`. They began tenant-level, on the
+reasoning that a business has one customer list — but a caller who books a haircut and a caller
+who asks a question are not the same record, and one shared table would have shown each module
+the other's callers. Separate schemas make that structural: `app.Clients` and `inf.Clients` are
+simply different tables, so there is no filter anyone can forget.
+
+Two consequences, chosen rather than stumbled into: the same person contacting two modules is
+two rows, and when a second module ships, a call that touched both will need a rule about which
+schema records it.
+
+The only tenant-level screen left is Administration — one company, one set of staff accounts.
 
 ⚠️ **Platform admins have `TenantId == null`.** A naive `HasQueryFilter(x => x.TenantId == current)`
 on `TenantModule` returns nothing for the one account that administers it. Needs the null-admin
