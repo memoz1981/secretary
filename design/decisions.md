@@ -291,6 +291,21 @@ turned out to be better.
 | N3 | **Business hours are hardcoded 09:00–21:00**, so the agent offered 20:30 today. | Availability is behaving as written: a 30-minute service starting 20:30 finishes exactly at close. Whether the real hours are shorter, and whether the last start should be pulled back so appointments finish *before* close rather than at it, are business questions. Per-tenant business hours were already deferred; this belongs there. |
 | N4 | **Pronunciation rules exist only for Gemini.** | Correct for now — "otuz otuz" and "albilerem" were only ever heard from Gemini. If OpenAI shows the same habits, the rule gets written into its own file then, from its own evidence. |
 
+## O. Modules — decided while building them
+
+Section G planned the module system; this is what building it changed. (IDs start at O to avoid
+colliding with §M's N1–N4.)
+
+| # | decision | why |
+|---|---|---|
+| O1 | **Modules are a hardcoded enum**, numbered explicitly, not rows in a table. | A module is code — pages, tools, a schema. A row for one that nothing can render is a lie the admin screen would have to tell. `TenantModule` grants them; it does not define them. The front-end registry is deliberately shorter than the enum, and the admin screen shows a granted-but-unbuilt module disabled rather than pretending. |
+| O2 | **A schema per module** — `app` for Appointment, `inf` later, `dbo` for `Tenants`, `Accounts`, `TenantModules`. | Separation becomes structural instead of conventional: no discriminator column, no filter to forget. `ALTER SCHEMA ... TRANSFER` made the move data-preserving. |
+| O3 | **`Clients`, `Calls`, `Escalations` and the dashboard belong to the module, not the tenant** — reversing the original assumption. | "A business has one customer list" sounded obviously right and was wrong: an appointment line and an information line take calls from different people. One shared list would show each module the other's callers. **Administration is the only genuinely shared screen** — one company, one set of staff accounts. |
+| O4 | The same person contacting two modules is **two rows in two tables**, and a call that touches both will need a rule about which schema records it. | Accepted consequence of O3, not an oversight. Nothing to decide until a second module actually ships. |
+| O5 | **The voice orchestrator checks the module itself**, on top of the endpoint policy. | The agent calls application services in-process. A telephony bridge will hand it a call that never passed an HTTP endpoint, so an endpoint policy alone is not a boundary. |
+| O6 | **Modules declare their own overlays**, mounted only when held. | The escalation toast was global, so every signed-in user opened a SignalR connection to the appointment hub — including tenants the hub now rejects. Keeping the decision in the registry means `App.tsx` still names no module. |
+| O7 | ⚠️ **The picker lives at exactly `/app`.** | `"/appointments/calendar".startsWith("/app")` is true, which silently classified the entire Appointment module as the picker and stripped its sidebar. Prefix-matching a route that is a prefix of another route is the trap; equality is both the fix and the accurate description. |
+
 ## L. Document map
 
 | file | holds |
