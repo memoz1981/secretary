@@ -1,8 +1,9 @@
-import { useLocation } from "react-router-dom";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
 import { businessNavItems } from "@/shared/lib/businessNav";
+import { useActiveModule } from "@/modules/useActiveModule";
+import { usableModules } from "@/modules/registry";
 
 /** Shared AppShell props for the tenant/business pages (Calendar, Services, Team, Call Log,
  * Call Detail, Dashboard) — identical across all six, so it's factored out once rather than
@@ -10,15 +11,17 @@ import { businessNavItems } from "@/shared/lib/businessNav";
 export function useBusinessShell() {
   const { role, me } = useAuth();
   const { language, t } = useLanguage();
-  const { pathname } = useLocation();
   const roleLabel = role ? translateEnum(accountRoleLabels, role, language) : "";
+  const activeModule = useActiveModule();
+  const moduleCount = usableModules(me?.enabledModules ?? []).length;
 
   return {
     brand: me?.tenantName ?? t("brandGeneric"),
-    domainLabel: roleLabel,
+    // The module replaces the role here. "Owner" told the user something they already knew;
+    // which module they are in is the thing that actually changes underneath them.
+    domainLabel: activeModule ? t(activeModule.titleKey) : roleLabel,
     whoText: me ? `${me.name} · ${roleLabel}` : roleLabel,
-    // Which module's pages appear comes from the URL — see businessNavItems.
-    navItems: businessNavItems(role, t, pathname, me?.enabledModules ?? []),
+    navItems: businessNavItems(role, t, activeModule, moduleCount),
   };
 }
 

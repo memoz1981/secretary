@@ -1,43 +1,30 @@
 import type { NavItem } from "@/shared/components/AppShell";
-import type { AccountRole, Module } from "@/shared/api/types";
+import type { AccountRole } from "@/shared/api/types";
 import type { TranslationKey } from "@/shared/i18n/translations";
-import { MODULE_REGISTRY, usableModules } from "@/modules/registry";
+import type { ModuleManifest } from "@/modules/registry";
 
-/** The sidebar: the current module's own pages, then the tenant-level ones.
- *
- * Which module is "current" comes from the URL rather than from state, so a deep link, a
- * refresh and the back button all agree without anything having to be kept in sync.
+/** The sidebar: the module you are working in, then the tenant-level pages.
  *
  * Clients, the Call Log and the Dashboard are deliberately not per-module. A tenant has one
  * customer list and one phone line however many modules they hold, and splitting those would
- * mean three copies of the same person. Only what a module genuinely owns sits above them. */
+ * mean three copies of the same person.
+ *
+ * `activeModule` is resolved by useActiveModule rather than read off the URL here, because the
+ * tenant-level pages sit outside every module's path — deriving it from the path alone blanked
+ * the sidebar as soon as one of them was opened. */
 export function businessNavItems(
   role: AccountRole | null,
   t: (key: TranslationKey) => string,
-  pathname: string,
-  enabledModules: Module[],
+  activeModule: ModuleManifest | null,
+  moduleCount: number,
 ): NavItem[] {
-  // The picker and the no-modules notice get no sidebar at all. You are choosing where to work,
-  // not working — and offering the tenant-level links there was a way round the choice: a
-  // tenant holding nothing could still reach the Call Log and the Dashboard from it.
-  if (pathname.startsWith("/app")) {
+  // No module, nothing to work in. The only screen a tenant in that state should see is the
+  // notice explaining it, and offering the tenant-level links there was a way round it.
+  if (!activeModule) {
     return [];
   }
 
-  // Held as well as matched. Without the second check, landing on a module's URL — typed, or
-  // from a bookmark predating a revocation — built a sidebar full of that module's links for a
-  // tenant who no longer has it.
-  const active = MODULE_REGISTRY.find(
-    (m) => pathname.startsWith(m.pathPrefix) && enabledModules.includes(m.key),
-  );
-
-  // Outside any module the tenant holds, there is nothing to show. Every remaining entry below
-  // is tenant-level, and reaching them without a module means something has gone wrong.
-  if (!active) {
-    return [];
-  }
-
-  const items: NavItem[] = [...active.nav(role, t)];
+  const items: NavItem[] = [...activeModule.nav(role, t)];
 
   items.push({ label: t("navClients"), to: "/clients" });
   if (role === "Owner") {
@@ -51,9 +38,9 @@ export function businessNavItems(
     items.push({ label: t("navAdmin"), to: "/admin" });
   }
 
-  // Only worth offering when there is somewhere else to go. A tenant with one module should
-  // never meet the concept at all.
-  if (usableModules(enabledModules).length > 1) {
+  // Only worth offering when there is somewhere else to go. Without it the only way back to the
+  // picker was to log out and in again.
+  if (moduleCount > 1) {
     items.push({ label: t("navSwitchModule"), to: "/app" });
   }
 
