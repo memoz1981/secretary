@@ -13,6 +13,7 @@ using Secretary.Api.Voice;
 using Secretary.Application;
 using Secretary.Application.Abstractions;
 using Secretary.Application.Pricing;
+using Secretary.Domain.Enums;
 using Secretary.Infrastructure;
 using Secretary.Voice.Google;
 using Secretary.Voice.OpenAi;
@@ -219,7 +220,13 @@ app.MapMethods("/voice/live-call", new[] { HttpMethods.Get, HttpMethods.Connect 
     await orchestrator.RunAsync(socket, requested.Pipeline, requested.RealtimeModel, context.RequestAborted);
     // Owner is allowed alongside Agent so the web UI's demo Call page can dial with the
     // tenant's own login instead of shipping the Agent credentials to the browser.
-}).RequireAuthorization(policy => policy.RequireRole("Agent", "Owner"));
+    //
+    // The module requirement refuses the handshake outright, so a tenant without Appointment
+    // never gets a socket. The orchestrator checks again once it has one, which is not
+    // redundant: a real telephony bridge will hand it a call that never passed through here.
+}).RequireAuthorization(policy => policy
+    .RequireRole("Agent", "Owner")
+    .AddRequirements(new ModuleRequirement(Module.Appointment)));
 
 /// The legend behind the Call page's pipeline picker, so the labels and the options cannot
 /// drift from what the server will actually dial.
