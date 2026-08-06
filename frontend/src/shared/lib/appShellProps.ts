@@ -17,7 +17,11 @@ export function useBusinessShell() {
   // The picker gets no sidebar. You are choosing where to work, not working — and leaving the
   // links there was a way straight past the choice: from the picker you could open Appointments
   // without picking it, and from inside Information reach appointment pages the same way.
-  const choosing = pathname.startsWith("/app");
+  //
+  // Exactly "/app", not startsWith: "/appointments/calendar" starts with "/app", so the whole
+  // Appointment module was treated as the picker and rendered with no sidebar at all. Nothing
+  // is nested under the picker, so an equality check is also the honest description of it.
+  const choosing = pathname === "/app";
 
   return {
     brand: me?.tenantName ?? t("brandGeneric"),
