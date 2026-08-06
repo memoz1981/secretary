@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Dtos;
 using Secretary.Application.Pricing;
 using Secretary.Application.Services;
@@ -27,6 +28,7 @@ public sealed class LiveVoiceCallOrchestrator
     private readonly RealtimeToolInvoker _toolInvoker;
     private readonly CallService _callService;
     private readonly AgentInstructionContext _instructionContext;
+    private readonly ICurrentTenantModules _modules;
     private readonly IClock _clock;
     private readonly ILogger<LiveVoiceCallOrchestrator> _logger;
 
@@ -36,12 +38,14 @@ public sealed class LiveVoiceCallOrchestrator
 
     public LiveVoiceCallOrchestrator(
         RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker, CallService callService,
-        AgentInstructionContext instructionContext, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
+        AgentInstructionContext instructionContext, ICurrentTenantModules modules, IClock clock,
+        ILogger<LiveVoiceCallOrchestrator> logger)
     {
         _sessionResolver = sessionResolver;
         _toolInvoker = toolInvoker;
         _callService = callService;
         _instructionContext = instructionContext;
+        _modules = modules;
         _clock = clock;
         _logger = logger;
     }
@@ -147,6 +151,30 @@ public sealed class LiveVoiceCallOrchestrator
     {
         var startedAt = _clock.GetCurrentInstant();
         var outcome = CallOutcome.ResolvedByAgent;
+
+        // The module check the HTTP layer cannot do for us.
+        //
+        // Every appointment endpoint carries [RequireModule], but the agent does not go through
+        // them — its tools call AppointmentService directly, in process. So a tenant whose
+        // Appointment module had been revoked was refused by the web app and still had an agent
+        // happily taking bookings over the phone.
+        //
+        // Checked here, once, rather than in each tool: the agent's entire toolset today is
+        // appointment work, so without the module there is no call worth having. When a second
+        // module brings tools of its own this becomes the IAgentModule profile from
+        // design/architecture.md §4 — tools composed from the modules the tenant holds — and
+        // this guard goes away with it.
+        if (!await _modules.HasAsync(Module.Appointment, cancellationToken))
+        {
+            _logger.LogWarning("Call refused: this tenant does not have the Appointment module.");
+            if (clientSocket.State == WebSocketState.Open)
+            {
+                await clientSocket.CloseAsync(
+                    WebSocketCloseStatus.PolicyViolation, "Module not enabled for this tenant.", cancellationToken);
+            }
+
+            return;
+        }
 
         // Which provider answers is the pipeline's decision, resolved here rather than injected.
         _realtimeSession = _sessionResolver.Create(pipeline);
