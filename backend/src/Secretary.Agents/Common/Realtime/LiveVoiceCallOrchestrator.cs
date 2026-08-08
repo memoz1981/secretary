@@ -411,7 +411,7 @@ public sealed class LiveVoiceCallOrchestrator
 
             if (result.MessageType == WebSocketMessageType.Binary)
             {
-                callerAudible = LogCallerAudioEdge(buffer.AsSpan(0, result.Count), callerAudible);
+                callerAudible = TryLogCallerAudioEdge(buffer.AsSpan(0, result.Count), callerAudible);
                 await _realtimeSession.SendAudioChunkAsync(buffer.AsMemory(0, result.Count), cancellationToken);
             }
         }
@@ -428,9 +428,9 @@ public sealed class LiveVoiceCallOrchestrator
     ///
     /// Crude on purpose: mean absolute amplitude over the chunk, one threshold, no smoothing.
     /// It does not need to be a VAD, only to timestamp when someone started making noise.</summary>
-    private bool LogCallerAudioEdge(ReadOnlySpan<byte> pcm16, bool wasAudible)
+    internal static bool LogCallerAudioEdge(ILogger logger, ReadOnlySpan<byte> pcm16, bool wasAudible)
     {
-        if (!_logger.IsEnabled(LogLevel.Debug) || pcm16.Length < 2)
+        if (!logger.IsEnabled(LogLevel.Debug) || pcm16.Length < 2)
         {
             return wasAudible;
         }
@@ -439,7 +439,11 @@ public sealed class LiveVoiceCallOrchestrator
         var samples = pcm16.Length / 2;
         for (var i = 0; i + 1 < pcm16.Length; i += 2)
         {
-            total += Math.Abs(BitConverter.ToInt16(pcm16[i..(i + 2)]));
+            // The (int) cast is load-bearing. Math.Abs(short) returns short, and short.MinValue
+            // has no positive counterpart in one — so a single full-scale negative sample threw
+            // OverflowException, out of the audio relay, out of RunAsync, and hung up on the
+            // caller. Widening first makes the negation representable.
+            total += Math.Abs((int)BitConverter.ToInt16(pcm16[i..(i + 2)]));
         }
 
         // ~1.5% of full scale. Above room tone, below speech, on the one microphone this was
@@ -449,10 +453,32 @@ public sealed class LiveVoiceCallOrchestrator
 
         if (audible != wasAudible)
         {
-            _logger.LogDebug("Caller mic: {State}.", audible ? "speaking" : "quiet");
+            logger.LogDebug("Caller mic: {State}.", audible ? "speaking" : "quiet");
         }
 
         return audible;
+    }
+
+    /// <summary>Keeps a diagnostic from taking the call with it.
+    ///
+    /// Nothing about the call depends on the amplitude scan — it exists to timestamp when the
+    /// caller started talking — but it runs inside the audio relay, so an exception in it
+    /// propagates out of RunAsync and the caller is hung up on. That is not hypothetical: it is
+    /// exactly how this bug presented, as Gemini dropping calls at random.
+    ///
+    /// The arithmetic is fixed above. This is here so that the next mistake in a log line costs
+    /// a log line.</summary>
+    private bool TryLogCallerAudioEdge(ReadOnlySpan<byte> pcm16, bool wasAudible)
+    {
+        try
+        {
+            return LogCallerAudioEdge(_logger, pcm16, wasAudible);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Caller mic edge detection failed — carrying on without it.");
+            return wasAudible;
+        }
     }
 
     /// <summary>Sent as a WebSocket Text frame (audio itself is always Binary) to tell the
