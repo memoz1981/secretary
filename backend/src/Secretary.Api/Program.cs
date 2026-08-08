@@ -92,10 +92,6 @@ builder.Services.AddGeminiLive(builder.Configuration);
 builder.Services.Configure<ModelPricingOptions>(builder.Configuration.GetSection(ModelPricingOptions.SectionName));
 ModelPricingGuard.EnsureConfiguredModelIsPriced(builder.Configuration);
 
-// Each provider reads its own instruction file. A missing one otherwise surfaces as silence on
-// the first call that picks that pipeline, not as a startup failure.
-InstructionFileGuard.EnsureEveryDialablePipelineHasInstructions();
-
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpCurrentTenantProvider>();
 builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -163,6 +159,17 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Every module that can answer a phone needs a file for every dialable provider. A missing one
+// otherwise surfaces as silence on the first call that picks that combination, not as a startup
+// failure. Resolved from the registry rather than a list kept here, so adding a module cannot
+// quietly skip the check — which costs a startup scope, the same way the seeder below does.
+using (var instructionScope = app.Services.CreateScope())
+{
+    InstructionFileGuard.EnsureEveryDialablePipelineHasInstructions(
+        instructionScope.ServiceProvider.GetRequiredService<AgentModuleRegistry>()
+            .All.Select(m => m.InstructionName));
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -214,19 +221,38 @@ app.MapMethods("/voice/live-call", new[] { HttpMethods.Get, HttpMethods.Connect 
         return;
     }
 
+    // ?module= says which line was dialled. One line answers as one module, so this is the
+    // stand-in for the inbound number a telephony bridge will one day resolve to a tenant and a
+    // module. Defaults to Appointment: the demo Call page predates modules entirely.
+    var module = Module.Appointment;
+    var requestedModule = context.Request.Query["module"].ToString();
+    if (!string.IsNullOrWhiteSpace(requestedModule) && !Enum.TryParse(requestedModule, ignoreCase: true, out module))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync(
+            "Unknown module. Expected one of: " + string.Join(", ", Enum.GetNames<Module>()));
+        return;
+    }
+
+    // Checked before the socket is accepted, so a tenant without the module never gets one. It
+    // cannot be an authorization policy like every other module endpoint, because the module is
+    // a query parameter and a policy is fixed at registration. The orchestrator checks again
+    // once it holds a socket, which is not redundant: a telephony bridge will hand it a call
+    // that never passed through here at all.
+    var tenantModules = context.RequestServices.GetRequiredService<ICurrentTenantModules>();
+    if (!await tenantModules.HasAsync(module, context.RequestAborted))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
 
     var orchestrator = context.RequestServices.GetRequiredService<LiveVoiceCallOrchestrator>();
-    await orchestrator.RunAsync(socket, requested.Pipeline, requested.RealtimeModel, context.RequestAborted);
+    await orchestrator.RunAsync(socket, module, requested.Pipeline, requested.RealtimeModel, context.RequestAborted);
     // Owner is allowed alongside Agent so the web UI's demo Call page can dial with the
     // tenant's own login instead of shipping the Agent credentials to the browser.
-    //
-    // The module requirement refuses the handshake outright, so a tenant without Appointment
-    // never gets a socket. The orchestrator checks again once it has one, which is not
-    // redundant: a real telephony bridge will hand it a call that never passed through here.
-}).RequireAuthorization(policy => policy
-    .RequireRole("Agent", "Owner")
-    .AddRequirements(new ModuleRequirement(Module.Appointment)));
+}).RequireAuthorization(policy => policy.RequireRole("Agent", "Owner"));
 
 /// The legend behind the Call page's pipeline picker, so the labels and the options cannot
 /// drift from what the server will actually dial.

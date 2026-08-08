@@ -18,7 +18,10 @@ namespace Secretary.Voice.OpenAi;
 public sealed class OpenAiRealtimeSession : IRealtimeSession
 {
     private readonly OpenAiRealtimeOptions _options;
-    private readonly IReadOnlyList<AIFunction> _functions;
+
+    /// <summary>Set at Connect, not injected: the toolset belongs to the module whose line was
+    /// dialled.</summary>
+    private IReadOnlyList<AIFunction> _functions = [];
 
     // The orchestrator drives two relay loops against this one session concurrently — inbound
     // audio chunks streaming in continuously, and outbound function-call results firing whenever
@@ -30,10 +33,9 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
     private readonly ILogger<OpenAiRealtimeSession> _logger;
     private RealtimeSessionClient? _session;
 
-    public OpenAiRealtimeSession(IOptions<OpenAiRealtimeOptions> options, IList<AITool> tools, ILogger<OpenAiRealtimeSession> logger)
+    public OpenAiRealtimeSession(IOptions<OpenAiRealtimeOptions> options, ILogger<OpenAiRealtimeSession> logger)
     {
         _options = options.Value;
-        _functions = tools.OfType<AIFunction>().ToList();
         _logger = logger;
     }
 
@@ -48,9 +50,11 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
     /// does, and the orchestrator sends it once every tool of the turn has reported.</summary>
     public bool ContinuesTurnAfterToolResult => false;
 
-    public async Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken)
+    public async Task ConnectAsync(
+        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken)
     {
         Model = string.IsNullOrWhiteSpace(modelOverride) ? _options.Model : modelOverride;
+        _functions = tools.OfType<AIFunction>().ToList();
 
         var client = new OpenAIClient(new ApiKeyCredential(_options.ApiKey));
         var realtimeClient = client.GetRealtimeClient();

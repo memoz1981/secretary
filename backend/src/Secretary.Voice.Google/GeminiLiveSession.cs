@@ -32,8 +32,11 @@ public sealed class GeminiLiveSession : IRealtimeSession
     private const string InputAudioMimeType = "audio/pcm;rate=24000";
 
     private readonly GeminiLiveOptions _options;
-    private readonly IReadOnlyList<AIFunction> _functions;
     private readonly ILogger<GeminiLiveSession> _logger;
+
+    /// <summary>Set at Connect, not injected: the toolset belongs to the module whose line was
+    /// dialled.</summary>
+    private IReadOnlyList<AIFunction> _functions = [];
 
     // One send in flight at a time: the orchestrator relays inbound audio and tool results from
     // two loops concurrently, and a WebSocket does not tolerate interleaved writes.
@@ -50,10 +53,9 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// so it can be attached to the ResponseFinished the loop actually acts on.</summary>
     private UsageMetadata? _pendingUsage;
 
-    public GeminiLiveSession(IOptions<GeminiLiveOptions> options, IList<AITool> tools, ILogger<GeminiLiveSession> logger)
+    public GeminiLiveSession(IOptions<GeminiLiveOptions> options, ILogger<GeminiLiveSession> logger)
     {
         _options = options.Value;
-        _functions = tools.OfType<AIFunction>().ToList();
         _logger = logger;
     }
 
@@ -71,9 +73,11 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// IS the farewell rather than something racing it.</summary>
     public bool ContinuesTurnAfterToolResult => true;
 
-    public async Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken)
+    public async Task ConnectAsync(
+        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken)
     {
         Model = string.IsNullOrWhiteSpace(modelOverride) ? _options.Model : modelOverride;
+        _functions = tools.OfType<AIFunction>().ToList();
 
         _client = _options.Backend == GeminiBackend.Enterprise
             ? new Client(enterprise: true, project: _options.Project, location: _options.Location)
@@ -133,10 +137,10 @@ public sealed class GeminiLiveSession : IRealtimeSession
             MaxOutputTokens = _options.MaxOutputTokens,
         };
 
-        var tools = GeminiLiveToolSchema.FromTools(_functions);
-        if (tools.Count > 0)
+        var declarations = GeminiLiveToolSchema.FromTools(_functions);
+        if (declarations.Count > 0)
         {
-            config.Tools = tools;
+            config.Tools = declarations;
         }
 
         _session = await _client.Live.ConnectAsync(Model, config, cancellationToken);

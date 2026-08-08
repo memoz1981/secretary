@@ -36,14 +36,14 @@ public sealed class RealtimeToolInvoker
     /// queries, and the caller is already hearing audio while they run.</summary>
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
 
-    private readonly IReadOnlyList<AIFunction> _functions;
+    private IReadOnlyList<AIFunction> _functions = [];
     private readonly ILogger<RealtimeToolInvoker> _logger;
 
-    public RealtimeToolInvoker(IList<AITool> tools, ILogger<RealtimeToolInvoker> logger)
-    {
-        _functions = tools.OfType<AIFunction>().ToList();
-        _logger = logger;
-    }
+    public RealtimeToolInvoker(ILogger<RealtimeToolInvoker> logger) => _logger = logger;
+
+    /// <summary>Handed in when the call starts rather than injected: which tools exist depends on
+    /// whose line was dialled, and the orchestrator is the first thing that knows.</summary>
+    public void UseTools(IList<AITool> tools) => _functions = tools.OfType<AIFunction>().ToList();
 
     public async Task<string> ExecuteFunctionAsync(string functionName, string argumentsJson, CancellationToken cancellationToken)
     {

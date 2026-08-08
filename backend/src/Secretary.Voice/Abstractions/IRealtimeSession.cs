@@ -1,3 +1,5 @@
+using Microsoft.Extensions.AI;
+
 namespace Secretary.Voice.Abstractions;
 
 /// <summary>One live speech-to-speech session, for the lifetime of a single call.
@@ -33,7 +35,12 @@ public interface IRealtimeSession : IAsyncDisposable
     /// the automatic turn beats the dictated farewell and the call ends in silence.</summary>
     bool ContinuesTurnAfterToolResult { get; }
 
-    Task ConnectAsync(string instructions, string? modelOverride, CancellationToken cancellationToken);
+    /// <summary>Opens the session. Tools arrive here rather than through the constructor because
+    /// they are per-call configuration in exactly the way the instructions beside them are: which
+    /// tools exist depends on whose line was dialled, and that is not known until the call
+    /// starts.</summary>
+    Task ConnectAsync(
+        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken);
 
     /// <summary>PCM16 captured from the caller's microphone. Both providers accept the browser's
     /// 24 kHz: OpenAI natively, Gemini by resampling server-side from the declared rate.</summary>

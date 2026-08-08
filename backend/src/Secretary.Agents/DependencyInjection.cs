@@ -27,12 +27,10 @@ public static class AgentsServiceCollectionExtensions
         services.AddScoped<AppointmentTools>();
         services.AddScoped<EscalationTools>();
         services.AddScoped<CallControlTools>();
-        services.AddScoped<IList<AITool>>(sp => PhoneAgentToolset.Build(
-            sp.GetRequiredService<ClientTools>(),
-            sp.GetRequiredService<ServiceCatalogTools>(),
-            sp.GetRequiredService<AppointmentTools>(),
-            sp.GetRequiredService<EscalationTools>(),
-            sp.GetRequiredService<CallControlTools>()));
+        // One IAgentModule per module that can answer a phone, and no shared IList<AITool> any
+        // more: a toolset belongs to a module, and a call always knows which module it is.
+        services.AddScoped<IAgentModule, AppointmentAgentModule>();
+        services.AddScoped<AgentModuleRegistry>();
 
         services.AddScoped<AgentInstructionContext>();
         services.AddScoped<PhoneAgentConversationService>();

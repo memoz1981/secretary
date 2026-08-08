@@ -60,6 +60,10 @@ export function CallPage() {
         },
       },
       pipeline,
+      // This page belongs to the Appointment module, so it dials the appointment line. An
+      // Orders module gets its own Call page rather than a picker here — a real caller does not
+      // choose which business they reached.
+      "Appointment",
     );
     callRef.current = call;
     try {
