@@ -25,8 +25,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<Call> Calls => Set<Call>();
     public DbSet<Escalation> Escalations => Set<Escalation>();
     public DbSet<TenantModule> TenantModules => Set<TenantModule>();
+    public DbSet<BusinessHours> BusinessHours => Set<BusinessHours>();
 
     // Orders module.
+    public DbSet<OrderSettings> OrderSettings => Set<OrderSettings>();
     public DbSet<MeasurementUnit> Units => Set<MeasurementUnit>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Customer> Customers => Set<Customer>();
@@ -39,6 +41,7 @@ public sealed class AppDbContext : DbContext
     {
         configurationBuilder.Properties<NodaTime.Instant>().HaveConversion<InstantConverter>();
         configurationBuilder.Properties<NodaTime.LocalDate>().HaveConversion<LocalDateConverter>();
+        configurationBuilder.Properties<NodaTime.LocalTime>().HaveConversion<LocalTimeConverter>();
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -60,6 +63,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Product>().HasQueryFilter(p => p.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Customer>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Order>().HasQueryFilter(o => o.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<BusinessHours>().HasQueryFilter(h => h.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<OrderSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
 
         // Deliberately unfiltered: a customer's phone numbers and addresses, and the order lines
         // under an order. None carries a TenantId, and giving them one to filter on would mean

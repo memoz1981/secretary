@@ -36,3 +36,17 @@ public sealed class LocalDateConverter : ValueConverter<LocalDate, DateTime>
     {
     }
 }
+
+/// <summary>A time of day with no date and no zone — opening and closing times. Stored as
+/// minutes since midnight rather than a time column: SQL Server's `time`, PostgreSQL's `time`
+/// and SQLite's text-plus-convention are three different behaviours, and an int is the same
+/// everywhere and orders correctly on all three.</summary>
+public sealed class LocalTimeConverter : ValueConverter<LocalTime, int>
+{
+    public LocalTimeConverter()
+        : base(
+            time => (time.Hour * 60) + time.Minute,
+            minutes => new LocalTime(minutes / 60, minutes % 60))
+    {
+    }
+}

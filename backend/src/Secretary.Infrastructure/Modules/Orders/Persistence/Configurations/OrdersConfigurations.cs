@@ -21,6 +21,19 @@ public sealed class MeasurementUnitConfiguration : IEntityTypeConfiguration<Meas
     }
 }
 
+public sealed class OrderSettingsConfiguration : IEntityTypeConfiguration<OrderSettings>
+{
+    public void Configure(EntityTypeBuilder<OrderSettings> builder)
+    {
+        builder.ToTable("OrderSettings", DbSchemas.Orders);
+        builder.ConfigureBaseEntity();
+
+        // One row per tenant. A second would be a second delivery promise.
+        builder.HasIndex(s => s.TenantId).IsUnique();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(s => s.TenantId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -30,6 +43,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
         builder.Property(p => p.Description).HasMaxLength(1000);
         builder.Property(p => p.Aliases).HasMaxLength(500);
+        builder.Property(p => p.UnitPrice).HasColumnType("decimal(10,2)");
 
         builder.HasIndex(p => p.TenantId);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Restrict);

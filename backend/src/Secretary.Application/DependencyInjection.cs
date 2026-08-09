@@ -35,6 +35,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<EscalationService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<TenantModuleService>();
+        services.AddScoped<BusinessHoursService>();
 
         // Scoped so the module lookup happens once per request, however many times the
         // authorization policy and /me ask for it.
