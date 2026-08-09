@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Secretary.Agents.Orders;
 using Secretary.Application.Dtos;
 using Secretary.Application.Services;
+using Microsoft.Extensions.Logging;
 using NodaTime;
 
 namespace Secretary.Agents.Tools;
@@ -14,12 +15,18 @@ public sealed class OrderTools
     private readonly CustomerIdentityService _identity;
     private readonly OrderService _orders;
     private readonly OrderDraft _draft;
+    private readonly EscalationTools _escalation;
+    private readonly ILogger<OrderTools> _logger;
 
-    public OrderTools(CustomerIdentityService identity, OrderService orders, OrderDraft draft)
+    public OrderTools(
+        CustomerIdentityService identity, OrderService orders, OrderDraft draft, EscalationTools escalation,
+        ILogger<OrderTools> logger)
     {
         _identity = identity;
         _orders = orders;
         _draft = draft;
+        _escalation = escalation;
+        _logger = logger;
     }
 
     [Description("Finds the caller by their customer number, or by their phone number. Never identifies them on " +
@@ -184,8 +191,49 @@ public sealed class OrderTools
             deliveryDay = parsed.InZone(AzerbaijanTime.Zone).Date;
         }
 
-        var order = await _orders.PlaceAsync(customerId, addressId, _draft.Lines, deliveryDay, notes, default);
-        var day = deliveryDay is null ? string.Empty : $", {deliveryDay.Value:yyyy-MM-dd}";
-        return $"ORDER_PLACED. Order {order.Id}: {_draft.Describe()}{day}.";
+        // Everything below exists so this tool can never hand back something a model could read
+        // as success without an order number behind it.
+        //
+        // On the appointment line the same models have confirmed a booking that was never made,
+        // three times in one day, and invented a caller's phone number. Instruction alone does
+        // not stop it — its first line already forbids exactly this. What can stop it is never
+        // producing a string that looks like a confirmation unless a row exists.
+        try
+        {
+            var order = await _orders.PlaceAsync(customerId, addressId, _draft.Lines, deliveryDay, notes, default);
+            if (order.Id <= 0)
+            {
+                return await FailWithoutConfirming(
+                    customerId, "The order returned no order number.", exception: null);
+            }
+
+            var day = deliveryDay is null ? string.Empty : $", {deliveryDay.Value:yyyy-MM-dd}";
+            return $"ORDER_PLACED. Order {order.Id}: {_draft.Describe()}{day}.";
+        }
+        catch (Exception ex)
+        {
+            return await FailWithoutConfirming(customerId, ex.Message, ex);
+        }
+    }
+
+    /// <summary>The order did not happen. Get a person on the line and give the model nothing it
+    /// could mistake for a confirmation — no order number, no products, no day.</summary>
+    private async Task<string> FailWithoutConfirming(int customerId, string reason, Exception? exception)
+    {
+        _logger.LogError(exception, "Order for customer {CustomerId} was not placed: {Reason}", customerId, reason);
+
+        try
+        {
+            var phone = (await _identity.GetPhoneNumbersAsync(customerId, default)).FirstOrDefault()
+                        ?? "unknown — ask the caller";
+
+            await _escalation.EscalateToHuman(phone, $"Order could not be placed: {reason}");
+            return "ORDER_FAILED. TRANSFER_ALREADY_STARTED.";
+        }
+        catch (Exception escalationFailure)
+        {
+            _logger.LogError(escalationFailure, "Escalating a failed order also failed.");
+            return "ORDER_FAILED. TRANSFER_FAILED.";
+        }
     }
 }

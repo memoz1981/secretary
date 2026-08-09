@@ -148,6 +148,12 @@ public sealed class CustomerIdentityService
         await _uow.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> GetPhoneNumbersAsync(int customerId, CancellationToken cancellationToken)
+    {
+        var numbers = await _uow.Customers.GetPhoneNumbersAsync(customerId, cancellationToken);
+        return numbers.Select(p => p.PhoneNumber).ToList();
+    }
+
     public async Task<IReadOnlyList<CustomerAddressResponse>> GetAddressesAsync(
         int customerId, CancellationToken cancellationToken)
     {

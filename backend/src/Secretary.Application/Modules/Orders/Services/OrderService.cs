@@ -192,6 +192,17 @@ public sealed class OrderService
 
         await _uow.Orders.AddAsync(order, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        // The identity is assigned by the insert, so a non-positive id here means the row is not
+        // in the database however this method returned. Throwing rather than returning is the
+        // point: the caller must not be able to treat "no order number" as a quiet success and
+        // tell someone their water is on its way.
+        if (order.Id <= 0)
+        {
+            throw new InvalidOperationException(
+                "The order was not persisted — no order number was assigned. Nothing may be confirmed to the caller.");
+        }
+
         return order;
     }
 }
