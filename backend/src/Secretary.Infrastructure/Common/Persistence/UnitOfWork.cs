@@ -17,9 +17,19 @@ internal sealed class UnitOfWork : IUnitOfWork
         IAppointmentRepository appointments,
         ICallRepository calls,
         IEscalationRepository escalations,
-        ITenantModuleRepository tenantModules)
+        ITenantModuleRepository tenantModules,
+        IMeasurementUnitRepository units,
+        IProductRepository products,
+        ICustomerRepository customers,
+        IOrderRepository orders,
+        IOrderSettingsRepository orderSettings)
     {
         _db = db;
+        Units = units;
+        Products = products;
+        Customers = customers;
+        Orders = orders;
+        OrderSettings = orderSettings;
         Tenants = tenants;
         Accounts = accounts;
         Providers = providers;
@@ -42,6 +52,11 @@ internal sealed class UnitOfWork : IUnitOfWork
     public ICallRepository Calls { get; }
     public IEscalationRepository Escalations { get; }
     public ITenantModuleRepository TenantModules { get; }
+    public IMeasurementUnitRepository Units { get; }
+    public IProductRepository Products { get; }
+    public ICustomerRepository Customers { get; }
+    public IOrderRepository Orders { get; }
+    public IOrderSettingsRepository OrderSettings { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => _db.SaveChangesAsync(cancellationToken);
 }

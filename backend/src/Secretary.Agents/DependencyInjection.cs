@@ -27,9 +27,15 @@ public static class AgentsServiceCollectionExtensions
         services.AddScoped<AppointmentTools>();
         services.AddScoped<EscalationTools>();
         services.AddScoped<CallControlTools>();
+        // Scoped to the call: what the caller has asked for so far, assembled a product at a
+        // time rather than as one array argument a model can truncate.
+        services.AddScoped<Orders.OrderDraft>();
+        services.AddScoped<OrderTools>();
+
         // One IAgentModule per module that can answer a phone, and no shared IList<AITool> any
         // more: a toolset belongs to a module, and a call always knows which module it is.
         services.AddScoped<IAgentModule, AppointmentAgentModule>();
+        services.AddScoped<IAgentModule, OrdersAgentModule>();
         services.AddScoped<AgentModuleRegistry>();
 
         services.AddScoped<AgentInstructionContext>();

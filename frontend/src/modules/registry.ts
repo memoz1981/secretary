@@ -4,6 +4,7 @@ import type { NavItem } from "@/shared/components/AppShell";
 import type { TranslationKey } from "@/shared/i18n/translations";
 import { appointmentsModule } from "@/modules/appointments/manifest";
 import { informationModule } from "@/modules/information/manifest";
+import { ordersModule } from "@/modules/orders/manifest";
 
 /** Everything a module has to declare to exist in the app.
  *
@@ -44,7 +45,7 @@ export interface ModuleManifest {
  * Information has one placeholder page behind it. It earns its place by making the
  * multi-module paths reachable — the picker and the sidebar switcher only appear for a tenant
  * holding two, so until there was a second, both were written and never seen. */
-export const MODULE_REGISTRY: ModuleManifest[] = [appointmentsModule, informationModule];
+export const MODULE_REGISTRY: ModuleManifest[] = [appointmentsModule, informationModule, ordersModule];
 
 export function findModule(key: Module): ModuleManifest | undefined
 {

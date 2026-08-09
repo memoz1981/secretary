@@ -13,5 +13,12 @@ public interface IUnitOfWork
     IEscalationRepository Escalations { get; }
     ITenantModuleRepository TenantModules { get; }
 
+    // Orders module.
+    IMeasurementUnitRepository Units { get; }
+    IProductRepository Products { get; }
+    ICustomerRepository Customers { get; }
+    IOrderRepository Orders { get; }
+    IOrderSettingsRepository OrderSettings { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

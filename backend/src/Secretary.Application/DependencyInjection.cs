@@ -1,4 +1,4 @@
-using Secretary.Application.Abstractions;
+﻿using Secretary.Application.Abstractions;
 using Secretary.Application.Pricing;
 using Secretary.Application.Services;
 using FluentValidation;
@@ -13,12 +13,12 @@ public static class ApplicationServiceCollectionExtensions
         services.AddValidatorsFromAssemblyContaining(typeof(ApplicationServiceCollectionExtensions));
 
         // Overridden by AddAgents()'s real cache-invalidating implementation when that's
-        // registered afterwards in the composition root — Application works standalone
+        // registered afterwards in the composition root â€” Application works standalone
         // without it (e.g. no agent wired up at all) rather than requiring a null check
         // at every ServiceOfferingService call site.
         services.AddSingleton<IAgentDirectoryChangeNotifier, NullAgentDirectoryChangeNotifier>();
 
-        // Stateless rate lookup over IOptions — nothing per-request about it. Left unconfigured
+        // Stateless rate lookup over IOptions â€” nothing per-request about it. Left unconfigured
         // (Application used standalone, or a test), the rate card is empty and calls price at
         // zero; the composition root is what binds real rates and refuses to boot without them
         // for the model actually in use. See Program.cs.
@@ -36,6 +36,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<DashboardService>();
         services.AddScoped<TenantModuleService>();
         services.AddScoped<BusinessHoursService>();
+        services.AddScoped<CustomerIdentityService>();
+        services.AddScoped<OrderService>();
 
         // Scoped so the module lookup happens once per request, however many times the
         // authorization policy and /me ask for it.
@@ -44,3 +46,4 @@ public static class ApplicationServiceCollectionExtensions
         return services;
     }
 }
+

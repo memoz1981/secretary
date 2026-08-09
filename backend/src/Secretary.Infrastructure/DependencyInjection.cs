@@ -1,4 +1,4 @@
-using Secretary.Application.Abstractions;
+﻿using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
 using Secretary.Infrastructure.Persistence;
 using Secretary.Infrastructure.Persistence.Repositories;
@@ -18,7 +18,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDbContext<AppDbContext>(options =>
             // SQL Server until the production deploy, then UseNpgsql and the parked migration
             // in Common/Persistence/Migrations.Postgres. Nothing else in the layer is
-            // provider-specific — no column types are hardcoded and index filters are
+            // provider-specific â€” no column types are hardcoded and index filters are
             // double-quoted, which SQL Server, PostgreSQL and SQLite all accept.
             options.UseSqlServer(configuration.GetConnectionString("Default")));
 
@@ -33,6 +33,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IEscalationRepository, EscalationRepository>();
         services.AddScoped<ITenantModuleRepository, TenantModuleRepository>();
         services.AddScoped<IBusinessHoursRepository, BusinessHoursRepository>();
+        services.AddScoped<IMeasurementUnitRepository, MeasurementUnitRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOrderSettingsRepository, OrderSettingsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddSingleton<IClock>(SystemClock.Instance);
@@ -42,3 +47,4 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 }
+

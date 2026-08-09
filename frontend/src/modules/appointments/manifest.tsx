@@ -5,7 +5,7 @@ import { CalendarPage } from "@/modules/appointments/pages/Calendar";
 import { ServicesPage } from "@/modules/appointments/pages/Services";
 import { ProvidersPage } from "@/modules/appointments/pages/Providers";
 import { ClientsPage } from "@/modules/appointments/pages/Clients";
-import { CallPage } from "@/modules/appointments/pages/Call";
+import { LiveCallPage } from "@/shared/components/LiveCallPage";
 import { CallLogPage } from "@/modules/appointments/pages/CallLog";
 import { CallDetailPage } from "@/modules/appointments/pages/CallDetail";
 import { DashboardPage } from "@/modules/appointments/pages/Dashboard";
@@ -94,7 +94,7 @@ export const appointmentsModule: ModuleManifest = {
         element={
           <RequireRole roles={["Owner"]}>
             <RequireModule module="Appointment">
-              <CallPage />
+              <LiveCallPage module="Appointment" />
             </RequireModule>
           </RequireRole>
         }
