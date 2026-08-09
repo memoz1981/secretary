@@ -2,27 +2,63 @@ import { Route } from "react-router-dom";
 import { RequireRole } from "@/shared/auth/RequireRole";
 import { RequireModule } from "@/shared/auth/RequireModule";
 import { LiveCallPage } from "@/shared/components/LiveCallPage";
+import { ProductsPage } from "@/modules/orders/pages/Products";
+import { OrdersPage } from "@/modules/orders/pages/Orders";
+import { OrderCustomersPage } from "@/modules/orders/pages/Customers";
 import type { ModuleManifest } from "@/modules/registry";
 
 /** Sifariş qəbulu — the order line.
  *
- * One page so far, and it is the one that matters: the call. The agent behind it is complete —
- * it identifies the caller, takes the order and books a delivery day — but nothing yet lets a
- * tenant manage products or read what was ordered. Those are the next thing, and until they
- * exist the catalogue has to be seeded by hand. */
+ * Products is the page that has to exist before anything else works: an empty catalogue means
+ * the agent can only tell callers it sells nothing. Orders and Customers are read-only, because
+ * every row in them was created by a phone call and a form that could invent one would be a
+ * form that disagreed with the recording. */
 export const ordersModule: ModuleManifest = {
   key: "Order",
   pathPrefix: "/orders",
-  home: "/orders/call",
+  home: "/orders/products",
   titleKey: "moduleOrdersTitle",
   descriptionKey: "moduleOrdersText",
 
   nav: (role, t) => [
+    { label: t("products"), to: "/orders/products" },
+    { label: t("orders"), to: "/orders/list" },
+    { label: t("navOrderCustomers"), to: "/orders/customers" },
     ...(role === "Owner" ? [{ label: t("navCall"), to: "/orders/call" }] : []),
   ],
 
   routes: (
     <Route path="/orders">
+      <Route
+        path="products"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <ProductsPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
+      <Route
+        path="list"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <OrdersPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
+      <Route
+        path="customers"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <OrderCustomersPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
       <Route
         path="call"
         element={

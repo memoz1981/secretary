@@ -22,6 +22,67 @@ export function isLanguage(value: unknown): value is Language {
 type Dict = Record<Language, string>;
 
 export const translations = {
+  products: { az: "Məhsullar", ru: "Товары", en: "Products" },
+  product: { az: "Məhsul", ru: "Товар", en: "Product" },
+  addProduct: { az: "Məhsul əlavə et", ru: "Добавить товар", en: "Add product" },
+  editProduct: { az: "Məhsulu redaktə et", ru: "Изменить товар", en: "Edit product" },
+  noProductsYet: { az: "Hələ məhsul yoxdur", ru: "Товаров пока нет", en: "No products yet" },
+  failedToLoadProducts: { az: "Məhsulları yükləmək alınmadı", ru: "Не удалось загрузить товары", en: "Failed to load products" },
+  productNameRequired: { az: "Məhsulun adı tələb olunur", ru: "Требуется название товара", en: "Product name is required" },
+  unit: { az: "Ölçü vahidi", ru: "Единица", en: "Unit" },
+  chooseUnit: { az: "Vahidi seçin", ru: "Выберите единицу", en: "Choose a unit" },
+  unitRequired: { az: "Ölçü vahidi tələb olunur", ru: "Требуется единица", en: "A unit is required" },
+  colAliases: {
+    az: "Zənglərdə deyilən adlar",
+    ru: "Как называют по телефону",
+    en: "What callers call it",
+  },
+  aliasesHelp: {
+    az: "Vergüllə ayırın: bidon, balon, su. Zəng edən bu sözlərdən birini deyəndə məhsul tapılır.",
+    ru: "Через запятую: bidon, balon, su. Если звонящий скажет одно из этих слов, товар будет найден.",
+    en: "Comma separated: bidon, balon, su. A caller saying any of these finds this product.",
+  },
+  description: { az: "Təsvir", ru: "Описание", en: "Description" },
+  orders: { az: "Sifarişlər", ru: "Заказы", en: "Orders" },
+  ordersSubtitle: {
+    az: "Telefonla qəbul edilmiş sifarişlər",
+    ru: "Заказы, принятые по телефону",
+    en: "Orders taken over the phone",
+  },
+  noOrdersYet: { az: "Hələ sifariş yoxdur", ru: "Заказов пока нет", en: "No orders yet" },
+  failedToLoadOrders: { az: "Sifarişləri yükləmək alınmadı", ru: "Не удалось загрузить заказы", en: "Failed to load orders" },
+  colItems: { az: "Məhsullar", ru: "Позиции", en: "Items" },
+  colTotal: { az: "Cəmi", ru: "Итого", en: "Total" },
+  colDeliveryDay: { az: "Çatdırılma günü", ru: "День доставки", en: "Delivery day" },
+  customer: { az: "Müştəri", ru: "Клиент", en: "Customer" },
+  customerNumber: { az: "Müştəri nömrəsi", ru: "Номер клиента", en: "Customer number" },
+  navOrderCustomers: { az: "Müştərilər", ru: "Клиенты", en: "Customers" },
+  orderCustomersSubtitle: {
+    az: "Sifariş xətti üçün ayrıca müştəri siyahısı",
+    ru: "Отдельный список клиентов линии заказов",
+    en: "The order line's own customers",
+  },
+  noCustomersYet: { az: "Hələ müştəri yoxdur", ru: "Клиентов пока нет", en: "No customers yet" },
+  failedToLoadCustomers: { az: "Müştəriləri yükləmək alınmadı", ru: "Не удалось загрузить клиентов", en: "Failed to load customers" },
+  deliveryPromise: { az: "Çatdırılma vədi", ru: "Обещание доставки", en: "Delivery promise" },
+  deliveryPromiseHelp: {
+    az: "Zəng edənə ilk təklif ediləcək gün — bu qədər iş günü sonra. 1 = sabah.",
+    ru: "День, который агент предложит первым — столько рабочих дней спустя. 1 = завтра.",
+    en: "The first day the agent offers — this many working days out. 1 is tomorrow.",
+  },
+  leadWorkingDays: { az: "İş günü", ru: "Рабочих дней", en: "Working days" },
+  businessHours: { az: "İş saatları", ru: "Часы работы", en: "Business hours" },
+  businessHoursHelp: {
+    az: "Randevu və çatdırılma yalnız bu saatlar daxilində təklif olunur. Bağlı gün üçün heç nə təklif edilmir.",
+    ru: "Записи и доставки предлагаются только в эти часы. В закрытый день не предлагается ничего.",
+    en: "Appointments and deliveries are only ever offered inside these. A closed day offers nothing.",
+  },
+  failedToLoadBusinessHours: {
+    az: "İş saatlarını yükləmək alınmadı",
+    ru: "Не удалось загрузить часы работы",
+    en: "Failed to load business hours",
+  },
+  closed: { az: "Bağlıdır", ru: "Закрыто", en: "Closed" },
   // ---- Landing page (public) ----
   // Marketing copy, and the only place in the app that speaks to someone who is not a
   // customer yet. Module statuses are deliberately honest: "Tezliklə" means it does not
@@ -501,6 +562,7 @@ export const translations = {
   clientsTitle: { az: "Müştərilər", ru: "Клиенты", en: "Clients" },
   addClient: { az: "+ Müştəri əlavə et", ru: "+ Добавить клиента", en: "+ Add client" },
   editClient: { az: "Müştərini redaktə et", ru: "Изменить клиента", en: "Edit client" },
+  colAddress: { az: "Ünvan", ru: "Адрес", en: "Address" },
   colPhone: { az: "Telefon", ru: "Телефон", en: "Phone" },
   noClientsYet: { az: "Hələ müştəri yoxdur.", ru: "Пока нет клиентов.", en: "No clients yet." },
   failedToLoadClients: {
@@ -772,6 +834,15 @@ export const callOutcomeLabels: Record<string, Dict> = {
   NoAnswer: { az: "Cavab yoxdur", ru: "Нет ответа", en: "No answer" },
 };
 
+export const dayOfWeekLabels: Record<string, Dict> = {
+  Monday: { az: "Bazar ertəsi", ru: "Понедельник", en: "Monday" },
+  Tuesday: { az: "Çərşənbə axşamı", ru: "Вторник", en: "Tuesday" },
+  Wednesday: { az: "Çərşənbə", ru: "Среда", en: "Wednesday" },
+  Thursday: { az: "Cümə axşamı", ru: "Четверг", en: "Thursday" },
+  Friday: { az: "Cümə", ru: "Пятница", en: "Friday" },
+  Saturday: { az: "Şənbə", ru: "Суббота", en: "Saturday" },
+  Sunday: { az: "Bazar", ru: "Воскресенье", en: "Sunday" },
+};
 export function translateEnum(map: Record<string, Dict>, value: string, language: Language): string {
   return map[value]?.[language] ?? value;
 }

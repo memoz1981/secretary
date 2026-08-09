@@ -315,3 +315,72 @@ export interface PipelineSpend {
   /** The models actually billed — the pipeline name gives the architecture, this the receipt. */
   models: string;
 }
+
+// ---- Orders module ----
+
+export interface UnitResponse {
+  id: number;
+  name: string;
+}
+
+export interface ProductDetailResponse {
+  id: number;
+  name: string;
+  description: string | null;
+  measurementUnitId: number;
+  unit: string;
+  unitPrice: number;
+  /** Comma-separated words a caller might use — "bidon, balon, su". The field that decides
+   *  whether the agent recognises what someone is asking for. */
+  aliases: string | null;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  description: string | null;
+  measurementUnitId: number;
+  unitPrice: number;
+  aliases: string | null;
+}
+
+export type UpdateProductRequest = CreateProductRequest;
+
+export interface OrderLineResponse {
+  productName: string;
+  quantity: number;
+  unit: string;
+  lineTotal: number;
+}
+
+export interface OrderResponse {
+  id: number;
+  customerId: number;
+  customerName: string | null;
+  deliveryAddress: string;
+  status: string;
+  placedAt: string;
+  requestedDeliveryDate: string | null;
+  notes: string | null;
+  lines: OrderLineResponse[];
+  total: number;
+}
+
+export interface OrderCustomerResponse {
+  id: number;
+  name: string | null;
+  phoneNumbers: string[];
+  addresses: string[];
+  createdAt: string;
+}
+
+export interface OrderSettingsResponse {
+  leadWorkingDays: number;
+}
+
+/** Both times null means the business is shut that day — one fact, not a separate flag that
+ *  could disagree with the times beside it. */
+export interface BusinessHoursDay {
+  dayOfWeek: string;
+  opensAt: string | null;
+  closesAt: string | null;
+}

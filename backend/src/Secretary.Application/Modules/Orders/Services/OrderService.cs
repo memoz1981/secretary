@@ -77,6 +77,100 @@ public sealed class OrderService
         return week.TryGetValue(day.DayOfWeek, out var hours) && !hours.IsClosed;
     }
 
+    /// <summary>The Orders page. Reads the whole thing in three queries rather than one per
+    /// order's lines — a phone-order business has a lot of small orders.</summary>
+    public async Task<IReadOnlyList<OrderResponse>> ListAsync(CancellationToken cancellationToken)
+    {
+        var orders = await _uow.Orders.GetAllAsync(cancellationToken);
+        if (orders.Count == 0)
+        {
+            return [];
+        }
+
+        var products = (await _uow.Products.GetAllAsync(cancellationToken)).ToDictionary(p => p.Id);
+        var units = (await _uow.Units.GetAllAsync(cancellationToken)).ToDictionary(u => u.Id, u => u.Name);
+        var customers = (await _uow.Customers.GetAllAsync(cancellationToken)).ToDictionary(c => c.Id);
+
+        var responses = new List<OrderResponse>(orders.Count);
+        foreach (var order in orders)
+        {
+            var addresses = await _uow.Customers.GetAddressesAsync(order.CustomerId, cancellationToken);
+            var address = addresses.FirstOrDefault(a => a.Id == order.CustomerAddressId);
+
+            var lines = order.Lines.Select(l =>
+            {
+                var product = products.GetValueOrDefault(l.ProductId);
+                var unit = product is null ? string.Empty : units.GetValueOrDefault(product.MeasurementUnitId, string.Empty);
+                return new OrderLineResponse(
+                    product?.Name ?? $"#{l.ProductId}", l.Quantity, unit, (product?.UnitPrice ?? 0m) * l.Quantity);
+            }).ToList();
+
+            responses.Add(new OrderResponse(
+                order.Id,
+                order.CustomerId,
+                customers.GetValueOrDefault(order.CustomerId)?.Name,
+                address is null ? string.Empty : CustomerAddressResponse.From(address).Spoken(),
+                order.OrderStatus.ToString(),
+                order.PlacedAt,
+                order.RequestedDeliveryDate,
+                order.Notes,
+                lines,
+                lines.Sum(l => l.LineTotal)));
+        }
+
+        return responses;
+    }
+
+    /// <summary>The Customers page: who has ordered, with every number and address they gave.</summary>
+    public async Task<IReadOnlyList<CustomerResponse>> ListCustomersAsync(CancellationToken cancellationToken)
+    {
+        var customers = await _uow.Customers.GetAllAsync(cancellationToken);
+        var responses = new List<CustomerResponse>(customers.Count);
+        foreach (var customer in customers)
+        {
+            var phones = await _uow.Customers.GetPhoneNumbersAsync(customer.Id, cancellationToken);
+            var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
+            responses.Add(new CustomerResponse(
+                customer.Id,
+                customer.Name,
+                phones.Select(p => p.PhoneNumber).ToList(),
+                addresses.Select(a => CustomerAddressResponse.From(a).Spoken()).ToList(),
+                customer.CreatedAt));
+        }
+
+        return responses;
+    }
+
+    public async Task<OrderSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken)
+    {
+        var settings = await _uow.OrderSettings.GetForCurrentTenantAsync(cancellationToken);
+        return new OrderSettingsResponse(settings?.LeadWorkingDays ?? OrderSettings.DefaultLeadWorkingDays);
+    }
+
+    /// <summary>Creates the row on first save rather than for every tenant up front — a tenant
+    /// without the module has no opinion about delivery.</summary>
+    public async Task<OrderSettingsResponse> UpdateSettingsAsync(
+        UpdateOrderSettingsRequest request, CancellationToken cancellationToken)
+    {
+        var tenantId = _currentTenant.TenantId
+            ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
+
+        var now = _clock.GetCurrentInstant();
+        var settings = await _uow.OrderSettings.GetForCurrentTenantAsync(cancellationToken);
+        if (settings is null)
+        {
+            settings = OrderSettings.Create(tenantId, request.LeadWorkingDays, now);
+            await _uow.OrderSettings.AddAsync(settings, cancellationToken);
+        }
+        else
+        {
+            settings.SetLeadWorkingDays(request.LeadWorkingDays, now);
+        }
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return new OrderSettingsResponse(settings.LeadWorkingDays);
+    }
+
     public async Task<Order> PlaceAsync(
         int customerId, int addressId, IReadOnlyList<(int ProductId, decimal Quantity)> lines,
         LocalDate? requestedDeliveryDate, string? notes, CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using Secretary.Domain.Entities;
+using NodaTime;
 
 namespace Secretary.Application.Dtos;
 
@@ -62,6 +63,37 @@ public sealed record CustomerAddressResponse(
 }
 
 public sealed record ProductResponse(int Id, string Name, string? Description, string Unit, decimal UnitPrice);
+
+public sealed record UnitResponse(int Id, string Name);
+
+public sealed record ProductDetailResponse(
+    int Id, string Name, string? Description, int MeasurementUnitId, string Unit, decimal UnitPrice, string? Aliases);
+
+public sealed record CreateProductRequest(
+    string Name, string? Description, int MeasurementUnitId, decimal UnitPrice, string? Aliases);
+
+public sealed record UpdateProductRequest(
+    string Name, string? Description, int MeasurementUnitId, decimal UnitPrice, string? Aliases);
+
+public sealed record OrderLineResponse(string ProductName, decimal Quantity, string Unit, decimal LineTotal);
+
+public sealed record OrderResponse(
+    int Id, int CustomerId, string? CustomerName, string DeliveryAddress, string Status,
+    Instant PlacedAt, LocalDate? RequestedDeliveryDate, string? Notes,
+    IReadOnlyList<OrderLineResponse> Lines, decimal Total);
+
+public sealed record CustomerResponse(
+    int Id, string? Name, IReadOnlyList<string> PhoneNumbers, IReadOnlyList<string> Addresses, Instant CreatedAt);
+
+public sealed record OrderSettingsResponse(int LeadWorkingDays);
+
+public sealed record UpdateOrderSettingsRequest(int LeadWorkingDays);
+
+/// <summary>One weekday. Both times null means closed — the same one-fact rule the entity
+/// keeps, carried out to the wire so the UI cannot send a half-set day.</summary>
+public sealed record BusinessHoursDay(IsoDayOfWeek DayOfWeek, LocalTime? OpensAt, LocalTime? ClosesAt);
+
+public sealed record UpdateBusinessHoursRequest(IReadOnlyList<BusinessHoursDay> Days);
 
 public sealed record NewCustomerDetails(
     string Name, string PhoneNumber, string District, string? Area, string Street, string? Lane, string Building,

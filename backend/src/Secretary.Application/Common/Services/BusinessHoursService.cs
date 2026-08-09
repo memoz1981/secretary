@@ -1,4 +1,6 @@
+using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
+using Secretary.Application.Dtos;
 using Secretary.Domain.Entities;
 using NodaTime;
 
@@ -14,11 +16,82 @@ namespace Secretary.Application.Services;
 public sealed class BusinessHoursService
 {
     private readonly IBusinessHoursRepository _repository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
+    private readonly ICurrentTenantProvider _currentTenant;
 
-    public BusinessHoursService(IBusinessHoursRepository repository) => _repository = repository;
+    public BusinessHoursService(
+        IBusinessHoursRepository repository, IUnitOfWork unitOfWork, IClock clock,
+        ICurrentTenantProvider currentTenant)
+    {
+        _repository = repository;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
+        _currentTenant = currentTenant;
+    }
 
     public Task<IReadOnlyList<BusinessHours>> GetWeekAsync(CancellationToken cancellationToken)
         => _repository.GetWeekAsync(cancellationToken);
+
+    /// <summary>The Administration page's view: always seven days, in week order, with the days
+    /// the tenant has never configured shown as closed rather than missing. A form with gaps in
+    /// it is a form nobody can fill in correctly.</summary>
+    public async Task<IReadOnlyList<BusinessHoursDay>> GetWeekForEditingAsync(CancellationToken cancellationToken)
+    {
+        var existing = (await _repository.GetWeekAsync(cancellationToken)).ToDictionary(h => h.DayOfWeek);
+
+        return WeekDays
+            .Select(day => existing.TryGetValue(day, out var hours)
+                ? new BusinessHoursDay(day, hours.OpensAt, hours.ClosesAt)
+                : new BusinessHoursDay(day, null, null))
+            .ToList();
+    }
+
+    /// <summary>Saves the whole week at once. Partial updates would let a tenant close Tuesday
+    /// and never find out that Wednesday was never set in the first place.</summary>
+    public async Task<IReadOnlyList<BusinessHoursDay>> UpdateWeekAsync(
+        UpdateBusinessHoursRequest request, CancellationToken cancellationToken)
+    {
+        var tenantId = _currentTenant.TenantId
+            ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
+
+        var now = _clock.GetCurrentInstant();
+        var existing = (await _repository.GetWeekAsync(cancellationToken)).ToDictionary(h => h.DayOfWeek);
+
+        foreach (var day in request.Days)
+        {
+            var isOpen = day.OpensAt is not null && day.ClosesAt is not null;
+            if (existing.TryGetValue(day.DayOfWeek, out var row))
+            {
+                if (isOpen)
+                {
+                    row.SetOpen(day.OpensAt!.Value, day.ClosesAt!.Value, now);
+                }
+                else
+                {
+                    row.SetClosed(now);
+                }
+
+                continue;
+            }
+
+            await _repository.AddAsync(
+                isOpen
+                    ? BusinessHours.Open(tenantId, day.DayOfWeek, day.OpensAt!.Value, day.ClosesAt!.Value, now)
+                    : BusinessHours.Closed(tenantId, day.DayOfWeek, now),
+                cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetWeekForEditingAsync(cancellationToken);
+    }
+
+    /// <summary>Monday first, the way a week is read here.</summary>
+    private static readonly IsoDayOfWeek[] WeekDays =
+    [
+        IsoDayOfWeek.Monday, IsoDayOfWeek.Tuesday, IsoDayOfWeek.Wednesday, IsoDayOfWeek.Thursday,
+        IsoDayOfWeek.Friday, IsoDayOfWeek.Saturday, IsoDayOfWeek.Sunday,
+    ];
 
     /// <summary>A lookup of the week, for callers that ask about many days at once and should not
     /// hit the database per day.</summary>
