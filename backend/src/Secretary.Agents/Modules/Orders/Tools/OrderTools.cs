@@ -39,6 +39,11 @@ public sealed class OrderTools
         return result.Outcome switch
         {
             CallerIdentityOutcome.NotFound => "NEW_CALLER.",
+
+            // Distinct from NEW_CALLER on purpose. They quoted a number, so they have one; the
+            // digit is far likelier to be misheard than invented, and registering them again
+            // would give one person two records and two customer numbers.
+            CallerIdentityOutcome.NoSuchCustomer => $"NO_SUCH_CUSTOMER. {result.Challenge}",
             CallerIdentityOutcome.Ambiguous => $"AMBIGUOUS. {result.Challenge}",
             CallerIdentityOutcome.NeedsConfirmation =>
                 $"CONFIRM_NEEDED. Customer {result.CustomerId}. {result.Challenge}",

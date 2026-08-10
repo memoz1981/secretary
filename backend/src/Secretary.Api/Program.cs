@@ -67,6 +67,8 @@ builder.Services.AddControllers(options =>
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new InstantJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new LocalDateJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new LocalTimeJsonConverter());
         // Without this, System.Text.Json serializes every enum (AccountRole, TenantStatus,
         // AppointmentStatus, CallOutcome, ...) as its raw integer ordinal, not its name — but
         // the frontend's types.ts and every role/status comparison in the app expects string

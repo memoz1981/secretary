@@ -20,6 +20,15 @@ public enum CallerIdentityOutcome
 
     /// <summary>Confirmed. Only ConfirmCaller returns this.</summary>
     Identified = 3,
+
+    /// <summary>A customer number was quoted and no such customer exists.
+    ///
+    /// Not the same as NotFound, and the difference matters more than it looks. Someone who
+    /// quotes a number believes they have one, so the likely explanation is that we misheard a
+    /// digit — which is exactly what happened: a caller said "two", the model passed 3, and the
+    /// agent started registering them as somebody new. Registering is the one response that
+    /// cannot be right here.</summary>
+    NoSuchCustomer = 4,
 }
 
 /// <summary>The verdict plus the single question that resolves it. The question comes from here

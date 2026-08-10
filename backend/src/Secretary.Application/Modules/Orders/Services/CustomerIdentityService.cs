@@ -39,7 +39,9 @@ public sealed class CustomerIdentityService
         {
             var byId = await _uow.Customers.GetByIdAsync(customerId.Value, cancellationToken);
             return byId is null
-                ? new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null)
+                ? new CallerIdentityResult(
+                    CallerIdentityOutcome.NoSuchCustomer, null, null,
+                    "Müştəri nömrənizi rəqəm-rəqəm təkrar edə bilərsiniz?")
                 : await ChallengeFor(byId, cancellationToken);
         }
 
