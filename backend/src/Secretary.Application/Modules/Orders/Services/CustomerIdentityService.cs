@@ -93,7 +93,10 @@ public sealed class CustomerIdentityService
         // what they said is enough, given a customer number or phone number already matched.
         var addressMatches = addresses.Any(a =>
             spokenStreet.Contains(a.StreetNormalized, StringComparison.Ordinal)
-            || a.StreetNormalized.Contains(spokenStreet, StringComparison.Ordinal));
+            || a.StreetNormalized.Contains(spokenStreet, StringComparison.Ordinal)
+            // The rayon on its own counts. It is what they were asked for, there are only twelve
+            // of them, and it is the half of the answer a transcript is least likely to mangle.
+            || spokenStreet.Contains(AddressText.Normalize(a.District), StringComparison.Ordinal));
 
         var nameMatches = customer.Name is not null
             && AddressText.Normalize(spokenAnswer).Contains(AddressText.Normalize(customer.Name), StringComparison.Ordinal);
@@ -169,8 +172,13 @@ public sealed class CustomerIdentityService
     private async Task<CallerIdentityResult> ChallengeFor(Customer customer, CancellationToken cancellationToken)
     {
         var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
+
+        // The rayon and the street, not the whole address. It is one short phrase rather than a
+        // recitation, it is the part the matcher actually compares, and a caller reeling off a
+        // building and a flat number gives the transcript more to mangle for no extra
+        // certainty.
         var challenge = addresses.Count > 0
-            ? "Ünvanınızı deyə bilərsiniz?"
+            ? "Rayonunuzu və küçənizi deyə bilərsiniz?"
             : "Adınızı deyə bilərsiniz?";
 
         return new CallerIdentityResult(

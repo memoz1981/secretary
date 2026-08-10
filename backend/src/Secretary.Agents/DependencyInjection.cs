@@ -1,4 +1,4 @@
-using Secretary.Agents.Realtime;
+﻿using Secretary.Agents.Realtime;
 using Secretary.Agents.ServiceCatalog;
 using Secretary.Agents.Tools;
 using Secretary.Application.Abstractions;
@@ -16,7 +16,7 @@ public static class AgentsServiceCollectionExtensions
         services.Configure<AgentProviderOptions>(configuration.GetSection(AgentProviderOptions.SectionName));
         services.AddSingleton<IAgentFactory, AgentFactory>();
 
-        // Overrides Application's no-op default — must be registered after AddApplicationServices()
+        // Overrides Application's no-op default â€” must be registered after AddApplicationServices()
         // in the composition root (see Program.cs) for this to win.
         services.AddSingleton<IAgentDirectoryChangeNotifier, AgentDirectoryChangeNotifier>();
         services.AddScoped<ITenantServiceCatalogCache, TenantServiceCatalogCache>();
@@ -30,6 +30,7 @@ public static class AgentsServiceCollectionExtensions
         // Scoped to the call: what the caller has asked for so far, assembled a product at a
         // time rather than as one array argument a model can truncate.
         services.AddScoped<Orders.OrderDraft>();
+        services.AddScoped<Orders.CallerIdentitySession>();
         services.AddScoped<OrderTools>();
 
         // One IAgentModule per module that can answer a phone, and no shared IList<AITool> any
@@ -50,3 +51,4 @@ public static class AgentsServiceCollectionExtensions
         return services;
     }
 }
+

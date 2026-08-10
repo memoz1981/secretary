@@ -15,16 +15,18 @@ public sealed class OrderTools
     private readonly CustomerIdentityService _identity;
     private readonly OrderService _orders;
     private readonly OrderDraft _draft;
+    private readonly CallerIdentitySession _session;
     private readonly EscalationTools _escalation;
     private readonly ILogger<OrderTools> _logger;
 
     public OrderTools(
-        CustomerIdentityService identity, OrderService orders, OrderDraft draft, EscalationTools escalation,
-        ILogger<OrderTools> logger)
+        CustomerIdentityService identity, OrderService orders, OrderDraft draft, CallerIdentitySession session,
+        EscalationTools escalation, ILogger<OrderTools> logger)
     {
         _identity = identity;
         _orders = orders;
         _draft = draft;
+        _session = session;
         _escalation = escalation;
         _logger = logger;
     }
@@ -35,7 +37,25 @@ public sealed class OrderTools
         [Description("The customer number they quoted, or 0 if they did not give one")] int customerId,
         [Description("Their phone number as they said it, or empty if they gave a customer number instead")] string phoneNumber)
     {
+        // Already confirmed on this call. Looking them up again would re-challenge someone we
+        // have finished identifying, and the caller would be asked their address twice.
+        if (_session.IsConfirmed && _session.CustomerId == customerId)
+        {
+            return await DescribeAlreadyIdentified(customerId);
+        }
+
         var result = await _identity.FindAsync(customerId, phoneNumber, default);
+        if (result.Outcome == CallerIdentityOutcome.NeedsConfirmation && result.CustomerId is { } found)
+        {
+            _session.Found(found);
+            return _session.IsRepeating(found)
+                // Same lookup, same answer, no progress. Saying so is the only thing that has
+                // not been tried — the model has to be told the next step is a different tool.
+                ? $"ALREADY_FOUND. Customer {found}. Stop calling FindCustomer. Ask: {result.Challenge} "
+                  + "Then call ConfirmCustomer with their exact words."
+                : $"CONFIRM_NEEDED. Customer {found}. {result.Challenge}";
+        }
+
         return result.Outcome switch
         {
             CallerIdentityOutcome.NotFound => "NEW_CALLER.",
@@ -63,6 +83,12 @@ public sealed class OrderTools
             return $"NOT_CONFIRMED. {result.Challenge}";
         }
 
+        _session.Confirmed(customerId);
+        return await DescribeIdentified(customerId, result.CustomerName);
+    }
+
+    private async Task<string> DescribeIdentified(int customerId, string? knownName)
+    {
         var addresses = await _identity.GetAddressesAsync(customerId, default);
         var where = addresses.Count switch
         {
@@ -71,7 +97,16 @@ public sealed class OrderTools
             _ => "Addresses: " + string.Join("; ", addresses.Select(a => $"{a.Id} — {a.Spoken()}")),
         };
 
-        return $"IDENTIFIED. Customer {customerId}, {result.CustomerName ?? "no name on file"}. {where}";
+        return $"IDENTIFIED. Customer {customerId}, {knownName ?? "no name on file"}. {where}";
+    }
+
+    /// <summary>Repeats what we already established rather than re-challenging someone whose
+    /// identity is settled — asking a caller their address twice on one call is how the last
+    /// test ended with them hanging up.</summary>
+    private async Task<string> DescribeAlreadyIdentified(int customerId)
+    {
+        var result = await _identity.FindAsync(customerId, null, default);
+        return await DescribeIdentified(customerId, result.CustomerName);
     }
 
     [Description("Records a caller who has never ordered before, and returns the customer number to read back " +
