@@ -228,6 +228,27 @@ public sealed class OrderToolsTests
         (await _sut.FindCustomerById(11)).ShouldBe("NOT_FOUND.");
     }
 
+    /// <summary>The order arrives as an array of objects, which is the one argument shape in this
+    /// module that has more structure than a scalar — and a realtime model once sent a tool call
+    /// whose JSON arrived truncated mid-string. Pin the schema the model is handed: a productId
+    /// and a quantity per line, so a truncated call fails to parse rather than placing half an
+    /// order.</summary>
+    [Fact]
+    public void The_order_lines_reach_the_model_as_an_array_of_id_and_quantity()
+    {
+        var placeOrder = new OrdersAgentModule(_sut, _escalation, new CallControlTools())
+            .BuildTools()
+            .OfType<Microsoft.Extensions.AI.AIFunction>()
+            .Single(f => f.Name == nameof(OrderTools.PlaceOrder));
+
+        var lines = placeOrder.JsonSchema.GetProperty("properties").GetProperty("lines");
+        lines.GetProperty("type").GetString().ShouldBe("array");
+
+        var line = lines.GetProperty("items").GetProperty("properties");
+        line.TryGetProperty("productId", out _).ShouldBeTrue();
+        line.TryGetProperty("quantity", out _).ShouldBeTrue();
+    }
+
     /// <summary>These reads happen inside a tool call, which happens in the middle of a spoken
     /// sentence. The caller hears the round trip, so it is worth not making it twice.</summary>
     [Fact]
