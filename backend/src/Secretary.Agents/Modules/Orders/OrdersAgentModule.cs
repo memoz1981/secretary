@@ -30,6 +30,7 @@ public sealed class OrdersAgentModule : IAgentModule
     public IList<AITool> BuildTools() =>
     [
         AIFunctionFactory.Create(_orderTools.FindCustomer),
+        AIFunctionFactory.Create(_orderTools.FindCustomerByAddress),
         AIFunctionFactory.Create(_orderTools.ConfirmCustomer),
         AIFunctionFactory.Create(_orderTools.RegisterCustomer),
         AIFunctionFactory.Create(_orderTools.GetProductCatalog),

@@ -58,7 +58,7 @@ public sealed class OrderTools
 
         return result.Outcome switch
         {
-            CallerIdentityOutcome.NotFound => "NEW_CALLER.",
+            CallerIdentityOutcome.NotFound => $"NOT_FOUND. {result.Challenge}",
 
             // Distinct from NEW_CALLER on purpose. They quoted a number, so they have one; the
             // digit is far likelier to be misheard than invented, and registering them again
@@ -69,6 +69,23 @@ public sealed class OrderTools
                 $"CONFIRM_NEEDED. Customer {result.CustomerId}. {result.Challenge}",
             _ => "NEW_CALLER.",
         };
+    }
+
+    [Description("Last resort, and only after the caller says they have ordered before: finds them by their " +
+                 "address. Call this only when neither a customer number nor a phone number found them.")]
+    public async Task<string> FindCustomerByAddress(
+        [Description("The rayon and street exactly as the caller said them")] string spokenAddress)
+    {
+        var result = await _identity.FindByAddressAsync(spokenAddress, default);
+        if (result.Outcome == CallerIdentityOutcome.NeedsConfirmation && result.CustomerId is { } found)
+        {
+            _session.Found(found);
+            return $"CONFIRM_NEEDED. Customer {found}. {result.Challenge}";
+        }
+
+        return result.Outcome == CallerIdentityOutcome.Ambiguous
+            ? $"AMBIGUOUS. {result.Challenge}"
+            : "NEW_CALLER.";
     }
 
     [Description("Checks what the caller answered against their record. Call this with their exact words. Only " +
@@ -229,6 +246,15 @@ public sealed class OrderTools
             }
 
             deliveryDay = parsed.InZone(AzerbaijanTime.Zone).Date;
+
+            // Checked here as well as in GetDeliveryDay, because the model does not have to have
+            // called that: on a real call it worked through three dates, was told twice the
+            // business was closed, and then placed the order on a fourth day it had never asked
+            // about. A promise made on a closed day is a delivery that does not arrive.
+            if (!await _orders.IsWorkingDayAsync(deliveryDay.Value, default))
+            {
+                return $"CLOSED_THAT_DAY. {deliveryDay.Value:yyyy-MM-dd}";
+            }
         }
 
         // Everything below exists so this tool can never hand back something a model could read

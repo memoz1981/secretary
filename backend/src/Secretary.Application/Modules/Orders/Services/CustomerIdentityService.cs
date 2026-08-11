@@ -31,6 +31,51 @@ public sealed class CustomerIdentityService
         _currentTenant = currentTenant;
     }
 
+    /// <summary>The last resort, and only after the caller has said they are sure they have
+    /// ordered before: find them by where they live.
+    ///
+    /// A full normalised match on rayon and street, never a partial one. Two people at one
+    /// address is ordinary — a household, a family — so this narrows to a household and then
+    /// asks for a name; it does not identify anybody on its own.</summary>
+    public async Task<CallerIdentityResult> FindByAddressAsync(
+        string spokenAddress, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(spokenAddress))
+        {
+            return new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null);
+        }
+
+        var spoken = AddressText.Normalize(spokenAddress);
+        var customers = await _uow.Customers.GetAllAsync(cancellationToken);
+
+        var matches = new List<Customer>();
+        foreach (var customer in customers)
+        {
+            var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
+            if (addresses.Any(a =>
+                    a.StreetNormalized.Length > 0
+                    && spoken.Contains(a.StreetNormalized, StringComparison.Ordinal)
+                    && spoken.Contains(AddressText.Normalize(a.District), StringComparison.Ordinal)))
+            {
+                matches.Add(customer);
+            }
+        }
+
+        return matches.Count switch
+        {
+            0 => new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null),
+
+            // One household. The name is what turns it into one person, and it is the one thing
+            // the caller will not have to look up.
+            1 => new CallerIdentityResult(
+                CallerIdentityOutcome.NeedsConfirmation, matches[0].Id, matches[0].Name,
+                "Adınızı deyə bilərsiniz?"),
+
+            _ => new CallerIdentityResult(
+                CallerIdentityOutcome.Ambiguous, null, null, "Adınızı deyə bilərsiniz?"),
+        };
+    }
+
     /// <summary>By customer number, or by phone number. Neither identifies on its own.</summary>
     public async Task<CallerIdentityResult> FindAsync(
         int? customerId, string? phoneNumber, CancellationToken cancellationToken)
@@ -55,7 +100,12 @@ public sealed class CustomerIdentityService
 
         return matches.Count switch
         {
-            0 => new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null),
+            // Not "new caller" — a number we do not hold could equally be a number we misheard,
+            // or a second phone the customer has never given us. Asking whether they have
+            // ordered before costs one turn and decides it; registering silently costs them a
+            // duplicate record and a second customer number.
+            0 => new CallerIdentityResult(
+                CallerIdentityOutcome.NotFound, null, null, "Əvvəllər bizdən sifariş vermisiniz?"),
             1 => await ChallengeFor(matches[0], cancellationToken),
 
             // Two people on one number is real — a household, an office. Asking for the name

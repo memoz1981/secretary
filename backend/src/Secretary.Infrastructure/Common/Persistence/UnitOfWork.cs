@@ -18,6 +18,7 @@ internal sealed class UnitOfWork : IUnitOfWork
         ICallRepository calls,
         IEscalationRepository escalations,
         ITenantModuleRepository tenantModules,
+        IBusinessHoursRepository businessHours,
         IMeasurementUnitRepository units,
         IProductRepository products,
         ICustomerRepository customers,
@@ -40,6 +41,7 @@ internal sealed class UnitOfWork : IUnitOfWork
         Calls = calls;
         Escalations = escalations;
         TenantModules = tenantModules;
+        BusinessHours = businessHours;
     }
 
     public ITenantRepository Tenants { get; }
@@ -52,6 +54,7 @@ internal sealed class UnitOfWork : IUnitOfWork
     public ICallRepository Calls { get; }
     public IEscalationRepository Escalations { get; }
     public ITenantModuleRepository TenantModules { get; }
+    public IBusinessHoursRepository BusinessHours { get; }
     public IMeasurementUnitRepository Units { get; }
     public IProductRepository Products { get; }
     public ICustomerRepository Customers { get; }

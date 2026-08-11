@@ -12,6 +12,7 @@ public interface IUnitOfWork
     ICallRepository Calls { get; }
     IEscalationRepository Escalations { get; }
     ITenantModuleRepository TenantModules { get; }
+    IBusinessHoursRepository BusinessHours { get; }
 
     // Orders module.
     IMeasurementUnitRepository Units { get; }
