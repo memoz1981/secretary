@@ -254,6 +254,25 @@ public sealed class OrderService
         return new OrderSettingsResponse(settings.LeadWorkingDays, settings.MaxDeliveryDaysAhead);
     }
 
+    /// <summary>Cancels an order the agent placed moments ago, so a corrected one can replace it.
+    ///
+    /// Belt and braces with the call session that gates the tool: this also refuses an order
+    /// belonging to somebody else and one that has already moved on. False rather than an
+    /// exception, because "that is not yours" is an answer the agent has to say out loud, not a
+    /// failure to escalate.</summary>
+    public async Task<bool> CancelPlacedAsync(int orderId, int customerId, CancellationToken cancellationToken)
+    {
+        var order = await _uow.Orders.GetByIdAsync(orderId, cancellationToken);
+        if (order is null || order.CustomerId != customerId || order.OrderStatus != OrderStatus.Placed)
+        {
+            return false;
+        }
+
+        order.Cancel(_clock.GetCurrentInstant());
+        await _uow.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<Order> PlaceAsync(
         int customerId, int addressId, IReadOnlyList<(int ProductId, decimal Quantity)> lines,
         LocalDate? requestedDeliveryDate, string? notes, CancellationToken cancellationToken)

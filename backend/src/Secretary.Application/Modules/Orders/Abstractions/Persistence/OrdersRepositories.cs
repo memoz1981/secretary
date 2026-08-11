@@ -24,6 +24,12 @@ public interface ICustomerRepository : IRepository<Customer>
     /// two people, which is why the phone route confirms rather than identifies.</summary>
     Task<IReadOnlyList<Customer>> FindByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken);
 
+    /// <summary>Everyone living on that street in that rayon. District is the canonical spelling
+    /// from BakuDistricts and street is already folded by AddressText — both comparisons are
+    /// exact, so the fold has to happen before the call rather than in the query.</summary>
+    Task<IReadOnlyList<Customer>> FindByAddressAsync(
+        string district, string normalizedStreet, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<CustomerPhoneNumber>> GetPhoneNumbersAsync(int customerId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<CustomerAddress>> GetAddressesAsync(int customerId, CancellationToken cancellationToken);

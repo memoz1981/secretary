@@ -4,41 +4,24 @@ using NodaTime;
 
 namespace Secretary.Application.Dtos;
 
-/// <summary>How sure we are who is calling. A verdict, not a list of candidates — the model
-/// must never be the thing that decides an identity, because it will decide it has one.</summary>
-public enum CallerIdentityOutcome
-{
-    /// <summary>Nobody matched. A first call: collect everything.</summary>
-    NotFound = 0,
+/// <summary>One customer a lookup turned up, with everywhere we could deliver to them.
+///
+/// A list of candidates rather than a verdict, which is the opposite of what this used to be.
+/// The old shape decided in code whether the caller was identified and handed the model a
+/// question to ask; identity is now settled out loud instead — the agent reads back the name and
+/// the rayon and the caller agrees or does not. That deletes a tool, a challenge string and a
+/// whole branch of the instruction file, and it confirms the same fact.
+///
+/// ⚠ A match with no address is not returned at all. This is a delivery business: a customer we
+/// hold no address for is one we cannot deliver to, so the lookup treats them as not found and
+/// registration picks them up — where the phone check reunites them with their existing
+/// record rather than making a second one.</summary>
+public sealed record CallerMatch(int CustomerId, string? Name, IReadOnlyList<CustomerAddressResponse> Addresses);
 
-    /// <summary>One customer matched, and the caller has to answer one question before we act on
-    /// it. The normal path — a match on a number or a customer number is evidence, not proof,
-    /// and the thing it usually gets wrong is a misheard digit rather than a lie.</summary>
-    NeedsConfirmation = 1,
-
-    /// <summary>Several customers matched. A shared landline, or two people at one address.</summary>
-    Ambiguous = 2,
-
-    /// <summary>Confirmed. Only ConfirmCaller returns this.</summary>
-    Identified = 3,
-
-    /// <summary>A customer number was quoted and no such customer exists.
-    ///
-    /// Not the same as NotFound, and the difference matters more than it looks. Someone who
-    /// quotes a number believes they have one, so the likely explanation is that we misheard a
-    /// digit — which is exactly what happened: a caller said "two", the model passed 3, and the
-    /// agent started registering them as somebody new. Registering is the one response that
-    /// cannot be right here.</summary>
-    NoSuchCustomer = 4,
-}
-
-/// <summary>The verdict plus the single question that resolves it. The question comes from here
-/// rather than from the model so it can never be one the answer to is "bəli".</summary>
-public sealed record CallerIdentityResult(
-    CallerIdentityOutcome Outcome,
-    int? CustomerId,
-    string? CustomerName,
-    string? Challenge);
+/// <summary>Whether registration created a customer or found one already there. The caller reads
+/// the number back either way; the flag exists so a returning customer is not told they are
+/// new.</summary>
+public sealed record RegistrationResult(int CustomerId, bool AlreadyExisted);
 
 public sealed record CustomerAddressResponse(
     int Id, string? Label, string District, string? Area, string Street, string? Lane, string Building,
@@ -128,6 +111,9 @@ public sealed record BusinessHoursDay(IsoDayOfWeek DayOfWeek, LocalTime? OpensAt
 
 public sealed record UpdateBusinessHoursRequest(IReadOnlyList<BusinessHoursDay> Days);
 
+/// <summary>What a first call has to collect. Four address fields, not seven: qəsəbə, döngə and
+/// landmark were the three heaviest things the agent had to ask for and the three a Baku driver
+/// least often needs, and asking for them cost a turn each on every registration. The columns
+/// stay on the entity for addresses that already carry them.</summary>
 public sealed record NewCustomerDetails(
-    string Name, string PhoneNumber, string District, string? Area, string Street, string? Lane, string Building,
-    string? Apartment, string? Landmark, string? SpokenAddress);
+    string Name, string PhoneNumber, string District, string Street, string Building, string? Apartment);

@@ -29,15 +29,13 @@ public sealed class OrdersAgentModule : IAgentModule
 
     public IList<AITool> BuildTools() =>
     [
-        AIFunctionFactory.Create(_orderTools.FindCustomer),
+        AIFunctionFactory.Create(_orderTools.FindCustomerById),
+        AIFunctionFactory.Create(_orderTools.FindCustomerByPhone),
         AIFunctionFactory.Create(_orderTools.FindCustomerByAddress),
-        AIFunctionFactory.Create(_orderTools.ConfirmCustomer),
         AIFunctionFactory.Create(_orderTools.RegisterCustomer),
-        AIFunctionFactory.Create(_orderTools.GetProductCatalog),
-        AIFunctionFactory.Create(_orderTools.AddToOrder),
-        AIFunctionFactory.Create(_orderTools.SetOrderQuantity),
-        AIFunctionFactory.Create(_orderTools.GetDeliveryDay),
+        AIFunctionFactory.Create(_orderTools.ListProducts),
         AIFunctionFactory.Create(_orderTools.PlaceOrder),
+        AIFunctionFactory.Create(_orderTools.CancelOrder),
         AIFunctionFactory.Create(_escalationTools.EscalateToHuman),
         AIFunctionFactory.Create(_callControlTools.EndCall),
     ];

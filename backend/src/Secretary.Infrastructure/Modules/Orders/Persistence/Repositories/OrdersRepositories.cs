@@ -84,6 +84,19 @@ internal sealed class CustomerRepository : ICustomerRepository
             .Distinct()
             .ToListAsync(cancellationToken);
 
+    /// <summary>Joined the same way and for the same reason as the phone lookup: the addresses
+    /// table carries no tenant of its own, so the filter has to arrive through Customers.</summary>
+    public async Task<IReadOnlyList<Customer>> FindByAddressAsync(
+        string district, string normalizedStreet, CancellationToken cancellationToken)
+        => await (from address in _db.CustomerAddresses
+                  join customer in _db.Customers on address.CustomerId equals customer.Id
+                  where address.Status == EntityStatus.Active
+                        && address.District == district
+                        && address.StreetNormalized == normalizedStreet
+                  select customer)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<CustomerPhoneNumber>> GetPhoneNumbersAsync(
         int customerId, CancellationToken cancellationToken)
         => await _db.CustomerPhoneNumbers
