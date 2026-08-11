@@ -70,6 +70,26 @@ public sealed class LiveVoiceCallOrchestrator
     private int _answerCount;
     private int _callerTurnCount;
 
+    /// <summary>Whether this caller turn has already been counted.
+    ///
+    /// The two providers announce a caller turn differently — OpenAI when its VAD hears speech
+    /// start, Gemini only when the caller talks over the agent, and both when a transcript
+    /// arrives. Counting either signal and ignoring a second one until the agent answers gets
+    /// one question per question on both, including a barge-in, where the speech signal and the
+    /// transcript describe the same interruption.</summary>
+    private bool _callerTurnCredited;
+
+    private void CreditCallerTurn()
+    {
+        if (_callerTurnCredited)
+        {
+            return;
+        }
+
+        _callerTurnCredited = true;
+        _callerTurnCount++;
+    }
+
     // ---- Turn state ----
     // A response.create is only legal once the previous response has finished. OpenAI emits
     // response.function_call_arguments.done BEFORE response.done, so asking for the follow-up
@@ -547,6 +567,9 @@ public sealed class LiveVoiceCallOrchestrator
                     currentGeneration = _turn.BeginResponse();
                     _logger.LogInformation("Turn: response created (pendingTools={Pending}).", _turn.PendingToolCalls);
 
+                    // The agent is answering, so the next caller signal starts a new question.
+                    _callerTurnCredited = false;
+
                     audioInCurrentResponse = false;
                     toolCallInCurrentResponse = false;
                     firstAudioLogged = false;
@@ -558,6 +581,12 @@ public sealed class LiveVoiceCallOrchestrator
                 // microphone tripping over background noise or the agent's own voice.
                 case RealtimeEvent.CallerTranscript transcription:
                     _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+
+                    // Also a question, and on Gemini it is usually the only sign of one. Gemini
+                    // reports speech starting only when the caller talks OVER the agent, so a
+                    // caller who waits their turn was never counted: seven questions logged as
+                    // one, and every cost-per-question figure wrong with it.
+                    CreditCallerTurn();
                     break;
 
                 case RealtimeEvent.CallerTranscriptFailed transcriptionFailure:
@@ -718,7 +747,7 @@ public sealed class LiveVoiceCallOrchestrator
                     // A question, for the call's question/answer count. Server VAD is what
                     // decides the caller took the turn, which is the same signal the model
                     // itself acts on — so this counts exactly the turns the model responded to.
-                    _callerTurnCount++;
+                    CreditCallerTurn();
 
                     if (_turn.BeginCallerSpeech())
                     {
