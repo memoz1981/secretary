@@ -238,11 +238,16 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
   display: inline-flex; align-items: center; gap: var(--space-1);
   border-radius: var(--radius-pill); padding: 2px 10px; font-size: var(--text-xs); font-weight: 600;
   background: var(--color-surface-sunken); color: var(--color-muted);
+  /* A neutral badge and a hovered table row are both --color-surface-sunken, so on the tenant
+     list the badge dissolved into the row under the cursor. The border is what keeps its shape
+     on any background; the variants below only recolour it. */
+  border: 1px solid var(--color-border);
 }
 .pill.success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success); }
 .pill.warning { background: var(--color-warning-bg); color: var(--color-warning); border-color: var(--color-warning); }
 .pill.critical { background: var(--color-critical-bg); color: var(--color-critical); border-color: var(--color-critical); }
-.pill.neutral { background: var(--color-surface-sunken); color: var(--color-muted); }
+/* The one that shares its background with the row hover, so its edge is all there is. */
+.pill.neutral { background: var(--color-surface-sunken); color: var(--color-muted); border-color: var(--color-muted); }
 
 /* ---- Stat / KPI ---- */
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
