@@ -2,6 +2,7 @@ using Secretary.Application.Abstractions.Persistence;
 using Secretary.Domain.Entities;
 using Secretary.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using NodaTime;
 
 namespace Secretary.Infrastructure.Persistence.Repositories;
 
@@ -84,6 +85,19 @@ internal sealed class CustomerRepository : ICustomerRepository
             .Distinct()
             .ToListAsync(cancellationToken);
 
+    /// <summary>Joined the same way and for the same reason as the phone lookup: the addresses
+    /// table carries no tenant of its own, so the filter has to arrive through Customers.</summary>
+    public async Task<IReadOnlyList<Customer>> FindByAddressAsync(
+        string district, string normalizedStreet, CancellationToken cancellationToken)
+        => await (from address in _db.CustomerAddresses
+                  join customer in _db.Customers on address.CustomerId equals customer.Id
+                  where address.Status == EntityStatus.Active
+                        && address.District == district
+                        && address.StreetNormalized == normalizedStreet
+                  select customer)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<CustomerPhoneNumber>> GetPhoneNumbersAsync(
         int customerId, CancellationToken cancellationToken)
         => await _db.CustomerPhoneNumbers
@@ -129,6 +143,49 @@ internal sealed class OrderRepository : IOrderRepository
             .Where(o => o.CustomerId == customerId)
             .OrderByDescending(o => o.PlacedAt)
             .ToListAsync(cancellationToken);
+}
+
+internal sealed class OrderCallRepository : IOrderCallRepository
+{
+    private readonly AppDbContext _db;
+
+    public OrderCallRepository(AppDbContext db) => _db = db;
+
+    public async Task<OrderCall?> GetByIdAsync(int id, CancellationToken cancellationToken)
+        => await _db.OrderCalls.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<OrderCall>> GetAllAsync(CancellationToken cancellationToken)
+        => await _db.OrderCalls.OrderByDescending(c => c.StartedAt).ToListAsync(cancellationToken);
+
+    public async Task AddAsync(OrderCall entity, CancellationToken cancellationToken)
+        => await _db.OrderCalls.AddAsync(entity, cancellationToken);
+
+    public void Update(OrderCall entity) => _db.OrderCalls.Update(entity);
+
+    public void Remove(OrderCall entity) => _db.OrderCalls.Remove(entity);
+
+    public async Task<IReadOnlyList<OrderCall>> SearchAsync(
+        Instant? from, Instant? to, CallOutcome? outcome, CancellationToken cancellationToken)
+    {
+        var query = _db.OrderCalls.AsQueryable();
+
+        if (from is { } start)
+        {
+            query = query.Where(c => c.StartedAt >= start);
+        }
+
+        if (to is { } end)
+        {
+            query = query.Where(c => c.StartedAt <= end);
+        }
+
+        if (outcome is { } wanted)
+        {
+            query = query.Where(c => c.Outcome == wanted);
+        }
+
+        return await query.OrderByDescending(c => c.StartedAt).ToListAsync(cancellationToken);
+    }
 }
 
 internal sealed class OrderSettingsRepository : IOrderSettingsRepository

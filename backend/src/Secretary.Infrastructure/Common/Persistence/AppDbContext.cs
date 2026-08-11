@@ -36,6 +36,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+    public DbSet<OrderCall> OrderCalls => Set<OrderCall>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -65,6 +66,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Order>().HasQueryFilter(o => o.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<BusinessHours>().HasQueryFilter(h => h.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OrderSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<OrderCall>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
 
         // Deliberately unfiltered: a customer's phone numbers and addresses, and the order lines
         // under an order. None carries a TenantId, and giving them one to filter on would mean

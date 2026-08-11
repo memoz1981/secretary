@@ -24,10 +24,11 @@ public sealed class OrderPlacementTests
         var tenant = new Mock<ICurrentTenantProvider>();
         tenant.SetupGet(t => t.TenantId).Returns(1);
 
+        var notifier = new NullAgentDirectoryChangeNotifier();
         var hours = new BusinessHoursService(
-            new Mock<IBusinessHoursRepository>().Object, uow.Object, clock.Object, tenant.Object);
+            new Mock<IBusinessHoursRepository>().Object, uow.Object, clock.Object, tenant.Object, notifier);
 
-        return new OrderService(uow.Object, hours, clock.Object, tenant.Object);
+        return new OrderService(uow.Object, hours, clock.Object, tenant.Object, notifier);
     }
 
     /// <summary>The identity comes from the insert, so an unsaved order still has id 0. Returning

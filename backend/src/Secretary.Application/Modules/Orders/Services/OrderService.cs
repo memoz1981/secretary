@@ -16,14 +16,17 @@ public sealed class OrderService
     private readonly BusinessHoursService _businessHours;
     private readonly IClock _clock;
     private readonly ICurrentTenantProvider _currentTenant;
+    private readonly IAgentDirectoryChangeNotifier _changeNotifier;
 
     public OrderService(
-        IUnitOfWork uow, BusinessHoursService businessHours, IClock clock, ICurrentTenantProvider currentTenant)
+        IUnitOfWork uow, BusinessHoursService businessHours, IClock clock, ICurrentTenantProvider currentTenant,
+        IAgentDirectoryChangeNotifier changeNotifier)
     {
         _uow = uow;
         _businessHours = businessHours;
         _clock = clock;
         _currentTenant = currentTenant;
+        _changeNotifier = changeNotifier;
     }
 
     /// <summary>For a caller recovering from a failed write — see IUnitOfWork.</summary>
@@ -251,7 +254,32 @@ public sealed class OrderService
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
+
+        // The lead time decides the day the agent promises, and it is cached with the working
+        // week. A tenant who lengthens it and is still quoted yesterday's lead has made a
+        // promise they cannot keep.
+        _changeNotifier.NotifyChanged(tenantId);
+
         return new OrderSettingsResponse(settings.LeadWorkingDays, settings.MaxDeliveryDaysAhead);
+    }
+
+    /// <summary>Cancels an order the agent placed moments ago, so a corrected one can replace it.
+    ///
+    /// Belt and braces with the call session that gates the tool: this also refuses an order
+    /// belonging to somebody else and one that has already moved on. False rather than an
+    /// exception, because "that is not yours" is an answer the agent has to say out loud, not a
+    /// failure to escalate.</summary>
+    public async Task<bool> CancelPlacedAsync(int orderId, int customerId, CancellationToken cancellationToken)
+    {
+        var order = await _uow.Orders.GetByIdAsync(orderId, cancellationToken);
+        if (order is null || order.CustomerId != customerId || order.OrderStatus != OrderStatus.Placed)
+        {
+            return false;
+        }
+
+        order.Cancel(_clock.GetCurrentInstant());
+        await _uow.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<Order> PlaceAsync(

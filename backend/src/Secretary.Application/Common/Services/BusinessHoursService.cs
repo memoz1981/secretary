@@ -19,15 +19,17 @@ public sealed class BusinessHoursService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
     private readonly ICurrentTenantProvider _currentTenant;
+    private readonly IAgentDirectoryChangeNotifier _changeNotifier;
 
     public BusinessHoursService(
         IBusinessHoursRepository repository, IUnitOfWork unitOfWork, IClock clock,
-        ICurrentTenantProvider currentTenant)
+        ICurrentTenantProvider currentTenant, IAgentDirectoryChangeNotifier changeNotifier)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _clock = clock;
         _currentTenant = currentTenant;
+        _changeNotifier = changeNotifier;
     }
 
     public Task<IReadOnlyList<BusinessHours>> GetWeekAsync(CancellationToken cancellationToken)
@@ -83,6 +85,12 @@ public sealed class BusinessHoursService
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // The order line holds these days between calls to keep a database round trip out of the
+        // middle of a sentence. A tenant who closes Sunday and is still offered it by the agent
+        // has a delivery nobody is there for.
+        _changeNotifier.NotifyChanged(tenantId);
+
         return await GetWeekForEditingAsync(cancellationToken);
     }
 
@@ -127,13 +135,21 @@ public sealed class BusinessHoursService
     /// discover that.</summary>
     public static LocalDate? NextWorkingDay(
         IReadOnlyDictionary<IsoDayOfWeek, BusinessHours> week, LocalDate from, int leadWorkingDays)
+        => NextWorkingDay(
+            week.Where(kv => !kv.Value.IsClosed).Select(kv => kv.Key).ToHashSet(), from, leadWorkingDays);
+
+    /// <summary>The same walk over the days the business opens, taking only the weekdays rather
+    /// than the rows. The order line caches its delivery policy between calls, and caching plain
+    /// weekdays keeps entities loaded by one request's DbContext from outliving it.</summary>
+    public static LocalDate? NextWorkingDay(
+        IReadOnlySet<IsoDayOfWeek> openDays, LocalDate from, int leadWorkingDays)
     {
         var day = from;
         var remaining = leadWorkingDays;
 
         for (var attempts = 0; attempts <= 14; attempts++)
         {
-            var isWorking = week.TryGetValue(day.DayOfWeek, out var hours) && !hours.IsClosed;
+            var isWorking = openDays.Contains(day.DayOfWeek);
             if (isWorking)
             {
                 if (remaining == 0)

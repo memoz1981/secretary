@@ -26,7 +26,6 @@ public sealed class LiveVoiceCallOrchestrator
 
     private readonly RealtimeSessionResolver _sessionResolver;
     private readonly RealtimeToolInvoker _toolInvoker;
-    private readonly CallService _callService;
     private readonly AgentInstructionContext _instructionContext;
     private readonly AgentModuleRegistry _agentModules;
     private readonly ICurrentTenantModules _modules;
@@ -38,13 +37,12 @@ public sealed class LiveVoiceCallOrchestrator
     private IRealtimeSession _realtimeSession = null!;
 
     public LiveVoiceCallOrchestrator(
-        RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker, CallService callService,
+        RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker,
         AgentInstructionContext instructionContext, AgentModuleRegistry agentModules,
         ICurrentTenantModules modules, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
     {
         _sessionResolver = sessionResolver;
         _toolInvoker = toolInvoker;
-        _callService = callService;
         _instructionContext = instructionContext;
         _agentModules = agentModules;
         _modules = modules;
@@ -71,6 +69,26 @@ public sealed class LiveVoiceCallOrchestrator
     /// bigger than the caller ever heard. Questions are the caller's own turns.</summary>
     private int _answerCount;
     private int _callerTurnCount;
+
+    /// <summary>Whether this caller turn has already been counted.
+    ///
+    /// The two providers announce a caller turn differently — OpenAI when its VAD hears speech
+    /// start, Gemini only when the caller talks over the agent, and both when a transcript
+    /// arrives. Counting either signal and ignoring a second one until the agent answers gets
+    /// one question per question on both, including a barge-in, where the speech signal and the
+    /// transcript describe the same interruption.</summary>
+    private bool _callerTurnCredited;
+
+    private void CreditCallerTurn()
+    {
+        if (_callerTurnCredited)
+        {
+            return;
+        }
+
+        _callerTurnCredited = true;
+        _callerTurnCount++;
+    }
 
     // ---- Turn state ----
     // A response.create is only legal once the previous response has finished. OpenAI emits
@@ -270,10 +288,13 @@ public sealed class LiveVoiceCallOrchestrator
             // passing it through meant every such call aborted its own Call Log write.
             try
             {
-                await _callService.LogAsync(
-                    new LogCallRequest(
-                        LocalDeviceCallerIdentifier, null, _classification, outcome,
-                        durationSeconds, _answerCount, _callerTurnCount, null,
+                // The module writes its own row, into its own module's table. This used to call
+                // CallService directly, which meant every order call landed in app.Calls beside
+                // the appointments with no way to tell them apart afterwards.
+                await agentModule.LogCallAsync(
+                    new CallLogEntry(
+                        LocalDeviceCallerIdentifier, _classification, outcome,
+                        durationSeconds, _answerCount, _callerTurnCount,
                         "local-device-call (no recording stored)", null, startedAt, pipeline,
                         // One model does everything on this path — that is what the realtime
                         // API is. The chained pipelines report three entries here instead.
@@ -362,6 +383,23 @@ public sealed class LiveVoiceCallOrchestrator
             _logger.LogError(ex, "Failed to start the reply after tool {Function}.", functionName);
         }
     }
+
+    /// <summary>Whether a turn that made no sound is ours to re-ask for.
+    ///
+    /// Three separate questions, and getting any of them wrong is audible. Is somebody else
+    /// going to speak? Was the silence deliberate? And have we already tried?
+    ///
+    /// ⚠ A tool call used to disqualify recovery outright, on the reasoning that the follow-up
+    /// would do the talking. That holds only where the follow-up is ours to start. Where the
+    /// provider resumes the turn itself, a resumed turn cancelled before it makes a sound has
+    /// nothing behind it — and that is not hypothetical: a caller was identified, Gemini reported
+    /// the turn interrupted 310 ms after the tool result with no audio, and the line sat silent
+    /// for fourteen seconds until they said "Aló. Aló."</summary>
+    internal static bool ShouldReAskAfterSilence(
+        bool toolCallInResponse, bool providerResumesTurn, string? statusReason, int retriesSoFar)
+        => (providerResumesTurn || !toolCallInResponse)
+           && ShouldRecoverFromSilence(statusReason)
+           && retriesSoFar < MaxSilentRetries;
 
     /// <summary>An empty response is only OUR problem to fix when nobody meant it to be empty.
     /// The two cancellation reasons below are the system working as designed: the caller took
@@ -546,6 +584,9 @@ public sealed class LiveVoiceCallOrchestrator
                     currentGeneration = _turn.BeginResponse();
                     _logger.LogInformation("Turn: response created (pendingTools={Pending}).", _turn.PendingToolCalls);
 
+                    // The agent is answering, so the next caller signal starts a new question.
+                    _callerTurnCredited = false;
+
                     audioInCurrentResponse = false;
                     toolCallInCurrentResponse = false;
                     firstAudioLogged = false;
@@ -557,6 +598,12 @@ public sealed class LiveVoiceCallOrchestrator
                 // microphone tripping over background noise or the agent's own voice.
                 case RealtimeEvent.CallerTranscript transcription:
                     _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+
+                    // Also a question, and on Gemini it is usually the only sign of one. Gemini
+                    // reports speech starting only when the caller talks OVER the agent, so a
+                    // caller who waits their turn was never counted: seven questions logged as
+                    // one, and every cost-per-question figure wrong with it.
+                    CreditCallerTurn();
                     break;
 
                 case RealtimeEvent.CallerTranscriptFailed transcriptionFailure:
@@ -698,9 +745,10 @@ public sealed class LiveVoiceCallOrchestrator
                         break;
                     }
 
-                    // Nothing was said and nothing was called: the turn produced dead air.
-                    // Whether that's worth fixing depends entirely on WHY it ended.
-                    if (toolCallInCurrentResponse || !ShouldRecoverFromSilence(statusReason) || silentRetries >= MaxSilentRetries)
+                    // The turn produced dead air.
+                    if (!ShouldReAskAfterSilence(
+                            toolCallInCurrentResponse, _realtimeSession.ContinuesTurnAfterToolResult,
+                            statusReason, silentRetries))
                     {
                         break;
                     }
@@ -708,8 +756,9 @@ public sealed class LiveVoiceCallOrchestrator
                     silentRetries++;
                     var retryDelay = RetryDelayFor(failureMessage);
                     _logger.LogWarning(
-                        "Turn: response produced no audio and no tool call (status={Status}, reason={Reason}) — will re-ask in {Ms} ms.",
-                        status, statusReason, retryDelay.TotalMilliseconds);
+                        "Turn: response produced no audio (status={Status}, reason={Reason}, toolCall={ToolCall}) "
+                        + "— will re-ask in {Ms} ms.",
+                        status, statusReason, toolCallInCurrentResponse, retryDelay.TotalMilliseconds);
                     _ = RetrySilentResponseAsync(currentGeneration, retryDelay, cancellationToken);
                     break;
 
@@ -717,7 +766,7 @@ public sealed class LiveVoiceCallOrchestrator
                     // A question, for the call's question/answer count. Server VAD is what
                     // decides the caller took the turn, which is the same signal the model
                     // itself acts on — so this counts exactly the turns the model responded to.
-                    _callerTurnCount++;
+                    CreditCallerTurn();
 
                     if (_turn.BeginCallerSpeech())
                     {

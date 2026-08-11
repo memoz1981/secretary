@@ -642,6 +642,10 @@ export const translations = {
   colModels: { az: "Modellər", ru: "Модели", en: "Models" },
   colAvgDuration: { az: "Orta müddət", ru: "Средняя длительность", en: "Avg. duration" },
   colCost: { az: "Dəyər", ru: "Стоимость", en: "Cost" },
+  colCustomer: { az: "Müştəri", ru: "Клиент", en: "Customer" },
+  colOrder: { az: "Sifariş", ru: "Заказ", en: "Order" },
+  colAgent: { az: "Agent", ru: "Агент", en: "Agent" },
+  navOrderCalls: { az: "Zənglər", ru: "Звонки", en: "Calls" },
   colCostPerMinute: { az: "Dəqiqəyə", ru: "За минуту", en: "Per minute" },
   noCallsMatchFilters: {
     az: "Bu filtrlərə uyğun zəng yoxdur.",

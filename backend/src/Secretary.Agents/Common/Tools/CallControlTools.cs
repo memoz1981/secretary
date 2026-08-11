@@ -10,7 +10,7 @@ namespace Secretary.Agents.Tools;
 public sealed class CallControlTools
 {
     [Description("Hangs up the phone call, once the caller's needs are handled or they say goodbye — never " +
-                 "leave the line open after the conversation is over. Say nothing at all in the turn you call " +
-                 "this: the farewell is spoken for you straight afterwards.")]
+                 "leave the line open after the conversation is over. Its result gives you the farewell to " +
+                 "say: say exactly that and nothing else.")]
     public string EndCall() => "CALL_ENDED.";
 }

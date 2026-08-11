@@ -264,6 +264,32 @@ export interface CallResponse {
   costPerMinuteUsd: number | null;
   costPerAnswerUsd: number | null;
 }
+/** One row of the order line's call log. Narrower than CallResponse on purpose: no
+ * classification, and `resolvedByAgent` collapses the six outcomes into the one question the
+ * page is actually asking. */
+export interface OrderCallResponse {
+  id: number;
+  customerId: number | null;
+  customerName: string | null;
+  callerPhoneNumber: string;
+  /** The order this call produced, when it produced one. */
+  relatedOrderId: number | null;
+  outcome: CallOutcome;
+  durationSeconds: number;
+  /** Answers the agent completed. */
+  turnCount: number;
+  /** Questions the caller asked. */
+  callerTurnCount: number;
+  startedAt: string;
+  agentModel: string;
+  pipeline: CallPipeline;
+  tokenUsage: TokenUsage;
+  costUsd: number;
+  costPerMinuteUsd: number | null;
+  costPerAnswerUsd: number | null;
+  resolvedByAgent: boolean;
+}
+
 export interface CallDetailResponse {
   call: CallResponse;
   transcript: string | null;

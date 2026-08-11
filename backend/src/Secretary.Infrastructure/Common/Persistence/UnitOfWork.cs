@@ -23,7 +23,8 @@ internal sealed class UnitOfWork : IUnitOfWork
         IProductRepository products,
         ICustomerRepository customers,
         IOrderRepository orders,
-        IOrderSettingsRepository orderSettings)
+        IOrderSettingsRepository orderSettings,
+        IOrderCallRepository orderCalls)
     {
         _db = db;
         Units = units;
@@ -31,6 +32,7 @@ internal sealed class UnitOfWork : IUnitOfWork
         Customers = customers;
         Orders = orders;
         OrderSettings = orderSettings;
+        OrderCalls = orderCalls;
         Tenants = tenants;
         Accounts = accounts;
         Providers = providers;
@@ -60,6 +62,7 @@ internal sealed class UnitOfWork : IUnitOfWork
     public ICustomerRepository Customers { get; }
     public IOrderRepository Orders { get; }
     public IOrderSettingsRepository OrderSettings { get; }
+    public IOrderCallRepository OrderCalls { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => _db.SaveChangesAsync(cancellationToken);
 

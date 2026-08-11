@@ -1,161 +1,165 @@
 using System.ComponentModel;
 using Secretary.Agents.Orders;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Dtos;
 using Secretary.Application.Services;
 using Microsoft.Extensions.Logging;
-using NodaTime;
 
 namespace Secretary.Agents.Tools;
 
+/// <summary>One line of an order tool's result. Ids, never names: the id came out of
+/// the customer lookup moments earlier, so there is nothing for the model to spell and nothing
+/// for the Azerbaijani fold to get wrong.</summary>
+public sealed record OrderLineInput(
+    [property: Description("Product id from the list you were given")] int ProductId,
+    [property: Description("How many")] decimal Quantity);
+
 /// <summary>The order line's tools. Results are DATA — never sentences telling the model how to
 /// behave, because anything phrased as instruction gets read aloud to the caller. Order.md says
-/// what to do with each marker.</summary>
+/// what to do with each marker.
+///
+/// Six order tools where there were nine, and the shape changed more than the count. Identity is
+/// three plain lookups whose result the agent reads back out loud instead of a lookup, a
+/// generated challenge and a confirm tool. The order arrives in one call rather than one call
+/// per product. The delivery day is assigned here rather than negotiated. The catalogue rides
+/// back with the customer instead of costing a round trip of its own.
+///
+/// Round trips are the expensive thing, not the tool count. A tool call is two model
+/// invocations — one to ask, one to speak afterwards — and each carries the whole prompt, so
+/// every tool a call does not have to make is worth about 4,700 tokens and a second of silence
+/// the caller would otherwise sit through.</summary>
 public sealed class OrderTools
 {
     private readonly CustomerIdentityService _identity;
     private readonly OrderService _orders;
-    private readonly OrderDraft _draft;
-    private readonly CallerIdentitySession _session;
+    private readonly ITenantOrderDirectory _directory;
+    private readonly OrderCallSession _session;
     private readonly EscalationTools _escalation;
     private readonly ILogger<OrderTools> _logger;
 
     public OrderTools(
-        CustomerIdentityService identity, OrderService orders, OrderDraft draft, CallerIdentitySession session,
-        EscalationTools escalation, ILogger<OrderTools> logger)
+        CustomerIdentityService identity, OrderService orders, ITenantOrderDirectory directory,
+        OrderCallSession session, EscalationTools escalation, ILogger<OrderTools> logger)
     {
         _identity = identity;
         _orders = orders;
-        _draft = draft;
+        _directory = directory;
         _session = session;
         _escalation = escalation;
         _logger = logger;
     }
 
-    [Description("Finds the caller by their customer number, or by their phone number. Never identifies them on " +
-                 "its own — it returns the one question to ask before trusting the match.")]
-    public async Task<string> FindCustomer(
-        [Description("The customer number they quoted, or 0 if they did not give one")] int customerId,
-        [Description("Their phone number as they said it, or empty if they gave a customer number instead")] string phoneNumber)
-    {
-        // Already confirmed on this call. Looking them up again would re-challenge someone we
-        // have finished identifying, and the caller would be asked their address twice.
-        if (_session.IsConfirmed && _session.CustomerId == customerId)
-        {
-            return await DescribeAlreadyIdentified(customerId);
-        }
+    [Description("Finds the caller by the customer number they quoted. Only once they have said one.")]
+    public async Task<string> FindCustomerById(
+        [Description("The customer number they said out loud")] int customerId)
+        => customerId <= 0
+            ? NoInput
+            : await DescribeAsync(await _identity.FindByIdAsync(customerId, default));
 
-        var result = await _identity.FindAsync(customerId, phoneNumber, default);
+    [Description("Finds the caller by their phone number.")]
+    public async Task<string> FindCustomerByPhone(
+        [Description("Their phone number as they said it")] string phoneNumber)
+        => string.IsNullOrWhiteSpace(phoneNumber)
+            ? NoInput
+            : await DescribeAsync(await _identity.FindByPhoneAsync(phoneNumber, default));
 
-        // A customer number settles it on the spot; only the phone route still asks a question.
-        if (result.Outcome == CallerIdentityOutcome.Identified && result.CustomerId is { } known)
-        {
-            _session.Confirmed(known);
-            return await DescribeIdentified(known, result.CustomerName);
-        }
-
-        if (result.Outcome == CallerIdentityOutcome.NeedsConfirmation && result.CustomerId is { } found)
-        {
-            _session.Found(found);
-            return _session.IsRepeating(found)
-                // Same lookup, same answer, no progress. Saying so is the only thing that has
-                // not been tried — the model has to be told the next step is a different tool.
-                ? $"ALREADY_FOUND. Customer {found}. Stop calling FindCustomer. Ask: {result.Challenge} "
-                  + "Then call ConfirmCustomer with their exact words."
-                : $"CONFIRM_NEEDED. Customer {found}. {result.Challenge}";
-        }
-
-        return result.Outcome switch
-        {
-            CallerIdentityOutcome.NotFound => $"NOT_FOUND. {result.Challenge}",
-
-            // Distinct from NEW_CALLER on purpose. They quoted a number, so they have one; the
-            // digit is far likelier to be misheard than invented, and registering them again
-            // would give one person two records and two customer numbers.
-            CallerIdentityOutcome.NoSuchCustomer => $"NO_SUCH_CUSTOMER. {result.Challenge}",
-            CallerIdentityOutcome.Ambiguous => $"AMBIGUOUS. {result.Challenge}",
-            CallerIdentityOutcome.NeedsConfirmation =>
-                $"CONFIRM_NEEDED. Customer {result.CustomerId}. {result.Challenge}",
-            _ => "NEW_CALLER.",
-        };
-    }
-
-    [Description("Last resort, and only after the caller says they have ordered before: finds them by their " +
-                 "address. Call this only when neither a customer number nor a phone number found them.")]
+    [Description("Finds the caller by where they live. Only after a customer number and a phone number both failed.")]
     public async Task<string> FindCustomerByAddress(
-        [Description("The rayon and street exactly as the caller said them")] string spokenAddress)
+        [Description("Baku rayon, e.g. Xətai")] string district,
+        [Description("Street name only, e.g. Sarayevo")] string street)
+        => string.IsNullOrWhiteSpace(district) || string.IsNullOrWhiteSpace(street)
+            ? NoInput
+            : await DescribeAsync(await _identity.FindByAddressAsync(district, street, default));
+
+    /// <summary>Nothing was searched for, because nothing was given to search with.
+    ///
+    /// ⚠ Distinct from NOT_FOUND on purpose, and it is not a nicety. The model calls a find tool
+    /// with 0 or an empty string the moment a caller says "yes, I have ordered before" — before
+    /// asking them for anything — and NOT_FOUND told it the customer does not exist. It then
+    /// worked down the ladder, or started registering somebody who already had a record. Watched
+    /// happen on two builds, so it is the model's habit rather than a wording problem: the tool
+    /// has to be able to say "you did not ask me anything".</summary>
+    private const string NoInput = "NO_INPUT.";
+
+    /// <summary>One shape for all three lookups, which is the point: the instruction file
+    /// describes these markers once instead of a ladder of outcomes per route.
+    ///
+    /// Nobody is identified here. The agent reads the name and the rayon back and the caller
+    /// agrees or does not — a misheard digit is caught by the same person who would have
+    /// answered a challenge question, one turn earlier.</summary>
+    private async Task<string> DescribeAsync(IReadOnlyList<CallerMatch> matches)
     {
-        var result = await _identity.FindByAddressAsync(spokenAddress, default);
-        if (result.Outcome == CallerIdentityOutcome.NeedsConfirmation && result.CustomerId is { } found)
+        if (matches.Count == 0)
         {
-            _session.Found(found);
-            return $"CONFIRM_NEEDED. Customer {found}. {result.Challenge}";
+            return "NOT_FOUND.";
         }
 
-        return result.Outcome == CallerIdentityOutcome.Ambiguous
-            ? $"AMBIGUOUS. {result.Challenge}"
-            : "NEW_CALLER.";
-    }
-
-    [Description("Checks what the caller answered against their record. Call this with their exact words. Only " +
-                 "after this returns IDENTIFIED is the caller known.")]
-    public async Task<string> ConfirmCustomer(
-        [Description("The customer number from FindCustomer")] int customerId,
-        [Description("Exactly what the caller said, in their words")] string spokenAnswer)
-    {
-        var result = await _identity.ConfirmAsync(customerId, spokenAnswer, default);
-        if (result.Outcome != CallerIdentityOutcome.Identified)
+        if (matches.Count > 1)
         {
-            return $"NOT_CONFIRMED. {result.Challenge}";
+            // Several people. Each with the one address line that tells them apart, and their
+            // customer number so the agent can come back through FindCustomerById with an id it
+            // was given rather than one it read out of what the caller said.
+            var candidates = matches.Select(m =>
+                $"{m.CustomerId} {m.Name ?? "adsız"} — {m.Addresses[0].District} r., {m.Addresses[0].Street}");
+
+            return $"MANY. {string.Join("; ", candidates)}";
         }
 
-        _session.Confirmed(customerId);
-        return await DescribeIdentified(customerId, result.CustomerName);
+        var match = matches[0];
+        var where = match.Addresses.Count == 1
+            ? $"Ünvan {match.Addresses[0].Id}: {match.Addresses[0].Spoken()}"
+            : "Ünvanlar: " + string.Join("; ", match.Addresses.Select(a => $"{a.Id} — {a.Spoken()}"));
+
+        // Remembered for the call log. Not proof they are who they say — the caller still has
+        // to agree out loud — but a browser call carries no number to look them up by
+        // afterwards, so this is the only moment the record can be attributed to a person.
+        _session.Identified(match.CustomerId);
+
+        return $"FOUND. Müştəri {match.CustomerId}, {match.Name ?? "adsız"}. {where}. "
+               + await DescribeCatalogAsync();
     }
 
-    private async Task<string> DescribeIdentified(int customerId, string? knownName)
+    /// <summary>The catalogue, carried back with whoever the call is about.
+    ///
+    /// It used to be a tool of its own, and that tool was a whole round trip to deliver two
+    /// lines of text. A tool call is two model invocations — one to ask for it, one to speak
+    /// afterwards — so each one costs the full prompt twice over, about 4,700 tokens and a
+    /// second of silence the caller sits through. Riding along with a call the agent was making
+    /// anyway costs fifty tokens and no silence at all.
+    ///
+    /// Every path to placing an order passes through identification or registration, so the ids
+    /// are always in hand by the time they are needed.</summary>
+    private async Task<string> DescribeCatalogAsync()
     {
-        var addresses = await _identity.GetAddressesAsync(customerId, default);
-        var where = addresses.Count switch
+        var catalog = await _directory.GetProductsAsync(default);
+        if (catalog.Count == 0)
         {
-            0 => "No address on file.",
-            1 => $"Address {addresses[0].Id}: {addresses[0].Spoken()}",
-            _ => "Addresses: " + string.Join("; ", addresses.Select(a => $"{a.Id} — {a.Spoken()}")),
-        };
+            return "NO_PRODUCTS.";
+        }
 
-        return $"IDENTIFIED. Customer {customerId}, {knownName ?? "no name on file"}. {where}";
+        return "Məhsullar: " + string.Join("; ", catalog.Select(p =>
+        {
+            var cap = p.MaxOrderQuantity is { } max ? $", maks {Trim(max)} {p.Unit}" : string.Empty;
+            return $"{p.Id} {p.Name} — {p.UnitPrice:0.##} AZN / {p.Unit}{cap}";
+        }));
     }
 
-    /// <summary>Repeats what we already established rather than re-challenging someone whose
-    /// identity is settled — asking a caller their address twice on one call is how the last
-    /// test ended with them hanging up.</summary>
-    private async Task<string> DescribeAlreadyIdentified(int customerId)
-    {
-        var result = await _identity.FindAsync(customerId, null, default);
-        return await DescribeIdentified(customerId, result.CustomerName);
-    }
-
-    [Description("Records a caller who has never ordered before, and returns the customer number to read back " +
-                 "to them. Only call this once every field has been heard and repeated back.")]
+    [Description("Records a first-time caller and returns their customer number.")]
     public async Task<string> RegisterCustomer(
         [Description("Their name")] string name,
         [Description("Their phone number")] string phoneNumber,
         [Description("Baku rayon, e.g. Nəsimi")] string district,
-        [Description("Qəsəbə or massiv, empty if none")] string? area,
         [Description("Street name")] string street,
-        [Description("Döngə, e.g. 5-ci döngə — empty if none")] string? lane,
         [Description("Building number, e.g. 12A")] string building,
-        [Description("Apartment number, empty for a private house")] string? apartment,
-        [Description("A landmark the driver would use, empty if none")] string? landmark,
-        [Description("The whole address exactly as the caller said it")] string? spokenAddress)
+        [Description("Apartment number, empty for a private house")] string? apartment)
     {
         try
         {
-            var customer = await _identity.RegisterAsync(
-                new NewCustomerDetails(
-                    name, phoneNumber, district, area, street, lane, building, apartment, landmark, spokenAddress),
-                default);
+            var result = await _identity.RegisterAsync(
+                new NewCustomerDetails(name, phoneNumber, district, street, building, apartment), default);
 
-            return $"REGISTERED. Customer {customer.Id}.";
+            _session.Identified(result.CustomerId);
+            return $"REGISTERED. Müştəri {result.CustomerId}. " + await DescribeCatalogAsync();
         }
         catch (ArgumentException ex)
         {
@@ -164,117 +168,73 @@ public sealed class OrderTools
         }
     }
 
-    [Description("What this business sells, with prices and units.")]
-    public async Task<string> GetProductCatalog()
-    {
-        var catalog = await _orders.GetCatalogAsync(default);
-        return catalog.Count == 0
-            ? "No products."
-            : string.Join("; ", catalog.Select(p => $"{p.Name} — {p.UnitPrice:0.##} AZN / {p.Unit}"));
-    }
-
-    [Description("Adds what the caller asked for to the order. Call it once per product as they say it.")]
-    public async Task<string> AddToOrder(
-        [Description("The product as the caller named it")] string productName,
-        [Description("How many or how much")] decimal quantity)
-    {
-        if (quantity <= 0)
-        {
-            return "BAD_QUANTITY.";
-        }
-
-        var product = await _orders.MatchProductAsync(productName, default);
-        if (product is null)
-        {
-            var catalog = await _orders.GetCatalogAsync(default);
-            return $"NO_SUCH_PRODUCT. Products: {string.Join(", ", catalog.Select(p => p.Name))}.";
-        }
-
-        // Checked against the running total, not this line alone: three bidons asked for twice
-        // is six, and a cap that only looked at one request would wave it through.
-        var running = _draft.QuantityOf(product.Id) + quantity;
-        if (product.MaxOrderQuantity is { } cap && running > cap)
-        {
-            return $"OVER_MAXIMUM. {product.Name}: {cap:0.###} max.";
-        }
-
-        _draft.Add(product.Id, product.Name, quantity);
-        return $"Added. Order so far: {_draft.Describe()}";
-    }
-
-    [Description("Corrects a line to an exact quantity, or removes it with a quantity of zero.")]
-    public async Task<string> SetOrderQuantity(
-        [Description("The product as the caller named it")] string productName,
-        [Description("The quantity it should now be; zero removes it")] decimal quantity)
-    {
-        var product = await _orders.MatchProductAsync(productName, default);
-        if (product is null)
-        {
-            return "NO_SUCH_PRODUCT.";
-        }
-
-        if (product.MaxOrderQuantity is { } cap && quantity > cap)
-        {
-            return $"OVER_MAXIMUM. {product.Name}: {cap:0.###} max.";
-        }
-
-        _draft.Set(product.Id, product.Name, quantity);
-        return $"Updated. Order so far: {_draft.Describe()}";
-    }
-
-    [Description("The day this business can deliver. Call with an empty day to get the soonest; call with a day " +
-                 "the caller asked for instead to find out whether it works.")]
-    public async Task<string> GetDeliveryDay(
-        [Description("A day the caller asked for, as 2026-08-10 — empty for the soonest")] string? requestedDayLocal)
-    {
-        if (!string.IsNullOrWhiteSpace(requestedDayLocal))
-        {
-            if (!AzerbaijanTime.TryParse($"{requestedDayLocal.Trim()} 12:00", out var parsed))
-            {
-                return "UNREADABLE_DAY.";
-            }
-
-            var asked = parsed.InZone(AzerbaijanTime.Zone).Date;
-            return DescribeDay(await _orders.CheckDeliveryDayAsync(asked, default), asked);
-        }
-
-        var soonest = await _orders.ProposeDeliveryDayAsync(default);
-        return soonest is null
-            ? "NO_WORKING_DAY."
-            : $"DELIVERY_DAY. {soonest.Value:yyyy-MM-dd}";
-    }
-
-    [Description("Places the order. Only after the caller has confirmed what they want and which day. It goes to " +
-                 "the address already on the customer's record.")]
+    [Description("Places the whole order at once and returns the delivery day. Call it after the caller has said "
+                 + "everything they want.")]
     public async Task<string> PlaceOrder(
-        [Description("The confirmed customer number")] int customerId,
-        [Description("Delivery day as 2026-08-10, from GetDeliveryDay")] string deliveryDayLocal,
-        [Description("Anything else the caller mentioned, empty if nothing")] string? notes)
+        [Description("The customer number")] int customerId,
+        [Description("Address id from the find result; 0 if they only have one")] int addressId,
+        [Description("Every product and quantity they asked for")] OrderLineInput[] lines)
     {
-        if (_draft.IsEmpty)
+        if (lines is null || lines.Length == 0)
         {
             return "EMPTY_ORDER.";
         }
 
-        LocalDate? deliveryDay = null;
-        if (!string.IsNullOrWhiteSpace(deliveryDayLocal))
+        var catalog = await _directory.GetProductsAsync(default);
+        var byId = catalog.ToDictionary(p => p.Id);
+
+        // Merged before anything is checked: a caller who says three bidons and then another two
+        // is asking for five, and a cap judged one line at a time would wave that through.
+        var wanted = new Dictionary<int, decimal>();
+        foreach (var line in lines)
         {
-            if (!AzerbaijanTime.TryParse($"{deliveryDayLocal.Trim()} 12:00", out var parsed))
+            if (line.Quantity <= 0)
             {
-                return "UNREADABLE_DAY.";
+                return "BAD_QUANTITY.";
             }
 
-            deliveryDay = parsed.InZone(AzerbaijanTime.Zone).Date;
-
-            // Checked here as well as in GetDeliveryDay, because the model does not have to have
-            // called that: on a real call it worked through three dates, was told twice the
-            // business was closed, and then placed the order on a fourth day it had never asked
-            // about. A promise made on a closed day is a delivery that does not arrive.
-            var verdict = await _orders.CheckDeliveryDayAsync(deliveryDay.Value, default);
-            if (verdict != DeliveryDayVerdict.Ok)
+            if (!byId.ContainsKey(line.ProductId))
             {
-                return DescribeDay(verdict, deliveryDay.Value);
+                return $"NO_SUCH_PRODUCT. {line.ProductId}. "
+                       + string.Join("; ", catalog.Select(p => $"{p.Id} {p.Name}"));
             }
+
+            wanted[line.ProductId] = wanted.GetValueOrDefault(line.ProductId) + line.Quantity;
+        }
+
+        foreach (var (productId, quantity) in wanted)
+        {
+            var product = byId[productId];
+            if (product.MaxOrderQuantity is { } cap && quantity > cap)
+            {
+                return $"OVER_MAXIMUM. {product.Name}: {Trim(cap)} {product.Unit} maks.";
+            }
+        }
+
+        var addresses = await _identity.GetAddressesAsync(customerId, default);
+        if (addresses.Count == 0)
+        {
+            return "NO_ADDRESS_ON_FILE.";
+        }
+
+        // The id has to be checked against this customer's own addresses rather than trusted.
+        // It used to be resolved entirely server-side because the model filled it with 43 — the
+        // mənzil out of "Xətai r., Sarayevo, ev 12, mənzil 43" — and a caller with two addresses
+        // now has to be able to choose. Rejecting an id that is not theirs costs one retry; not
+        // checking it delivers to somebody else's street.
+        var address = addressId <= 0
+            ? addresses.FirstOrDefault(a => a.IsDefault) ?? addresses[0]
+            : addresses.FirstOrDefault(a => a.Id == addressId);
+
+        if (address is null)
+        {
+            return "NO_SUCH_ADDRESS. " + string.Join("; ", addresses.Select(a => $"{a.Id} — {a.Spoken()}"));
+        }
+
+        var deliveryDay = await _directory.GetDeliveryDayAsync(default);
+        if (deliveryDay is null)
+        {
+            return "NO_WORKING_DAY.";
         }
 
         // Everything below exists so this tool can never hand back something a model could read
@@ -286,27 +246,27 @@ public sealed class OrderTools
         // producing a string that looks like a confirmation unless a row exists.
         try
         {
-            // The address is resolved here rather than asked of the model. It used to be a
-            // parameter and the model filled it with 43 — the mənzil out of "Xətai r., Sarayevo,
-            // ev 12, mənzil 43". Asking it to copy an id out of a sentence holding three other
-            // numbers gets the wrong one, and the wrong one is a foreign-key violation that
-            // kills the order.
-            var addresses = await _identity.GetAddressesAsync(customerId, default);
-            if (addresses.Count == 0)
-            {
-                return "NO_ADDRESS_ON_FILE.";
-            }
+            var order = await _orders.PlaceAsync(
+                customerId, address.Id, wanted.Select(kv => (kv.Key, kv.Value)).ToList(), deliveryDay, notes: null,
+                default);
 
-            var address = addresses.FirstOrDefault(a => a.IsDefault) ?? addresses[0];
-            var order = await _orders.PlaceAsync(customerId, address.Id, _draft.Lines, deliveryDay, notes, default);
             if (order.Id <= 0)
             {
-                return await FailWithoutConfirming(
-                    customerId, "The order returned no order number.", exception: null);
+                return await FailWithoutConfirming(customerId, "The order returned no order number.", exception: null);
             }
 
-            var day = deliveryDay is null ? string.Empty : $", {deliveryDay.Value:yyyy-MM-dd}";
-            return $"ORDER_PLACED. Order {order.Id}: {_draft.Describe()}{day}.";
+            _session.Placed(order.Id);
+            _session.Identified(customerId);
+
+            // The readback comes from here rather than from the model's memory of the
+            // conversation. That is the whole reason the order is one call: what it repeats to
+            // the caller is what went into the database, not what it believes it heard.
+            var what = string.Join(", ", wanted.Select(kv => Say(byId[kv.Key], kv.Value)));
+            // The number rides inside the marker rather than in the sentence. The caller does
+            // not want an order number read at them, and "never speak a marker" is a rule the
+            // instructions already carry — so putting it here is worth more than another line
+            // asking the model not to say it. CancelOrder still reads it straight back off.
+            return $"ORDER_PLACED#{order.Id}. {what}. Çatdırılma: {AzerbaijanTime.SpokenDate(deliveryDay.Value)}";
         }
         catch (Exception ex)
         {
@@ -314,17 +274,36 @@ public sealed class OrderTools
         }
     }
 
-    /// <summary>One marker per verdict, shared by the two tools that reach one. Two spellings of
-    /// the same refusal is two things for the instructions to cover and one of them to be
-    /// missing.</summary>
-    private static string DescribeDay(DeliveryDayVerdict verdict, LocalDate day) => verdict switch
+    [Description("Cancels the order just placed on this call, so a corrected one can replace it.")]
+    public async Task<string> CancelOrder(
+        [Description("The number in the ORDER_PLACED marker")] int orderId,
+        [Description("The customer number")] int customerId)
     {
-        DeliveryDayVerdict.Ok => $"DAY_OK. {day:yyyy-MM-dd}",
-        DeliveryDayVerdict.InThePast => $"DAY_IN_THE_PAST. {day:yyyy-MM-dd}",
-        DeliveryDayVerdict.TooSoon => $"DAY_TOO_SOON. {day:yyyy-MM-dd}",
-        DeliveryDayVerdict.TooFarAhead => $"DAY_TOO_FAR_AHEAD. {day:yyyy-MM-dd}",
-        _ => $"CLOSED_THAT_DAY. {day:yyyy-MM-dd}",
-    };
+        if (!_session.CanCancel(orderId))
+        {
+            return "NOT_THIS_CALL.";
+        }
+
+        if (!await _orders.CancelPlacedAsync(orderId, customerId, default))
+        {
+            return "NOT_CANCELLED.";
+        }
+
+        _session.Cancelled();
+        return $"ORDER_CANCELLED#{orderId}.";
+    }
+
+    /// <summary>One order line the way it is said out loud: "3 ədəd Sirab".
+    ///
+    /// It used to read "Sirab × 3", and the agent said "Sirab vuraq üç" — it read the symbol. A
+    /// tool result is spoken almost verbatim, so it has to be written the way a person would say
+    /// it, in the order they would say it, with the unit the product is actually sold in.</summary>
+    private static string Say(ProductResponse product, decimal quantity)
+        => $"{Trim(quantity)} {product.Unit} {product.Name}".Replace("  ", " ");
+
+    /// <summary>Three, not 3.000 — the agent reads this aloud.</summary>
+    private static string Trim(decimal quantity)
+        => quantity == decimal.Truncate(quantity) ? ((long)quantity).ToString() : quantity.ToString("0.###");
 
     /// <summary>The order did not happen. Get a person on the line and give the model nothing it
     /// could mistake for a confirmation — no order number, no products, no day.</summary>

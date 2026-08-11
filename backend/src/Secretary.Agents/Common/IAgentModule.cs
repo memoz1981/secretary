@@ -25,4 +25,13 @@ public interface IAgentModule
     /// <summary>The tools for one call. Built per call rather than held, because every tool
     /// object closes over request-scoped services.</summary>
     IList<AITool> BuildTools();
+
+    /// <summary>Writes this call to the module's own log, once, as the call tears down.
+    ///
+    /// The module does it rather than the orchestrator because the record is module-shaped: an
+    /// appointment call points at an appointment and a client in app.Calls, an order call at an
+    /// order and a customer in ord.Calls. The orchestrator knows what every call has in common
+    /// and nothing else, which is exactly what CallLogEntry carries — the module fills in who
+    /// the call was about, because only its own tools ever found that out.</summary>
+    Task LogCallAsync(CallLogEntry entry, CancellationToken cancellationToken);
 }

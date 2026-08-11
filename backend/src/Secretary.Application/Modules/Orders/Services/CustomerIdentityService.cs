@@ -7,17 +7,17 @@ using NodaTime;
 
 namespace Secretary.Application.Services;
 
-/// <summary>Works out who is calling, and says how sure it is.
+/// <summary>Works out who is calling — three ways in, one shape out.
 ///
-/// Every decision here is deterministic and in code. The model's job is to ask the question this
-/// returns and repeat the answer back — never to conclude that it has identified someone. On the
-/// appointment line the same model has invented a caller's phone number and confirmed a booking
-/// it never made; identity is not something to leave to it.
+/// Each lookup returns the customers it found together with their addresses, and nothing here
+/// decides that the caller is who they say. The check happens out loud: the agent reads back the
+/// name and the rayon, and the caller agrees or does not. That replaced a confirm tool and a
+/// generated challenge question, and it catches the same thing they did — a misheard digit —
+/// without a second round trip.
 ///
-/// Search keys are the customer number and the phone number: unique, and spoken as digits.
-/// Name and address are challenge fields — they confirm a match, they never find one. A full
-/// address does find a household, but two people live at one address, so it narrows rather than
-/// identifies.</summary>
+/// Search keys are the customer number, the phone number, and the rayon plus street. The first
+/// two are unique and spoken as digits. The third finds a household rather than a person, which
+/// is why a name still has to come back correct.</summary>
 public sealed class CustomerIdentityService
 {
     private readonly IUnitOfWork _uow;
@@ -31,153 +31,84 @@ public sealed class CustomerIdentityService
         _currentTenant = currentTenant;
     }
 
-    /// <summary>The last resort, and only after the caller has said they are sure they have
-    /// ordered before: find them by where they live.
-    ///
-    /// A full normalised match on rayon and street, never a partial one. Two people at one
-    /// address is ordinary — a household, a family — so this narrows to a household and then
-    /// asks for a name; it does not identify anybody on its own.</summary>
-    public async Task<CallerIdentityResult> FindByAddressAsync(
-        string spokenAddress, CancellationToken cancellationToken)
+    /// <summary>By customer number. At most one, and no challenge — a caller who quotes their
+    /// number has produced the one piece of evidence nobody else has, and being asked for their
+    /// street straight afterwards reads as not being believed. The number is not secret, so this
+    /// is a real trade: for water on cash delivery it is worth the turn it saves on every call,
+    /// and it would not be for anything valuable.</summary>
+    public async Task<IReadOnlyList<CallerMatch>> FindByIdAsync(int customerId, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(spokenAddress))
+        if (customerId <= 0)
         {
-            return new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null);
+            return [];
         }
 
-        var spoken = AddressText.Normalize(spokenAddress);
-        var customers = await _uow.Customers.GetAllAsync(cancellationToken);
-
-        var matches = new List<Customer>();
-        foreach (var customer in customers)
-        {
-            var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
-            if (addresses.Any(a =>
-                    a.StreetNormalized.Length > 0
-                    && spoken.Contains(a.StreetNormalized, StringComparison.Ordinal)
-                    && spoken.Contains(AddressText.Normalize(a.District), StringComparison.Ordinal)))
-            {
-                matches.Add(customer);
-            }
-        }
-
-        return matches.Count switch
-        {
-            0 => new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null),
-
-            // One household. The name is what turns it into one person, and it is the one thing
-            // the caller will not have to look up.
-            1 => new CallerIdentityResult(
-                CallerIdentityOutcome.NeedsConfirmation, matches[0].Id, matches[0].Name,
-                "Adınızı deyə bilərsiniz?"),
-
-            _ => new CallerIdentityResult(
-                CallerIdentityOutcome.Ambiguous, null, null, "Adınızı deyə bilərsiniz?"),
-        };
+        var customer = await _uow.Customers.GetByIdAsync(customerId, cancellationToken);
+        return customer is null ? [] : await DescribeAsync([customer], cancellationToken);
     }
 
-    /// <summary>By customer number, or by phone number. Neither identifies on its own.</summary>
-    public async Task<CallerIdentityResult> FindAsync(
-        int? customerId, string? phoneNumber, CancellationToken cancellationToken)
+    /// <summary>By phone number. More than one is ordinary — a household landline, an office —
+    /// so this can hand back several and the agent asks which name.</summary>
+    public async Task<IReadOnlyList<CallerMatch>> FindByPhoneAsync(
+        string phoneNumber, CancellationToken cancellationToken)
     {
-        if (customerId is > 0)
-        {
-            var byId = await _uow.Customers.GetByIdAsync(customerId.Value, cancellationToken);
-
-            // A customer number identifies outright — no challenge.
-            //
-            // It was confirmed like the phone route at first, and on real calls that was simply
-            // wrong. A caller who quotes their number has already produced the one piece of
-            // evidence nobody else has, and being asked for their street straight afterwards
-            // reads as not being believed. Worse, they answer by repeating the number, the
-            // address check fails on it, and the call goes round again — which is exactly what
-            // happened, twice.
-            //
-            // The number is not secret and this is a real trade: someone else's number gets
-            // their address read out and an order billed to them. For water on cash delivery
-            // that is worth one turn saved on every call. It would not be for anything valuable.
-            return byId is null
-                ? new CallerIdentityResult(
-                    CallerIdentityOutcome.NoSuchCustomer, null, null,
-                    "Müştəri nömrənizi rəqəm-rəqəm təkrar edə bilərsiniz?")
-                : new CallerIdentityResult(CallerIdentityOutcome.Identified, byId.Id, byId.Name, null);
-        }
-
         if (string.IsNullOrWhiteSpace(phoneNumber))
         {
-            return new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null);
+            return [];
         }
 
         var matches = await _uow.Customers.FindByPhoneNumberAsync(
             PhoneNumberNormalizer.Normalize(phoneNumber), cancellationToken);
 
-        return matches.Count switch
-        {
-            // Not "new caller" — a number we do not hold could equally be a number we misheard,
-            // or a second phone the customer has never given us. Asking whether they have
-            // ordered before costs one turn and decides it; registering silently costs them a
-            // duplicate record and a second customer number.
-            0 => new CallerIdentityResult(
-                CallerIdentityOutcome.NotFound, null, null, "Əvvəllər bizdən sifariş vermisiniz?"),
-            1 => await ChallengeFor(matches[0], cancellationToken),
-
-            // Two people on one number is real — a household, an office. Asking for the name
-            // separates them, and it is the one thing they will not have to think about.
-            _ => new CallerIdentityResult(
-                CallerIdentityOutcome.Ambiguous, null, null, "Adınızı da deyə bilərsiniz?"),
-        };
+        return await DescribeAsync(matches, cancellationToken);
     }
 
-    /// <summary>Checks what the caller said against what is on file.
-    ///
-    /// The question asked was open — "what is your address?" — never "is your address X?", so
-    /// this is a real check rather than a caller agreeing with a prompt. Against a misheard
-    /// match, which is the actual failure mode, that is what catches it.</summary>
-    public async Task<CallerIdentityResult> ConfirmAsync(
-        int customerId, string spokenAnswer, CancellationToken cancellationToken)
+    /// <summary>By where they live. The rayon and the street arrive as separate fields rather
+    /// than one spoken line, because the agent has to ask for them separately anyway and slicing
+    /// a recited address apart afterwards is where it went wrong.</summary>
+    public async Task<IReadOnlyList<CallerMatch>> FindByAddressAsync(
+        string district, string street, CancellationToken cancellationToken)
     {
-        var customer = await _uow.Customers.GetByIdAsync(customerId, cancellationToken);
-        if (customer is null)
+        var canonicalDistrict = BakuDistricts.Match(district);
+        var normalizedStreet = AddressText.Normalize(street);
+        if (canonicalDistrict is null || normalizedStreet.Length == 0)
         {
-            return new CallerIdentityResult(CallerIdentityOutcome.NotFound, null, null, null);
+            return [];
         }
 
-        if (string.IsNullOrWhiteSpace(spokenAnswer))
-        {
-            return await ChallengeFor(customer, cancellationToken);
-        }
+        // One query. This used to read every customer and then their addresses one at a time,
+        // which is fine at two customers and a table scan per call at two thousand.
+        var matches = await _uow.Customers.FindByAddressAsync(
+            canonicalDistrict, normalizedStreet, cancellationToken);
 
-        var addresses = await _uow.Customers.GetAddressesAsync(customerId, cancellationToken);
-        var spokenStreet = AddressText.Normalize(spokenAnswer);
-
-        // Generous on purpose. The caller is reciting their own address down a phone line, and
-        // the transcript arrives mangled; requiring every field to line up would reject the
-        // right person far more often than it caught the wrong one. A street that appears in
-        // what they said is enough, given a customer number or phone number already matched.
-        var addressMatches = addresses.Any(a =>
-            spokenStreet.Contains(a.StreetNormalized, StringComparison.Ordinal)
-            || a.StreetNormalized.Contains(spokenStreet, StringComparison.Ordinal)
-            // The rayon on its own counts. It is what they were asked for, there are only twelve
-            // of them, and it is the half of the answer a transcript is least likely to mangle.
-            || spokenStreet.Contains(AddressText.Normalize(a.District), StringComparison.Ordinal));
-
-        var nameMatches = customer.Name is not null
-            && AddressText.Normalize(spokenAnswer).Contains(AddressText.Normalize(customer.Name), StringComparison.Ordinal);
-
-        return addressMatches || nameMatches
-            ? new CallerIdentityResult(CallerIdentityOutcome.Identified, customer.Id, customer.Name, null)
-            : new CallerIdentityResult(
-                CallerIdentityOutcome.NeedsConfirmation, customer.Id, customer.Name,
-                "Deyilən ünvan qeydə uyğun gəlmədi. Ünvanı bir daha soruşun.");
+        return await DescribeAsync(matches, cancellationToken);
     }
 
-    /// <summary>A first call: name, number and address, and the customer number read back.</summary>
-    public async Task<Customer> RegisterAsync(NewCustomerDetails details, CancellationToken cancellationToken)
+    /// <summary>A first call: name, number and address, and the customer number read back.
+    ///
+    /// ⚠ Checks the phone number before inserting. Not finding a customer now sends the caller
+    /// here rather than ending the call, and a misheard digit — 050 for 055 — would otherwise
+    /// make a second Elvin at the same address that nobody notices until the driver does.</summary>
+    public async Task<RegistrationResult> RegisterAsync(
+        NewCustomerDetails details, CancellationToken cancellationToken)
     {
         var tenantId = _currentTenant.TenantId
             ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
         var now = _clock.GetCurrentInstant();
+        var existing = (await _uow.Customers.FindByPhoneNumberAsync(
+            PhoneNumberNormalizer.Normalize(details.PhoneNumber), cancellationToken)).FirstOrDefault();
+
+        if (existing is not null)
+        {
+            // They are already ours — the lookup missed them, most likely because the number was
+            // heard differently or they had no address on file. Give them the address rather
+            // than a second identity.
+            await AddAddressIfNewAsync(existing.Id, details, now, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+            return new RegistrationResult(existing.Id, AlreadyExisted: true);
+        }
+
         var customer = Customer.Create(tenantId, details.Name, now);
         await _uow.Customers.AddAsync(customer, cancellationToken);
 
@@ -187,14 +118,10 @@ public sealed class CustomerIdentityService
         await _uow.Customers.AddPhoneNumberAsync(
             CustomerPhoneNumber.Create(customer.Id, details.PhoneNumber, isPrimary: true, now), cancellationToken);
 
-        await _uow.Customers.AddAddressAsync(
-            CustomerAddress.Create(
-                customer.Id, details.District, details.Area, details.Street, details.Lane, details.Building,
-                details.Apartment, details.Landmark, details.SpokenAddress, label: null, isDefault: true, now),
-            cancellationToken);
+        await AddAddressIfNewAsync(customer.Id, details, now, cancellationToken);
 
         await _uow.SaveChangesAsync(cancellationToken);
-        return customer;
+        return new RegistrationResult(customer.Id, AlreadyExisted: false);
     }
 
     /// <summary>Adds a number to a customer we have already identified. The reason the numbers
@@ -229,22 +156,46 @@ public sealed class CustomerIdentityService
         return addresses.Select(CustomerAddressResponse.From).ToList();
     }
 
-    /// <summary>Ask for the address, or for the name when there is no address yet. Never states
-    /// the stored value: reading it out and inviting "bəli" would confirm nothing, and would
-    /// hand a stranger the address of whoever the number really belongs to.</summary>
-    private async Task<CallerIdentityResult> ChallengeFor(Customer customer, CancellationToken cancellationToken)
+    /// <summary>Attaches the addresses, and drops anyone we hold none for — see CallerMatch.</summary>
+    private async Task<IReadOnlyList<CallerMatch>> DescribeAsync(
+        IReadOnlyList<Customer> customers, CancellationToken cancellationToken)
     {
-        var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
+        var described = new List<CallerMatch>(customers.Count);
+        foreach (var customer in customers)
+        {
+            var addresses = await _uow.Customers.GetAddressesAsync(customer.Id, cancellationToken);
+            if (addresses.Count == 0)
+            {
+                continue;
+            }
 
-        // The rayon and the street, not the whole address. It is one short phrase rather than a
-        // recitation, it is the part the matcher actually compares, and a caller reeling off a
-        // building and a flat number gives the transcript more to mangle for no extra
-        // certainty.
-        var challenge = addresses.Count > 0
-            ? "Rayonunuzu və küçənizi deyə bilərsiniz?"
-            : "Adınızı deyə bilərsiniz?";
+            described.Add(new CallerMatch(
+                customer.Id, customer.Name, addresses.Select(CustomerAddressResponse.From).ToList()));
+        }
 
-        return new CallerIdentityResult(
-            CallerIdentityOutcome.NeedsConfirmation, customer.Id, customer.Name, challenge);
+        return described;
+    }
+
+    private async Task AddAddressIfNewAsync(
+        int customerId, NewCustomerDetails details, Instant now, CancellationToken cancellationToken)
+    {
+        var existing = await _uow.Customers.GetAddressesAsync(customerId, cancellationToken);
+        var canonicalDistrict = BakuDistricts.Match(details.District)
+            ?? throw new ArgumentException($"'{details.District}' is not a Baku rayon.", nameof(details));
+
+        var street = AddressText.Normalize(details.Street);
+        var building = AddressText.Normalize(details.Building);
+        if (existing.Any(a =>
+                a.District == canonicalDistrict && a.StreetNormalized == street && a.BuildingNormalized == building))
+        {
+            return;
+        }
+
+        await _uow.Customers.AddAddressAsync(
+            CustomerAddress.Create(
+                customerId, details.District, area: null, details.Street, lane: null, details.Building,
+                details.Apartment, landmark: null, spokenText: null, label: null,
+                isDefault: existing.Count == 0, now),
+            cancellationToken);
     }
 }

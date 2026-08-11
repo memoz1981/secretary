@@ -47,5 +47,8 @@ public sealed class AgentModuleRegistryTests
         public string InstructionName => Key.ToString();
 
         public IList<AITool> BuildTools() => [];
+
+        /// <summary>The registry test is about lookup, not logging.</summary>
+        public Task LogCallAsync(CallLogEntry entry, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

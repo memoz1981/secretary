@@ -51,4 +51,19 @@ public static class AzerbaijanTime
     public static string FormatTimeOnly(Instant instant) => TimeOnlyPattern.Format(instant.InZone(Zone).TimeOfDay);
 
     public static LocalDateTime ToLocal(Instant instant) => instant.InZone(Zone).LocalDateTime;
+
+    private static readonly string[] MonthsAz =
+    [
+        "Yanvar", "Fevral", "Mart", "Aprel", "May", "İyun",
+        "İyul", "Avqust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr",
+    ];
+
+    /// <summary>"12 Avqust" — the day as a person says it, with no year in it.
+    ///
+    /// The year is left out on purpose rather than trimmed by instruction. Handed 2026-08-12 the
+    /// model reads the year aloud, and handed a year it will also accept one: a caller was once
+    /// offered and agreed to the 31st of December 2031. A delivery is always within the month or
+    /// two ahead, so the year carries no information and only gives the model something to get
+    /// wrong.</summary>
+    public static string SpokenDate(LocalDate date) => $"{date.Day} {MonthsAz[date.Month - 1]}";
 }
