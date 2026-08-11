@@ -190,6 +190,14 @@ public sealed class OrderTools
             return $"NO_SUCH_PRODUCT. Products: {string.Join(", ", catalog.Select(p => p.Name))}.";
         }
 
+        // Checked against the running total, not this line alone: three bidons asked for twice
+        // is six, and a cap that only looked at one request would wave it through.
+        var running = _draft.QuantityOf(product.Id) + quantity;
+        if (product.MaxOrderQuantity is { } cap && running > cap)
+        {
+            return $"OVER_MAXIMUM. {product.Name}: {cap:0.###} max.";
+        }
+
         _draft.Add(product.Id, product.Name, quantity);
         return $"Added. Order so far: {_draft.Describe()}";
     }
@@ -203,6 +211,11 @@ public sealed class OrderTools
         if (product is null)
         {
             return "NO_SUCH_PRODUCT.";
+        }
+
+        if (product.MaxOrderQuantity is { } cap && quantity > cap)
+        {
+            return $"OVER_MAXIMUM. {product.Name}: {cap:0.###} max.";
         }
 
         _draft.Set(product.Id, product.Name, quantity);

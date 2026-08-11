@@ -8,12 +8,13 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { getTenants } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 
 export function TenantListPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [search, setSearch] = useState("");
   const state = useApiData(() => getTenants(token!, search || undefined), [token, search]);
@@ -44,7 +45,23 @@ export function TenantListPage() {
         emptyMessage={t("noTenantsYet")}
         columns={[
           { header: t("colName"), render: (tenant) => tenant.name },
-          { header: t("colTimezone"), render: (tenant) => tenant.timezone },
+          {
+            // What the admin is really managing. The list showed everything except this, so
+            // finding out what a client had bought meant opening them one at a time.
+            header: t("tenantModules"),
+            render: (tenant) =>
+              tenant.enabledModules.length === 0 ? (
+                <span className="sub">{t("noModules")}</span>
+              ) : (
+                <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
+                  {tenant.enabledModules.map((module) => (
+                    <Pill key={module} variant="neutral">
+                      {translateEnum(moduleLabels, module, language)}
+                    </Pill>
+                  ))}
+                </span>
+              ),
+          },
           { header: t("colPhoneLine"), render: (tenant) => tenant.phoneLine ?? t("unassigned") },
           {
             header: t("colStatus"),

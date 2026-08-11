@@ -32,7 +32,8 @@ public sealed class OrderService
 
         return products
             .Select(p => new ProductResponse(
-                p.Id, p.Name, p.Description, unitNames.GetValueOrDefault(p.MeasurementUnitId, "ea."), p.UnitPrice))
+                p.Id, p.Name, unitNames.GetValueOrDefault(p.MeasurementUnitId, string.Empty), p.UnitPrice,
+                p.MaxOrderQuantity))
             .ToList();
     }
 
@@ -83,12 +84,6 @@ public sealed class OrderService
         return BusinessHoursService.NextWorkingDay(week, today, leadDays);
     }
 
-    /// <summary>How far ahead an order may be placed. A phone order for water is for this week,
-    /// and a date beyond this is a mishearing rather than a request — a caller was offered and
-    /// accepted the 31st of December 2031, which is a Wednesday and so passed a weekday check
-    /// with nothing else to stop it.</summary>
-    private const int MaxDeliveryDaysAhead = 30;
-
     /// <summary>Whether a day the caller asked for instead is one the business works, and is a
     /// day it makes sense to promise at all. "Birigün olar?" is a normal thing to say, and the
     /// answer has to come from the tenant's days rather than the model's sense of the
@@ -106,7 +101,9 @@ public sealed class OrderService
             return DeliveryDayVerdict.InThePast;
         }
 
-        if (day > today.PlusDays(MaxDeliveryDaysAhead))
+        var settings = await _uow.OrderSettings.GetForCurrentTenantAsync(cancellationToken);
+        var window = settings?.MaxDeliveryDaysAhead ?? OrderSettings.DefaultMaxDeliveryDaysAhead;
+        if (day > today.PlusDays(window))
         {
             return DeliveryDayVerdict.TooFarAhead;
         }
@@ -184,7 +181,9 @@ public sealed class OrderService
     public async Task<OrderSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken)
     {
         var settings = await _uow.OrderSettings.GetForCurrentTenantAsync(cancellationToken);
-        return new OrderSettingsResponse(settings?.LeadWorkingDays ?? OrderSettings.DefaultLeadWorkingDays);
+        return new OrderSettingsResponse(
+            settings?.LeadWorkingDays ?? OrderSettings.DefaultLeadWorkingDays,
+            settings?.MaxDeliveryDaysAhead ?? OrderSettings.DefaultMaxDeliveryDaysAhead);
     }
 
     /// <summary>Creates the row on first save rather than for every tenant up front — a tenant
@@ -199,16 +198,17 @@ public sealed class OrderService
         var settings = await _uow.OrderSettings.GetForCurrentTenantAsync(cancellationToken);
         if (settings is null)
         {
-            settings = OrderSettings.Create(tenantId, request.LeadWorkingDays, now);
+            settings = OrderSettings.Create(
+                tenantId, request.LeadWorkingDays, request.MaxDeliveryDaysAhead, now);
             await _uow.OrderSettings.AddAsync(settings, cancellationToken);
         }
         else
         {
-            settings.SetLeadWorkingDays(request.LeadWorkingDays, now);
+            settings.Update(request.LeadWorkingDays, request.MaxDeliveryDaysAhead, now);
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
-        return new OrderSettingsResponse(settings.LeadWorkingDays);
+        return new OrderSettingsResponse(settings.LeadWorkingDays, settings.MaxDeliveryDaysAhead);
     }
 
     public async Task<Order> PlaceAsync(

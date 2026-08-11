@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -318,7 +318,7 @@ namespace Secretary.Infrastructure.Common.Persistence.Migrations
                 """
                 INSERT INTO [ord].[Units] ([Name], [CreatedAt], [UpdatedAt], [Status])
                 SELECT seed.[Name], SYSUTCDATETIME(), SYSUTCDATETIME(), 0
-                FROM (VALUES ('ea.'), ('kg'), ('m3')) AS seed([Name])
+                FROM (VALUES (N'ədəd'), ('kg'), ('m3')) AS seed([Name])
                 WHERE NOT EXISTS (SELECT 1 FROM [ord].[Units] u WHERE u.[Name] = seed.[Name]);
                 """);
         }

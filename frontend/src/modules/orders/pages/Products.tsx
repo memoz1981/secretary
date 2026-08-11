@@ -41,6 +41,11 @@ export function ProductsPage() {
           { header: t("product"), render: (p) => p.name },
           { header: t("colPrice"), render: (p) => `${p.unitPrice} AZN / ${p.unit}`, className: "mono" },
           { header: t("colAliases"), render: (p) => p.aliases ?? "—" },
+          {
+            header: t("maxOrderQuantity"),
+            render: (p) => (p.maxOrderQuantity === null ? "—" : String(p.maxOrderQuantity)),
+            className: "mono",
+          },
           ...(canEdit
             ? [
                 {
@@ -93,10 +98,14 @@ function ProductEditor({
   const { t } = useLanguage();
   const units = useApiData(() => getUnits(token!), [token]);
   const [name, setName] = useState(existing?.name ?? "");
-  const [description, setDescription] = useState(existing?.description ?? "");
   const [unitId, setUnitId] = useState(existing ? String(existing.measurementUnitId) : "");
   const [price, setPrice] = useState(existing ? String(existing.unitPrice) : "");
   const [aliases, setAliases] = useState(existing?.aliases ?? "");
+  const [maxQuantity, setMaxQuantity] = useState(
+    existing?.maxOrderQuantity === null || existing?.maxOrderQuantity === undefined
+      ? ""
+      : String(existing.maxOrderQuantity),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -108,6 +117,10 @@ function ProductEditor({
     if (!isRequired(name)) nextErrors.name = t("productNameRequired");
     if (!isRequired(unitId)) nextErrors.unit = t("unitRequired");
     if (price === "" || Number.isNaN(Number(price)) || Number(price) < 0) nextErrors.price = t("enterValidPrice");
+    if (maxQuantity.trim() !== "" && (Number.isNaN(Number(maxQuantity)) || Number(maxQuantity) <= 0)) {
+      nextErrors.maxQuantity = t("enterValidMaxQuantity");
+    }
+
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -115,10 +128,10 @@ function ProductEditor({
     try {
       const request = {
         name,
-        description: description.trim() === "" ? null : description,
         measurementUnitId: Number(unitId),
         unitPrice: Number(price),
         aliases: aliases.trim() === "" ? null : aliases,
+        maxOrderQuantity: maxQuantity.trim() === "" ? null : Number(maxQuantity),
       };
 
       if (existing) {
@@ -161,12 +174,13 @@ function ProductEditor({
             onChange={(e) => setAliases(e.target.value)}
           />
           <div className="sub" style={{ marginTop: "calc(var(--space-2) * -1)" }}>{t("aliasesHelp")}</div>
-          <TextAreaField
-            label={t("description")}
-            value={description}
-            rows={2}
-            onChange={(e) => setDescription(e.target.value)}
+          <TextField
+            label={t("maxOrderQuantity")}
+            value={maxQuantity}
+            onChange={(e) => setMaxQuantity(e.target.value)}
+            error={errors.maxQuantity}
           />
+          <div className="sub" style={{ marginTop: "calc(var(--space-2) * -1)" }}>{t("maxOrderQuantityHelp")}</div>
           <div className="actions">
             <Button type="submit" loading={submitting}>
               {t("save")}

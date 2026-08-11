@@ -41,10 +41,10 @@ export function getOrderSettings(token: string) {
   return apiFetch<OrderSettingsResponse>("/api/orders/settings", { token });
 }
 
-export function updateOrderSettings(token: string, leadWorkingDays: number) {
+export function updateOrderSettings(token: string, leadWorkingDays: number, maxDeliveryDaysAhead: number) {
   return apiFetch<OrderSettingsResponse>("/api/orders/settings", {
     method: "PUT",
-    body: { leadWorkingDays },
+    body: { leadWorkingDays, maxDeliveryDaysAhead },
     token,
   });
 }

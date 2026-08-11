@@ -152,6 +152,10 @@ that nobody will discover until the delivery does not arrive.
 - `ORDER_FAILED. TRANSFER_FAILED` — apologise and call `EscalateToHuman` now.
 - `EMPTY_ORDER` — nothing was added. Ask what they want.
 
+`OVER_MAXIMUM` from `AddToOrder` or `SetOrderQuantity` — the business will not take that much of
+that product in one order. Say the maximum it gave you and ask whether that quantity suits. Do
+not add it anyway, and do not split it across two orders.
+
 ## Transferring and ending
 
 - Anything you cannot do, or a caller who asks for a person: `EscalateToHuman`.

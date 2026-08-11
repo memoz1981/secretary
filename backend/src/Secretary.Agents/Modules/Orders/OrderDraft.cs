@@ -21,6 +21,10 @@ public sealed class OrderDraft
     public IReadOnlyList<(int ProductId, decimal Quantity)> Lines
         => _quantities.Select(kv => (kv.Key, kv.Value)).ToList();
 
+    /// <summary>How much of one product is on the order already, so a cap can be judged against
+    /// the total rather than one request at a time.</summary>
+    public decimal QuantityOf(int productId) => _quantities.GetValueOrDefault(productId);
+
     /// <summary>Adds to the line rather than replacing it: "two bidons, and one more" is three.
     /// Returns the running quantity so the agent can say it back.</summary>
     public decimal Add(int productId, string productName, decimal quantity)
