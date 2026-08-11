@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Secretary.Agents.Orders;
 using Secretary.Agents.ServiceCatalog;
 using Secretary.Agents.Tools;
@@ -15,6 +16,7 @@ using Moq;
 using NodaTime;
 using Shouldly;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Secretary.Agents.Tests;
 
@@ -46,8 +48,12 @@ public sealed class OrderToolsTests
     private readonly EscalationTools _escalation;
     private readonly OrderCallService _orderCalls;
 
-    public OrderToolsTests()
+    private readonly ITestOutputHelper _output;
+
+    public OrderToolsTests(ITestOutputHelper output)
     {
+        _output = output;
+
         _uow.SetupGet(u => u.Customers).Returns(_customers.Object);
         _uow.SetupGet(u => u.Products).Returns(_products.Object);
         _uow.SetupGet(u => u.Units).Returns(_units.Object);
@@ -360,6 +366,35 @@ public sealed class OrderToolsTests
         logged!.CustomerId.ShouldBeNull();
         logged.RelatedOrderId.ShouldBeNull();
         logged.CallerPhoneNumber.ShouldBe("local-device-call");
+    }
+
+    /// <summary>What the tool declarations cost, in characters, every time they are sent.
+    ///
+    /// Here because of a measurement the log could not explain: on a real Gemini call the prompt
+    /// jumped by ~2,200 text tokens on the turn that made the first tool call, held for the rest
+    /// of the call, and vanished on the last one. The schemas are the only thing on the wire the
+    /// right size to account for that.
+    ///
+    /// The number is a ceiling, not a target. It is here so that adding a tool, or a paragraph
+    /// to a description, shows up as a failing test rather than as a bill.</summary>
+    [Fact]
+    public void The_toolset_schema_stays_within_its_budget()
+    {
+        var total = 0;
+        foreach (var tool in BuildModule().BuildTools().OfType<Microsoft.Extensions.AI.AIFunction>())
+        {
+            var declaration = JsonSerializer.Serialize(
+                new { name = tool.Name, description = tool.Description, parameters = tool.JsonSchema });
+
+            _output.WriteLine($"{tool.Name,-24} {declaration.Length,6} chars");
+            total += declaration.Length;
+        }
+
+        _output.WriteLine($"{"TOTAL",-24} {total,6} chars");
+
+        // Roughly four characters to a token. Raise this deliberately, with a reason, or trim a
+        // description instead.
+        total.ShouldBeLessThan(6000);
     }
 
     private OrdersAgentModule BuildModule()
