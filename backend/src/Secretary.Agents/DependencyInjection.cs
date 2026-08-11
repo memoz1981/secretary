@@ -22,6 +22,10 @@ public static class AgentsServiceCollectionExtensions
         services.AddScoped<ITenantServiceCatalogCache, TenantServiceCatalogCache>();
         services.AddScoped<ITenantProviderDirectory, TenantProviderDirectory>();
 
+        // What the order line reads mid-sentence: the catalogue and the delivery policy. Cached
+        // for latency, not load — the caller hears the round trip.
+        services.AddScoped<ITenantOrderDirectory, Orders.TenantOrderDirectory>();
+
         services.AddScoped<ClientTools>();
         services.AddScoped<ServiceCatalogTools>();
         services.AddScoped<AppointmentTools>();

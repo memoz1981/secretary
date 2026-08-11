@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Secretary.Agents.Orders;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Dtos;
 using Secretary.Application.Services;
 using Microsoft.Extensions.Logging;
@@ -26,16 +27,18 @@ public sealed class OrderTools
 {
     private readonly CustomerIdentityService _identity;
     private readonly OrderService _orders;
+    private readonly ITenantOrderDirectory _directory;
     private readonly OrderCallSession _session;
     private readonly EscalationTools _escalation;
     private readonly ILogger<OrderTools> _logger;
 
     public OrderTools(
-        CustomerIdentityService identity, OrderService orders, OrderCallSession session,
-        EscalationTools escalation, ILogger<OrderTools> logger)
+        CustomerIdentityService identity, OrderService orders, ITenantOrderDirectory directory,
+        OrderCallSession session, EscalationTools escalation, ILogger<OrderTools> logger)
     {
         _identity = identity;
         _orders = orders;
+        _directory = directory;
         _session = session;
         _escalation = escalation;
         _logger = logger;
@@ -115,7 +118,7 @@ public sealed class OrderTools
     [Description("What this business sells, with the product id needed to order it.")]
     public async Task<string> ListProducts()
     {
-        var catalog = await _orders.GetCatalogAsync(default);
+        var catalog = await _directory.GetProductsAsync(default);
         if (catalog.Count == 0)
         {
             return "NO_PRODUCTS.";
@@ -140,7 +143,7 @@ public sealed class OrderTools
             return "EMPTY_ORDER.";
         }
 
-        var catalog = await _orders.GetCatalogAsync(default);
+        var catalog = await _directory.GetProductsAsync(default);
         var byId = catalog.ToDictionary(p => p.Id);
 
         // Merged before anything is checked: a caller who says three bidons and then another two
@@ -191,7 +194,7 @@ public sealed class OrderTools
             return "NO_SUCH_ADDRESS. " + string.Join("; ", addresses.Select(a => $"{a.Id} — {a.Spoken()}"));
         }
 
-        var deliveryDay = await _orders.ProposeDeliveryDayAsync(default);
+        var deliveryDay = await _directory.GetDeliveryDayAsync(default);
         if (deliveryDay is null)
         {
             return "NO_WORKING_DAY.";

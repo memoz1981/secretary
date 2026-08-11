@@ -16,14 +16,17 @@ public sealed class OrderService
     private readonly BusinessHoursService _businessHours;
     private readonly IClock _clock;
     private readonly ICurrentTenantProvider _currentTenant;
+    private readonly IAgentDirectoryChangeNotifier _changeNotifier;
 
     public OrderService(
-        IUnitOfWork uow, BusinessHoursService businessHours, IClock clock, ICurrentTenantProvider currentTenant)
+        IUnitOfWork uow, BusinessHoursService businessHours, IClock clock, ICurrentTenantProvider currentTenant,
+        IAgentDirectoryChangeNotifier changeNotifier)
     {
         _uow = uow;
         _businessHours = businessHours;
         _clock = clock;
         _currentTenant = currentTenant;
+        _changeNotifier = changeNotifier;
     }
 
     /// <summary>For a caller recovering from a failed write — see IUnitOfWork.</summary>
@@ -251,6 +254,12 @@ public sealed class OrderService
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
+
+        // The lead time decides the day the agent promises, and it is cached with the working
+        // week. A tenant who lengthens it and is still quoted yesterday's lead has made a
+        // promise they cannot keep.
+        _changeNotifier.NotifyChanged(tenantId);
+
         return new OrderSettingsResponse(settings.LeadWorkingDays, settings.MaxDeliveryDaysAhead);
     }
 

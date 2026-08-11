@@ -17,12 +17,16 @@ public sealed class ProductService
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
     private readonly ICurrentTenantProvider _currentTenant;
+    private readonly IAgentDirectoryChangeNotifier _changeNotifier;
 
-    public ProductService(IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant)
+    public ProductService(
+        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant,
+        IAgentDirectoryChangeNotifier changeNotifier)
     {
         _uow = uow;
         _clock = clock;
         _currentTenant = currentTenant;
+        _changeNotifier = changeNotifier;
     }
 
     public async Task<IReadOnlyList<UnitResponse>> ListUnitsAsync(CancellationToken cancellationToken)
@@ -49,6 +53,11 @@ public sealed class ProductService
 
         await _uow.Products.AddAsync(product, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        // The agent holds the catalogue between calls, and the ids in it are what an order is
+        // placed with. A product added and not seen is one the business cannot sell by phone.
+        _changeNotifier.NotifyChanged(tenantId);
+
         return ToResponse(product, await UnitNamesAsync(cancellationToken));
     }
 
@@ -63,6 +72,7 @@ public sealed class ProductService
             _clock.GetCurrentInstant());
 
         await _uow.SaveChangesAsync(cancellationToken);
+        _changeNotifier.NotifyChanged(product.TenantId);
         return ToResponse(product, await UnitNamesAsync(cancellationToken));
     }
 
@@ -75,6 +85,10 @@ public sealed class ProductService
 
         product.Deactivate(_clock.GetCurrentInstant());
         await _uow.SaveChangesAsync(cancellationToken);
+
+        // Especially this one. A withdrawn product left in the cache is one the agent goes on
+        // taking orders for.
+        _changeNotifier.NotifyChanged(product.TenantId);
     }
 
     private async Task<Dictionary<int, string>> UnitNamesAsync(CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using Secretary.Agents.Orders;
+using Secretary.Agents.ServiceCatalog;
 using Secretary.Agents.Tools;
 using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
@@ -32,6 +33,10 @@ public sealed class OrderToolsTests
     private readonly Mock<IBusinessHoursRepository> _hours = new();
     private readonly OrderCallSession _session = new();
 
+    /// <summary>Movable, so a test can prove the delivery day is worked out per call rather than
+    /// cached with the policy behind it.</summary>
+    private Instant _now = Now;
+
     private readonly OrderTools _sut;
     private readonly EscalationTools _escalation;
 
@@ -47,7 +52,7 @@ public sealed class OrderToolsTests
         _uow.SetupGet(u => u.Escalations).Returns(new Mock<IEscalationRepository>().Object);
 
         var clock = new Mock<IClock>();
-        clock.Setup(c => c.GetCurrentInstant()).Returns(Now);
+        clock.Setup(c => c.GetCurrentInstant()).Returns(() => _now);
 
         var tenant = new Mock<ICurrentTenantProvider>();
         tenant.SetupGet(t => t.TenantId).Returns(1);
@@ -60,14 +65,23 @@ public sealed class OrderToolsTests
                 .Select(d => BusinessHours.Open(1, d, new LocalTime(9, 0), new LocalTime(21, 0), Now))
                 .ToList());
 
-        var businessHours = new BusinessHoursService(_hours.Object, _uow.Object, clock.Object, tenant.Object);
+        var notifier = new NullAgentDirectoryChangeNotifier();
+        var businessHours = new BusinessHoursService(
+            _hours.Object, _uow.Object, clock.Object, tenant.Object, notifier);
+
         var identity = new CustomerIdentityService(_uow.Object, clock.Object, tenant.Object);
-        var orderService = new OrderService(_uow.Object, businessHours, clock.Object, tenant.Object);
+        var orderService = new OrderService(_uow.Object, businessHours, clock.Object, tenant.Object, notifier);
         var clients = new ClientService(_uow.Object, clock.Object, tenant.Object);
         _escalation = new EscalationTools(
             new EscalationService(_uow.Object, clock.Object, tenant.Object, clients));
 
-        _sut = new OrderTools(identity, orderService, _session, _escalation, NullLogger<OrderTools>.Instance);
+        // The directory's store is process-wide, so one test's catalogue would otherwise be
+        // served to the next — every test here is tenant 1.
+        OrderDirectoryStore.Invalidate(1);
+        var directory = new TenantOrderDirectory(orderService, businessHours, clock.Object, tenant.Object);
+
+        _sut = new OrderTools(
+            identity, orderService, directory, _session, _escalation, NullLogger<OrderTools>.Instance);
     }
 
     /// <summary>The instruction file names these tools, so a rename here silently breaks it.
@@ -212,6 +226,55 @@ public sealed class OrderToolsTests
         GivenAddresses(11);
 
         (await _sut.FindCustomerById(11)).ShouldBe("NOT_FOUND.");
+    }
+
+    /// <summary>These reads happen inside a tool call, which happens in the middle of a spoken
+    /// sentence. The caller hears the round trip, so it is worth not making it twice.</summary>
+    [Fact]
+    public async Task The_catalogue_is_read_once_and_then_held()
+    {
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+
+        await _sut.ListProducts();
+        await _sut.ListProducts();
+
+        _products.Verify(p => p.GetCatalogAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Through the real notifier, not the store — a product withdrawn on the Products
+    /// page and still in the cache is one the agent goes on taking orders for.</summary>
+    [Fact]
+    public async Task Changing_the_catalogue_is_picked_up_on_the_next_call()
+    {
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+        await _sut.ListProducts();
+
+        new AgentDirectoryChangeNotifier().NotifyChanged(1);
+        await _sut.ListProducts();
+
+        _products.Verify(p => p.GetCatalogAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    /// <summary>The policy is what holds still. The day it produces moves at midnight, and a
+    /// cached one would have the agent promising yesterday.</summary>
+    [Fact]
+    public async Task The_delivery_day_moves_with_the_date_even_though_the_policy_is_cached()
+    {
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+        GivenAddresses(11, WithId(Address(11, "Xətai", "Sarayevo", "12"), 87));
+        GivenOrdersSave(orderId: 42);
+
+        var today = await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 1m)]);
+
+        _now = Now.Plus(Duration.FromDays(1));
+        _session.Cancelled();
+        var tomorrow = await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 1m)]);
+
+        tomorrow.ShouldNotBe(today);
+
+        // Read once all the same — the settings and the working week did not change.
+        _settings.Verify(
+            s => s.GetForCurrentTenantAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private void GivenCatalog(params Product[] products)
