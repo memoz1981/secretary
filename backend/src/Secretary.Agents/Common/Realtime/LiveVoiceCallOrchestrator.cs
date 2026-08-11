@@ -28,6 +28,7 @@ public sealed class LiveVoiceCallOrchestrator
     private readonly RealtimeToolInvoker _toolInvoker;
     private readonly CallService _callService;
     private readonly AgentInstructionContext _instructionContext;
+    private readonly AgentModuleRegistry _agentModules;
     private readonly ICurrentTenantModules _modules;
     private readonly IClock _clock;
     private readonly ILogger<LiveVoiceCallOrchestrator> _logger;
@@ -38,13 +39,14 @@ public sealed class LiveVoiceCallOrchestrator
 
     public LiveVoiceCallOrchestrator(
         RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker, CallService callService,
-        AgentInstructionContext instructionContext, ICurrentTenantModules modules, IClock clock,
-        ILogger<LiveVoiceCallOrchestrator> logger)
+        AgentInstructionContext instructionContext, AgentModuleRegistry agentModules,
+        ICurrentTenantModules modules, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
     {
         _sessionResolver = sessionResolver;
         _toolInvoker = toolInvoker;
         _callService = callService;
         _instructionContext = instructionContext;
+        _agentModules = agentModules;
         _modules = modules;
         _clock = clock;
         _logger = logger;
@@ -141,32 +143,34 @@ public sealed class LiveVoiceCallOrchestrator
     }
 
     public Task RunAsync(WebSocket clientSocket, CancellationToken cancellationToken)
-        => RunAsync(clientSocket, CallPipeline.OpenAiRealtime_2_1, null, cancellationToken);
+        => RunAsync(clientSocket, Module.Appointment, CallPipeline.OpenAiRealtime_2_1, null, cancellationToken);
 
-    /// <summary>Runs a realtime call on a specific model. The full and mini realtime models are
+    /// <summary>Runs a realtime call for one module on a specific model.
+    ///
+    /// The module is an argument, not an assumption. One phone line answers as one module, so
+    /// the caller of this method — an inbound number resolved to a tenant, or the demo Call page
+    /// — is what decides which business the agent is in. The full and mini realtime models are
     /// the same architecture at very different prices, so they are dialled as separate pipelines
-    /// and recorded as such — otherwise the Call Log could not tell them apart.</summary>
+    /// and recorded as such, otherwise the Call Log could not tell them apart.</summary>
     public async Task RunAsync(
-        WebSocket clientSocket, CallPipeline pipeline, string? modelOverride, CancellationToken cancellationToken)
+        WebSocket clientSocket, Module module, CallPipeline pipeline, string? modelOverride,
+        CancellationToken cancellationToken)
     {
         var startedAt = _clock.GetCurrentInstant();
         var outcome = CallOutcome.ResolvedByAgent;
 
         // The module check the HTTP layer cannot do for us.
         //
-        // Every appointment endpoint carries [RequireModule], but the agent does not go through
-        // them — its tools call AppointmentService directly, in process. So a tenant whose
-        // Appointment module had been revoked was refused by the web app and still had an agent
-        // happily taking bookings over the phone.
+        // Every module endpoint carries [RequireModule], but the agent does not go through them —
+        // its tools call the application services directly, in process. So a tenant whose module
+        // had been revoked was refused by the web app and still had an agent happily taking
+        // bookings over the phone.
         //
-        // Checked here, once, rather than in each tool: the agent's entire toolset today is
-        // appointment work, so without the module there is no call worth having. When a second
-        // module brings tools of its own this becomes the IAgentModule profile from
-        // design/architecture.md §4 — tools composed from the modules the tenant holds — and
-        // this guard goes away with it.
-        if (!await _modules.HasAsync(Module.Appointment, cancellationToken))
+        // Checked here, once, rather than in each tool: a line belongs to exactly one module, so
+        // without that module there is no call worth having.
+        if (!await _modules.HasAsync(module, cancellationToken))
         {
-            _logger.LogWarning("Call refused: this tenant does not have the Appointment module.");
+            _logger.LogWarning("Call refused: this tenant does not have the {Module} module.", module);
             if (clientSocket.State == WebSocketState.Open)
             {
                 await clientSocket.CloseAsync(
@@ -176,13 +180,23 @@ public sealed class LiveVoiceCallOrchestrator
             return;
         }
 
+        var agentModule = _agentModules.For(module);
+
+        // Built once for the call and handed to both the session (which declares them to the
+        // model) and the invoker (which runs them). Two copies of one list would be two chances
+        // for the model to ask for a tool nothing can execute.
+        var tools = agentModule.BuildTools();
+        _toolInvoker.UseTools(tools);
+
         // Which provider answers is the pipeline's decision, resolved here rather than injected.
         _realtimeSession = _sessionResolver.Create(pipeline);
 
         try
         {
             await _realtimeSession.ConnectAsync(
-                _instructionContext.BuildPhoneAgentInstructions(_realtimeSession.ProviderKey),
+                _instructionContext.BuildPhoneAgentInstructions(
+                    agentModule.InstructionName, _realtimeSession.ProviderKey),
+                tools,
                 modelOverride,
                 cancellationToken);
 

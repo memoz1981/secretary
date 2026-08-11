@@ -4,7 +4,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { LiveVoiceCall, type LiveCallStatus } from "@/shared/lib/liveVoiceCall";
-import { CALL_PIPELINES, type CallPipeline } from "@/shared/api/types";
+import { CALL_PIPELINES, type CallPipeline, type Module } from "@/shared/api/types";
 import { PIPELINE_INFO } from "@/shared/lib/pipelines";
 import { Card } from "@/shared/components/Card";
 import { AgentAvatar } from "@/shared/components/AgentAvatar";
@@ -21,7 +21,12 @@ function PhoneIcon({ size = 34 }: { size?: number }) {
   );
 }
 
-export function CallPage() {
+/** The demo call page: a microphone, a pipeline picker, and a line to dial.
+ *
+ * Shared plumbing rather than a module's own page — the mic and the pipeline comparison are
+ * identical whoever answers. What differs is only which line it rings, so each module owns the
+ * route and passes its own module here. A real caller never chooses; they dial a number. */
+export function LiveCallPage({ module }: { module: Module }) {
   const { token } = useAuth();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
@@ -60,6 +65,7 @@ export function CallPage() {
         },
       },
       pipeline,
+      module,
     );
     callRef.current = call;
     try {

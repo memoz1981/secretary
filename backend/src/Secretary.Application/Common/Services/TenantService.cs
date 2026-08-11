@@ -26,6 +26,16 @@ public sealed class TenantService
         _currentTenant = currentTenant;
     }
 
+    /// <summary>Open every day to start with, the window the whole system used before hours were
+    /// a per-tenant thing. Wrong for most businesses and visibly so, which is the point: a
+    /// tenant who has not set their hours sees a week they can obviously correct, rather than a
+    /// system that quietly refuses every caller.</summary>
+    private static readonly IsoDayOfWeek[] DefaultWeek =
+    [
+        IsoDayOfWeek.Monday, IsoDayOfWeek.Tuesday, IsoDayOfWeek.Wednesday, IsoDayOfWeek.Thursday,
+        IsoDayOfWeek.Friday, IsoDayOfWeek.Saturday, IsoDayOfWeek.Sunday,
+    ];
+
     public async Task<CreateTenantResult> CreateAsync(CreateTenantRequest request, CancellationToken cancellationToken)
     {
         // TC-TEAM-06's fix applies here too — the owner email goes through the same
@@ -56,6 +66,23 @@ public sealed class TenantService
         // Revisit when a second module ships and "which did they buy" becomes a real question.
         await _uow.TenantModules.AddAsync(
             TenantModule.Grant(tenant.Id, Module.Appointment, now), cancellationToken);
+
+        // Seven days of default hours, without which the tenant is closed all week.
+        //
+        // A day with no row is closed — deliberately, so a tenant who has never set their hours
+        // offers nothing rather than everything. The consequence is that a tenant created
+        // without rows can neither offer an appointment nor promise a delivery, and says so with
+        // no hint as to why. That is not hypothetical: it is what a brand-new tenant did on its
+        // first order call, answering CLOSED_THAT_DAY to every day the caller suggested.
+        //
+        // The Administration page is where these get changed; this is only so the business works
+        // on day one.
+        foreach (var day in DefaultWeek)
+        {
+            await _uow.BusinessHours.AddAsync(
+                BusinessHours.Open(tenant.Id, day, new LocalTime(9, 0), new LocalTime(21, 0), now),
+                cancellationToken);
+        }
 
         await _uow.SaveChangesAsync(cancellationToken);
         return new CreateTenantResult(ToResponse(tenant), owner.Id, agent.Id, agentApiKey);

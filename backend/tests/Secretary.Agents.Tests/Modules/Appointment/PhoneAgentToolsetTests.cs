@@ -31,7 +31,10 @@ public sealed class PhoneAgentToolsetTests
 
         var clientTools = new ClientTools(clientService);
         var serviceCatalogTools = new ServiceCatalogTools(catalog.Object);
-        var appointmentTools = new AppointmentTools(appointmentService, clientService, providers.Object, catalog.Object, clock.Object);
+        var businessHours = new BusinessHoursService(
+            new Mock<IBusinessHoursRepository>().Object, uow.Object, clock.Object, tenantProvider.Object);
+        var appointmentTools = new AppointmentTools(
+            appointmentService, clientService, providers.Object, catalog.Object, businessHours, clock.Object);
         var escalationTools = new EscalationTools(escalationService);
         var callControlTools = new CallControlTools();
 

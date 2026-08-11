@@ -16,13 +16,23 @@ namespace Secretary.Api.Startup;
 /// between them, which is the whole reason for running two.</summary>
 public static class InstructionFileGuard
 {
-    public static void EnsureEveryDialablePipelineHasInstructions()
+    /// <summary>Every dialable pipeline × every module that can answer a phone. Both axes matter:
+    /// a module with no file for the provider a caller picks fails exactly as badly as a missing
+    /// provider file did, and there is no sensible fallback in either direction.</summary>
+    public static void EnsureEveryDialablePipelineHasInstructions(IEnumerable<string> instructionNames)
     {
         var directory = Path.Combine(AppContext.BaseDirectory, "Instructions");
 
         var missing = VoicePipelineCatalog.All
             .Where(entry => entry.Enabled)
-            .Select(entry => new { entry.Pipeline, entry.ProviderKey, Path = Path.Combine(directory, $"PhoneAgent.{entry.ProviderKey}.md") })
+            .SelectMany(
+                _ => instructionNames,
+                (entry, name) => new
+                {
+                    entry.Pipeline,
+                    entry.ProviderKey,
+                    Path = Path.Combine(directory, $"{name}.{entry.ProviderKey}.md"),
+                })
             .Where(candidate => !File.Exists(candidate.Path))
             .ToList();
 

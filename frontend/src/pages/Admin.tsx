@@ -17,12 +17,13 @@ import {
 } from "@/shared/api/accounts";
 import type { AccountResponse } from "@/shared/api/types";
 import { ThemePicker } from "@/shared/components/ThemeSelect";
+import { BusinessHoursCard } from "@/shared/components/BusinessHoursCard";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
 
 export function AdminPage() {
-  const { token } = useAuth();
+  const { token, role } = useAuth();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -81,6 +82,8 @@ export function AdminPage() {
           </form>
         )}
       </Card>
+
+      <BusinessHoursCard canEdit={role === "Owner"} />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>

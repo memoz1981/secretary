@@ -1,4 +1,4 @@
-using Microsoft.Extensions.AI;
+using Secretary.Domain.Enums;
 
 namespace Secretary.Agents;
 
@@ -9,22 +9,27 @@ namespace Secretary.Agents;
 public sealed class PhoneAgentConversationService
 {
     private readonly IAgentFactory _agentFactory;
-    private readonly IList<AITool> _tools;
+    private readonly AgentModuleRegistry _agentModules;
     private readonly AgentInstructionContext _instructionContext;
 
-    public PhoneAgentConversationService(IAgentFactory agentFactory, IList<AITool> tools, AgentInstructionContext instructionContext)
+    public PhoneAgentConversationService(
+        IAgentFactory agentFactory, AgentModuleRegistry agentModules, AgentInstructionContext instructionContext)
     {
         _agentFactory = agentFactory;
-        _tools = tools;
+        _agentModules = agentModules;
         _instructionContext = instructionContext;
     }
 
     public async Task<string> RespondAsync(string callerMessage, CancellationToken cancellationToken)
     {
+        // Pinned to Appointment. A real line carries its module; this stopgap has no line, and
+        // guessing would be worse than saying which one it speaks for.
+        var module = _agentModules.For(Module.Appointment);
+
         // The text path runs on OpenAI, so it reads OpenAI's instruction file — the speech rules
         // in the other one are about how a model sounds, which does not apply here at all.
-        var instructions = _instructionContext.BuildPhoneAgentInstructions("openai");
-        var agent = _agentFactory.Create(AgentProvider.OpenAi, instructions, _tools);
+        var instructions = _instructionContext.BuildPhoneAgentInstructions(module.InstructionName, "openai");
+        var agent = _agentFactory.Create(AgentProvider.OpenAi, instructions, module.BuildTools());
         var response = await agent.RunAsync(callerMessage, cancellationToken: cancellationToken);
         return response.Text;
     }

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Secretary.Agents.ServiceCatalog;
 using Secretary.Application.Dtos;
 using Secretary.Application.Services;
+using Secretary.Domain.Entities;
 using Secretary.Domain.Enums;
 using Secretary.Domain.Exceptions;
 using NodaTime;
@@ -14,14 +15,6 @@ namespace Secretary.Agents.Tools;
 /// narration came from. How to behave belongs in Instructions/PhoneAgent.md.</summary>
 public sealed class AppointmentTools
 {
-    /// <summary>Slots outside these hours are never offered — without this the agent cheerfully
-    /// proposed 03:00 haircuts, and a "what's free this week" question produced a wall of
-    /// hourly slots the model then had to read through before it could speak. Should become a
-    /// per-tenant setting; a single sensible window is enough while every tenant is a local
-    /// business on Baku hours.</summary>
-    private const int BusinessOpenHour = 9;
-    private const int BusinessCloseHour = 21;
-
     /// <summary>A caller can't absorb more than a couple of days of options in speech, and every
     /// extra line is latency before the model starts talking.</summary>
     private static readonly Duration MaxAvailabilityWindow = Duration.FromDays(7);
@@ -30,16 +23,18 @@ public sealed class AppointmentTools
     private readonly ClientService _clientService;
     private readonly ITenantProviderDirectory _providers;
     private readonly ITenantServiceCatalogCache _catalog;
+    private readonly BusinessHoursService _businessHours;
     private readonly IClock _clock;
 
     public AppointmentTools(
         AppointmentService appointmentService, ClientService clientService, ITenantProviderDirectory providers,
-        ITenantServiceCatalogCache catalog, IClock clock)
+        ITenantServiceCatalogCache catalog, BusinessHoursService businessHours, IClock clock)
     {
         _appointmentService = appointmentService;
         _clientService = clientService;
         _providers = providers;
         _catalog = catalog;
+        _businessHours = businessHours;
         _clock = clock;
     }
 
@@ -106,13 +101,18 @@ public sealed class AppointmentTools
             to = from + MaxAvailabilityWindow;
         }
 
+        // Fetched once for the whole answer rather than per provider or per day: the week does
+        // not change between two providers checked a millisecond apart, and a live call pays for
+        // every round trip.
+        var week = await _businessHours.GetWeekByDayAsync(default);
+
         var lines = new List<string>();
         foreach (var provider in candidates)
         {
             var availability = await _appointmentService.FindAvailabilityAsync(
                 new AvailabilityRequest(provider.Id, service.Id, from, to), default);
 
-            if (DescribeOpenSlots(availability.Slots) is { } openRanges)
+            if (DescribeOpenSlots(availability.Slots, week) is { } openRanges)
             {
                 lines.Add($"{provider.Name}: {openRanges}");
             }
@@ -301,23 +301,23 @@ public sealed class AppointmentTools
         }
     }
 
-    /// <summary>One provider's free time, as the caller should hear it: inside opening hours,
-    /// contiguous slots collapsed into ranges. Null when there is nothing to offer. This is the
-    /// whole shape of a "when are you free?" answer, so it is tested directly.</summary>
-    internal static string? DescribeOpenSlots(IEnumerable<AvailableSlot> slots)
+    /// <summary>One provider's free time, as the caller should hear it: inside the tenant's own
+    /// opening hours, contiguous slots collapsed into ranges. Null when there is nothing to
+    /// offer. This is the whole shape of a "when are you free?" answer, so it is tested
+    /// directly — which is why the week is a parameter rather than fetched in here.</summary>
+    internal static string? DescribeOpenSlots(
+        IEnumerable<AvailableSlot> slots, IReadOnlyDictionary<IsoDayOfWeek, BusinessHours> week)
     {
-        var ranges = MergeToRanges(slots.Where(IsWithinOpeningHours));
+        var ranges = MergeToRanges(slots.Where(s => IsWithinOpeningHours(s, week)));
         return ranges.Count == 0 ? null : string.Join(", ", ranges.Select(FormatRange));
     }
 
-    /// <summary>Opening hours only, and the slot must finish before closing.</summary>
-    private static bool IsWithinOpeningHours(AvailableSlot slot)
-    {
-        var start = AzerbaijanTime.ToLocal(slot.Start);
-        var end = AzerbaijanTime.ToLocal(slot.End);
-        var close = start.Date.At(new LocalTime(BusinessCloseHour, 0));
-        return start.Hour >= BusinessOpenHour && end <= close;
-    }
+    /// <summary>The tenant's hours for that weekday, and the slot must finish before closing —
+    /// a haircut cannot start five minutes before the shutters come down. A day the tenant has
+    /// not configured is closed, not open all hours.</summary>
+    private static bool IsWithinOpeningHours(
+        AvailableSlot slot, IReadOnlyDictionary<IsoDayOfWeek, BusinessHours> week)
+        => BusinessHoursService.IsOpen(week, AzerbaijanTime.ToLocal(slot.Start), AzerbaijanTime.ToLocal(slot.End));
 
     /// <summary>Back-to-back slots collapse into one range: 26 hourly entries per provider
     /// become "2026-07-26 09:00–21:00". The model reads far less before it can speak, and the

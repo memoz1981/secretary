@@ -525,3 +525,56 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
   .stat-grid { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
   .stat .value { font-size: var(--text-xl); }
 }
+
+/* Business hours — seven rows of "day, closed?, from, to". A grid rather than a table so the
+   time inputs line up down the column whatever the day name's length, which varies a lot
+   between Azerbaijani, Russian and English. */
+.hours-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.hours-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hours-day {
+  font-weight: 500;
+}
+
+.hours-closed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.hours-row .input {
+  width: auto;
+  margin: 0;
+}
+
+.hours-dash {
+  color: var(--text-muted);
+}
+
+/* Below this the five columns stop fitting; the day and the closed toggle take a line of their
+   own and the times sit under them. */
+@media (max-width: 640px) {
+  .hours-row {
+    grid-template-columns: 1fr auto;
+    row-gap: var(--space-1);
+  }
+
+  .hours-row .input,
+  .hours-dash {
+    grid-column: span 1;
+  }
+}

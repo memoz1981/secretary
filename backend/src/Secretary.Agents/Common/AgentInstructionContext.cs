@@ -22,12 +22,15 @@ public sealed class AgentInstructionContext
     /// the other. There is no compiler and no test to catch a shared edit regressing the model
     /// you were not listening to, which is exactly why the files are kept whole and separate.
     ///
-    /// They start as copies and diverge; duplication is the cheaper mistake here.</summary>
-    public string BuildPhoneAgentInstructions(string providerKey)
+    /// They start as copies and diverge; duplication is the cheaper mistake here.
+    ///
+    /// One file per (module × provider), so the name carries both: Appointment.gemini.md. A line
+    /// answers as one module, and an order call has nothing to learn from the booking rules.</summary>
+    public string BuildPhoneAgentInstructions(string instructionName, string providerKey)
     {
         var local = _clock.GetCurrentInstant().InZone(AzerbaijanTime.Zone).LocalDateTime;
 
-        return InstructionLoader.Load($"PhoneAgent.{providerKey}") +
+        return InstructionLoader.Load($"{instructionName}.{providerKey}") +
                "\n\n## Right now\n\n" +
                $"- The current date and time is {LocalPattern.Format(local)} (Azerbaijan time).\n" +
                "- Every time you hear, say, pass to a tool, or read from a tool result is Azerbaijan " +

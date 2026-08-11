@@ -24,4 +24,10 @@ public static class DbSchemas
     /// <summary>The Appointment module: appointments, providers, service offerings, and the
     /// clients, calls and escalations that belong to them.</summary>
     public const string Appointment = "app";
+
+    /// <summary>The Orders module: products, units, orders, and its own customers with their
+    /// phone numbers and delivery addresses. A customer here is not a client in "app" — the
+    /// person who orders water and the person who books a haircut are different records, which
+    /// is the whole reason a module owns a schema.</summary>
+    public const string Orders = "ord";
 }

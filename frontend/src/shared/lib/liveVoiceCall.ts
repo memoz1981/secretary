@@ -9,7 +9,7 @@
 // chipmunk — and it will still transcribe *something*, which is worse than failing outright
 // because the call appears to work while every word is wrong.
 
-import type { CallPipeline } from "@/shared/api/types";
+import type { CallPipeline, Module } from "@/shared/api/types";
 
 interface PipelineProfile {
   sampleRate: number;
@@ -80,6 +80,9 @@ export class LiveVoiceCall {
     private readonly token: string,
     private readonly callbacks: LiveCallCallbacks,
     private readonly pipeline: CallPipeline = "OpenAiRealtime_2_1",
+    /** Which line is being dialled. One line answers as one module, so this decides the agent's
+     *  tools and instructions — the stand-in for the inbound number a real phone call carries. */
+    private readonly module: Module = "Appointment",
   ) {
     this.profile = PIPELINES[pipeline];
   }
@@ -105,7 +108,7 @@ export class LiveVoiceCall {
     // The JWT goes in the query string, not a header — browsers can't set headers on
     // WebSocket connects, and the backend's auth middleware reads access_token for /voice paths.
     const socket = new WebSocket(
-      `${wsBaseUrl}/voice/live-call?pipeline=${this.pipeline}` +
+      `${wsBaseUrl}/voice/live-call?pipeline=${this.pipeline}&module=${this.module}` +
         `&access_token=${encodeURIComponent(this.token)}`,
     );
     socket.binaryType = "arraybuffer";
