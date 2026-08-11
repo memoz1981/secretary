@@ -22,6 +22,39 @@ export function isLanguage(value: unknown): value is Language {
 type Dict = Record<Language, string>;
 
 export const translations = {
+  modulesSaved: { az: "Yadda saxlanıldı", ru: "Сохранено", en: "Saved" },
+  colQuantity: { az: "Miqdar", ru: "Количество", en: "Quantity" },
+  markDelivered: { az: "Çatdırıldı", ru: "Доставлен", en: "Delivered" },
+  markCancelled: { az: "Ləğv et", ru: "Отменить", en: "Cancel" },
+  noModules: { az: "Modul yoxdur", ru: "Нет модулей", en: "No modules" },
+  maxOrderQuantity: { az: "Maksimum sifariş sayı", ru: "Максимум в заказе", en: "Max per order" },
+  maxOrderQuantityHelp: {
+    az: "Bir sifarişdə bu məhsuldan ən çoxu. Boş buraxsanız məhdudiyyət yoxdur.",
+    ru: "Не больше этого количества в одном заказе. Пусто — без ограничения.",
+    en: "The most of this one order may contain. Leave empty for no limit.",
+  },
+  enterValidMaxQuantity: {
+    az: "Sıfırdan böyük rəqəm yazın və ya boş buraxın",
+    ru: "Введите число больше нуля или оставьте пустым",
+    en: "Enter a number above zero, or leave it empty",
+  },
+  deliverySettings: { az: "Çatdırılma parametrləri", ru: "Параметры доставки", en: "Delivery settings" },
+  maxDeliveryDaysAhead: { az: "Ən uzaq çatdırılma günü", ru: "Самый дальний день доставки", en: "Furthest delivery day" },
+  maxDeliveryDaysAheadHelp: {
+    az: "Bu qədər gündən uzağa sifariş qəbul edilmir. Səhv eşidilmiş tarixi tutmaq üçündür.",
+    ru: "Заказы дальше этого срока не принимаются. Ловит неверно услышанную дату.",
+    en: "Orders are not taken beyond this many days. It is what catches a misheard date.",
+  },
+  leadWorkingDaysRange: {
+    az: "İş günü 0 ilə 14 arasında olmalıdır",
+    ru: "Рабочих дней: от 0 до 14",
+    en: "Working days must be between 0 and 14",
+  },
+  maxDeliveryDaysAheadRange: {
+    az: "1 ilə 365 arasında və ilk təklif olunan gündən yaxın olmamalıdır",
+    ru: "От 1 до 365 и не раньше первого предлагаемого дня",
+    en: "Between 1 and 365, and not sooner than the first day offered",
+  },
   products: { az: "Məhsullar", ru: "Товары", en: "Products" },
   product: { az: "Məhsul", ru: "Товар", en: "Product" },
   addProduct: { az: "Məhsul əlavə et", ru: "Добавить товар", en: "Add product" },
@@ -843,6 +876,12 @@ export const dayOfWeekLabels: Record<string, Dict> = {
   Saturday: { az: "Şənbə", ru: "Суббота", en: "Saturday" },
   Sunday: { az: "Bazar", ru: "Воскресенье", en: "Sunday" },
 };
+export const orderStatusLabels: Record<string, Dict> = {
+  Placed: { az: "Qəbul edilib", ru: "Принят", en: "Placed" },
+  Delivered: { az: "Çatdırılıb", ru: "Доставлен", en: "Delivered" },
+  Cancelled: { az: "Ləğv edilib", ru: "Отменён", en: "Cancelled" },
+};
+
 export function translateEnum(map: Record<string, Dict>, value: string, language: Language): string {
   return map[value]?.[language] ?? value;
 }

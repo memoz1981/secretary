@@ -85,20 +85,41 @@ public sealed class TenantService
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
-        return new CreateTenantResult(ToResponse(tenant), owner.Id, agent.Id, agentApiKey);
+        return new CreateTenantResult(
+            ToResponse(tenant, [Module.Appointment]), owner.Id, agent.Id, agentApiKey);
     }
 
     public async Task<TenantResponse> GetAsync(int id, CancellationToken cancellationToken)
     {
         var tenant = await _uow.Tenants.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(Tenant), id);
-        return ToResponse(tenant);
+
+        return ToResponse(tenant, await _uow.TenantModules.GetEnabledModulesAsync(id, cancellationToken));
     }
 
+    /// <summary>The tenant list, with what each one can actually use.
+    ///
+    /// Modules are what the platform admin is really managing, and the list showed everything
+    /// except them — you had to open a tenant to find out what they had bought. One query for
+    /// the grants rather than one per row: the list is unpaged and a query per tenant would grow
+    /// with the customer base.</summary>
     public async Task<IReadOnlyList<TenantResponse>> ListAsync(string? searchText, CancellationToken cancellationToken)
     {
         var tenants = await _uow.Tenants.SearchAsync(searchText, cancellationToken);
-        return tenants.Select(ToResponse).ToList();
+        if (tenants.Count == 0)
+        {
+            return [];
+        }
+
+        var grants = await _uow.TenantModules.GetAllAsync(cancellationToken);
+        var byTenant = grants
+            .Where(g => g.Status == EntityStatus.Active)
+            .GroupBy(g => g.TenantId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Module>)g.Select(x => x.Module).OrderBy(m => m).ToList());
+
+        return tenants
+            .Select(t => ToResponse(t, byTenant.GetValueOrDefault(t.Id, [])))
+            .ToList();
     }
 
     /// <summary>Backs the platform-admin Tenant Detail page's "Owner accounts" card
@@ -127,7 +148,7 @@ public sealed class TenantService
 
         tenant.UpdateDetails(request.Name, request.Timezone, request.PhoneLine, _clock.GetCurrentInstant());
         await _uow.SaveChangesAsync(cancellationToken);
-        return ToResponse(tenant);
+        return ToResponse(tenant, await _uow.TenantModules.GetEnabledModulesAsync(id, cancellationToken));
     }
 
     /// <summary>The caller's own tenant — backs the tenant-facing Admin page.</summary>
@@ -135,7 +156,7 @@ public sealed class TenantService
     {
         var tenant = await _uow.Tenants.GetByIdAsync(RequireTenant(), cancellationToken)
             ?? throw new NotFoundException(nameof(Tenant), RequireTenant());
-        return ToResponse(tenant);
+        return ToResponse(tenant, await _uow.TenantModules.GetEnabledModulesAsync(tenant.Id, cancellationToken));
     }
 
     /// <summary>Tenant self-service: an Owner updates their own business's name/phone/timezone.</summary>
@@ -163,6 +184,9 @@ public sealed class TenantService
     private int RequireTenant()
         => _currentTenant.TenantId ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
-    private static TenantResponse ToResponse(Tenant tenant)
-        => new(tenant.Id, tenant.Name, tenant.Timezone, tenant.PhoneLine, tenant.Status, tenant.CreatedAt);
+    /// <summary>Modules are passed in rather than loaded here, so a list of tenants costs one
+    /// query for all their grants instead of one per row.</summary>
+    private static TenantResponse ToResponse(Tenant tenant, IReadOnlyList<Module> enabledModules)
+        => new(tenant.Id, tenant.Name, tenant.Timezone, tenant.PhoneLine, tenant.Status, tenant.CreatedAt,
+            enabledModules);
 }

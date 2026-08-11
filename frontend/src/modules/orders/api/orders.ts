@@ -41,10 +41,16 @@ export function getOrderSettings(token: string) {
   return apiFetch<OrderSettingsResponse>("/api/orders/settings", { token });
 }
 
-export function updateOrderSettings(token: string, leadWorkingDays: number) {
+export function updateOrderSettings(token: string, leadWorkingDays: number, maxDeliveryDaysAhead: number) {
   return apiFetch<OrderSettingsResponse>("/api/orders/settings", {
     method: "PUT",
-    body: { leadWorkingDays },
+    body: { leadWorkingDays, maxDeliveryDaysAhead },
     token,
   });
+}
+
+/** Delivered or cancelled. The only write on the Orders page: an order arrives by phone, but
+ *  whether it was delivered is something only a person knows. */
+export function setOrderStatus(token: string, id: number, status: "Delivered" | "Cancelled") {
+  return apiFetch<OrderResponse>(`/api/orders/${id}/status`, { method: "POST", body: { status }, token });
 }

@@ -42,6 +42,12 @@ public sealed class FakeUnitOfWork
         TenantModules
             .Setup(r => r.GetEnabledModulesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+
+        // Same reason: the tenant list reads every grant in one call so it does not query per
+        // row, and an unconfigured Moq returns null straight into a Where.
+        TenantModules
+            .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     public IUnitOfWork Object => UnitOfWork.Object;

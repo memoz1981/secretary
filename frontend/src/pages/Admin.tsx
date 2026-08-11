@@ -18,12 +18,13 @@ import {
 import type { AccountResponse } from "@/shared/api/types";
 import { ThemePicker } from "@/shared/components/ThemeSelect";
 import { BusinessHoursCard } from "@/shared/components/BusinessHoursCard";
+import { DeliverySettingsCard } from "@/modules/orders/components/DeliverySettingsCard";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
 
 export function AdminPage() {
-  const { token, role } = useAuth();
+  const { token, role, me } = useAuth();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -84,6 +85,11 @@ export function AdminPage() {
       </Card>
 
       <BusinessHoursCard canEdit={role === "Owner"} />
+
+      {/* The one module setting on the shared page, and only for a tenant that holds the module.
+          It belongs beside opening hours because it is made of them — the promise counts working
+          days — rather than above a list of today's orders. */}
+      {me?.enabledModules.includes("Order") && <DeliverySettingsCard canEdit={role === "Owner"} />}
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>

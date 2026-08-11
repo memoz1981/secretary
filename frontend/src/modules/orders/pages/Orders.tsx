@@ -1,31 +1,41 @@
 import { useState } from "react";
 import { AppShell } from "@/shared/components/AppShell";
-import { Button } from "@/shared/components/Button";
-import { Card } from "@/shared/components/Card";
+import { Pill } from "@/shared/components/Pill";
 import { DataTable } from "@/shared/components/DataTable";
-import { TextField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
-import { getOrders, getOrderSettings, updateOrderSettings } from "@/modules/orders/api/orders";
+import { getOrders, setOrderStatus } from "@/modules/orders/api/orders";
 import type { OrderResponse } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { orderStatusLabels, translateEnum } from "@/shared/i18n/translations";
+import { formatDayMonth } from "@/shared/lib/dates";
 
 export function OrdersPage() {
   const { token, role } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = useBusinessShell();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const state = useApiData(() => getOrders(token!), [token, refreshKey]);
 
+  const canEdit = role === "Owner";
   const orders = state.status === "success" ? state.data : [];
+
+  async function setStatus(id: number, status: "Delivered" | "Cancelled") {
+    setBusyId(id);
+    try {
+      await setOrderStatus(token!, id, status);
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <AppShell {...shell}>
       <h1 className="page-title">{t("orders")}</h1>
       <div className="subtitle">{t("ordersSubtitle")}</div>
-
-      <DeliveryPromise canEdit={role === "Owner"} onSaved={() => setRefreshKey((k) => k + 1)} />
 
       {state.status === "error" && <div className="field-error">{t("failedToLoadOrders")}</div>}
       <DataTable
@@ -40,68 +50,71 @@ export function OrdersPage() {
             render: (o: OrderResponse) => o.customerName ?? `#${o.customerId}`,
           },
           {
-            header: t("colItems"),
-            render: (o: OrderResponse) =>
-              o.lines.map((l) => `${l.productName} × ${l.quantity}`).join(", "),
+            // Product and quantity as separate columns: an order is usually one or two lines,
+            // and "Sirab × 10" in a single cell cannot be scanned down a page.
+            header: t("product"),
+            render: (o: OrderResponse) => (
+              <span style={{ display: "flex", flexDirection: "column" }}>
+                {o.lines.map((l, i) => (
+                  <span key={i}>{l.productName}</span>
+                ))}
+              </span>
+            ),
+          },
+          {
+            header: t("colQuantity"),
+            className: "mono",
+            render: (o: OrderResponse) => (
+              <span style={{ display: "flex", flexDirection: "column" }}>
+                {o.lines.map((l, i) => (
+                  <span key={i}>
+                    {l.quantity} {l.unit}
+                  </span>
+                ))}
+              </span>
+            ),
           },
           { header: t("colTotal"), render: (o: OrderResponse) => `${o.total} AZN`, className: "mono" },
-          { header: t("colDeliveryDay"), render: (o: OrderResponse) => o.requestedDeliveryDate ?? "—" },
+          { header: t("colDeliveryDay"), render: (o: OrderResponse) => (o.requestedDeliveryDate ? formatDayMonth(o.requestedDeliveryDate, language) : "—") },
           { header: t("colAddress"), render: (o: OrderResponse) => o.deliveryAddress },
-          { header: t("colStatus"), render: (o: OrderResponse) => o.status },
+          {
+            header: t("colStatus"),
+            render: (o: OrderResponse) => (
+              <Pill variant={o.status === "Delivered" ? "success" : o.status === "Cancelled" ? "critical" : "neutral"}>
+                {translateEnum(orderStatusLabels, o.status, language)}
+              </Pill>
+            ),
+          },
+          ...(canEdit
+            ? [
+                {
+                  // Whether an order arrived is a fact only a person has — the call cannot know
+                  // it, so this is the one thing staff do to an order after it is taken.
+                  header: "",
+                  render: (o: OrderResponse) =>
+                    o.status !== "Placed" ? null : (
+                      <span className="row-actions">
+                        <button
+                          className="link"
+                          disabled={busyId === o.id}
+                          onClick={() => void setStatus(o.id, "Delivered")}
+                        >
+                          {t("markDelivered")}
+                        </button>
+                        <button
+                          className="link danger"
+                          disabled={busyId === o.id}
+                          onClick={() => void setStatus(o.id, "Cancelled")}
+                        >
+                          {t("markCancelled")}
+                        </button>
+                      </span>
+                    ),
+                },
+              ]
+            : []),
         ]}
       />
     </AppShell>
-  );
-}
-
-/** The one editable thing on this page. Orders themselves arrive by phone — there is no reason
- *  to type one in, and a form that let you would be a form that disagreed with the recording. */
-function DeliveryPromise({ canEdit, onSaved }: { canEdit: boolean; onSaved: () => void }) {
-  const { token } = useAuth();
-  const { t } = useLanguage();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const settings = useApiData(() => getOrderSettings(token!), [token, refreshKey]);
-  const [draft, setDraft] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  if (settings.status !== "success") {
-    return null;
-  }
-
-  const value = draft ?? String(settings.data.leadWorkingDays);
-
-  return (
-    <Card>
-      <h2>{t("deliveryPromise")}</h2>
-      <p className="sub">{t("deliveryPromiseHelp")}</p>
-      <div className="toolbar" style={{ alignItems: "flex-end", gap: "var(--space-3)" }}>
-        <TextField
-          label={t("leadWorkingDays")}
-          value={value}
-          disabled={!canEdit}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        {canEdit && (
-          <Button
-            loading={saving}
-            onClick={async () => {
-              const days = Number(value);
-              if (Number.isNaN(days) || days < 0 || days > 14) return;
-              setSaving(true);
-              try {
-                await updateOrderSettings(token!, days);
-                setDraft(null);
-                setRefreshKey((k) => k + 1);
-                onSaved();
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            {t("save")}
-          </Button>
-        )}
-      </div>
-    </Card>
   );
 }

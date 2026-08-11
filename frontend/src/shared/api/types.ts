@@ -74,6 +74,8 @@ export interface TenantModuleResponse {
 
 // ---- Tenant ----
 export interface TenantResponse {
+  /** What this tenant can actually use. */
+  enabledModules: Module[];
   id: number;
   name: string;
   timezone: string;
@@ -326,10 +328,11 @@ export interface UnitResponse {
 export interface ProductDetailResponse {
   id: number;
   name: string;
-  description: string | null;
   measurementUnitId: number;
   unit: string;
   unitPrice: number;
+  /** The most of this that one order may contain. Null means no limit. */
+  maxOrderQuantity: number | null;
   /** Comma-separated words a caller might use — "bidon, balon, su". The field that decides
    *  whether the agent recognises what someone is asking for. */
   aliases: string | null;
@@ -337,10 +340,10 @@ export interface ProductDetailResponse {
 
 export interface CreateProductRequest {
   name: string;
-  description: string | null;
   measurementUnitId: number;
   unitPrice: number;
   aliases: string | null;
+  maxOrderQuantity: number | null;
 }
 
 export type UpdateProductRequest = CreateProductRequest;
@@ -375,6 +378,8 @@ export interface OrderCustomerResponse {
 
 export interface OrderSettingsResponse {
   leadWorkingDays: number;
+  /** How far ahead an order may be placed, in calendar days. */
+  maxDeliveryDaysAhead: number;
 }
 
 /** Both times null means the business is shut that day — one fact, not a separate flag that

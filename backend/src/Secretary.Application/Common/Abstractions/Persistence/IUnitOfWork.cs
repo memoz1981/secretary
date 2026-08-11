@@ -22,4 +22,13 @@ public interface IUnitOfWork
     IOrderSettingsRepository OrderSettings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Throws away everything pending, so a failed save cannot be retried by the next
+    /// one.
+    ///
+    /// A rejected insert stays tracked, and every later SaveChanges on the same request tries it
+    /// again. One bad order took the escalation and the call-log write down with it — the caller
+    /// was neither transferred nor recorded, because of a row that was never going to save.
+    /// Whoever handles the failure calls this before doing anything else that writes.</summary>
+    void DiscardPendingChanges();
 }

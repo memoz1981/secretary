@@ -60,7 +60,10 @@ export function CreateTenantPage() {
         }
       }
 
-      navigate(`/admin/tenants/${result.tenant.id}`);
+      // Back to the list, where the new tenant appears with the modules just granted. The
+      // detail page was a dead end: the admin had finished, and the next thing they want is to
+      // see it sitting alongside the others.
+      navigate("/admin/tenants");
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +130,10 @@ export function CreateTenantPage() {
               module={module}
               checked={modules[module] ?? false}
               disabled={submitting}
-              onChange={(next) => setModules({ ...modules, [module]: next })}
+              // Functional update, not a spread of the captured `modules`. Two toggles clicked
+              // before React re-renders both read the same stale object, and the second write
+              // silently undoes the first — which is the selections appearing to flip.
+              onChange={(next) => setModules((current) => ({ ...current, [module]: next }))}
             />
           ))}
           <div className="actions">

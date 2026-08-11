@@ -44,8 +44,8 @@ public sealed class ProductService
             ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
         var product = Product.Create(
-            tenantId, request.Name, request.Description, request.MeasurementUnitId, request.UnitPrice,
-            request.Aliases, _clock.GetCurrentInstant());
+            tenantId, request.Name, request.MeasurementUnitId, request.UnitPrice, request.Aliases,
+            request.MaxOrderQuantity, _clock.GetCurrentInstant());
 
         await _uow.Products.AddAsync(product, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -59,7 +59,7 @@ public sealed class ProductService
             ?? throw new NotFoundException(nameof(Product), id);
 
         product.UpdateDetails(
-            request.Name, request.Description, request.MeasurementUnitId, request.UnitPrice, request.Aliases,
+            request.Name, request.MeasurementUnitId, request.UnitPrice, request.Aliases, request.MaxOrderQuantity,
             _clock.GetCurrentInstant());
 
         await _uow.SaveChangesAsync(cancellationToken);
@@ -84,6 +84,7 @@ public sealed class ProductService
     }
 
     private static ProductDetailResponse ToResponse(Product p, IReadOnlyDictionary<int, string> unitNames)
-        => new(p.Id, p.Name, p.Description, p.MeasurementUnitId,
-            unitNames.TryGetValue(p.MeasurementUnitId, out var unit) ? unit : "ea.", p.UnitPrice, p.Aliases);
+        => new(p.Id, p.Name, p.MeasurementUnitId,
+            unitNames.TryGetValue(p.MeasurementUnitId, out var unit) ? unit : string.Empty, p.UnitPrice, p.Aliases,
+            p.MaxOrderQuantity);
 }

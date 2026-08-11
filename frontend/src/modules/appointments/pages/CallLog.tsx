@@ -11,6 +11,7 @@ import { searchCalls } from "@/modules/appointments/api/calls";
 import { CALL_PIPELINES, type CallClassification, type CallOutcome, type CallPipeline } from "@/shared/api/types";
 import { PIPELINE_INFO, pipelineLabel } from "@/shared/lib/pipelines";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { formatDayMonthTime } from "@/shared/lib/dates";
 import { callClassificationLabels, callOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
 
 const CLASSIFICATIONS: CallClassification[] = [
@@ -99,7 +100,7 @@ export function CallLogPage() {
         onRowClick={(c) => navigate(`/appointments/calls/${c.id}`)}
         emptyMessage={classification || outcome || pipeline ? t("noCallsMatchFilters") : t("noCallsYet")}
         columns={[
-          { header: t("colDateTime"), render: (c) => new Date(c.startedAt).toLocaleString(), className: "mono" },
+          { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.startedAt, language), className: "mono" },
           // Immediately after the timestamp: with four pipelines in one log, every other column
           // on the row is meaningless until you know which one produced it.
           { header: t("colPipeline"), render: (c) => pipelineLabel(c.pipeline) },

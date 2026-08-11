@@ -4,7 +4,8 @@ using NodaTime;
 namespace Secretary.Application.Dtos;
 
 public sealed record TenantResponse(
-    int Id, string Name, string Timezone, string? PhoneLine, EntityStatus Status, Instant CreatedAt);
+    int Id, string Name, string Timezone, string? PhoneLine, EntityStatus Status, Instant CreatedAt,
+    IReadOnlyList<Module> EnabledModules);
 
 public sealed record CreateTenantRequest(
     string Name, string Timezone, string? PhoneLine, string OwnerName, string OwnerEmail, string OwnerPassword);

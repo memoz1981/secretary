@@ -62,4 +62,9 @@ internal sealed class UnitOfWork : IUnitOfWork
     public IOrderSettingsRepository OrderSettings { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => _db.SaveChangesAsync(cancellationToken);
+
+    /// <summary>Detaches everything the change tracker is holding. Blunt on purpose: after a
+    /// failed save the only safe assumption is that nothing pending is trustworthy, and the
+    /// alternative — unpicking which entity caused it — is guesswork at the worst moment.</summary>
+    public void DiscardPendingChanges() => _db.ChangeTracker.Clear();
 }

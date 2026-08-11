@@ -12,6 +12,7 @@ import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getCallDetail } from "@/modules/appointments/api/calls";
 import type { CallOutcome, CallResponse } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { formatDayMonthTime } from "@/shared/lib/dates";
 import { callClassificationLabels, callOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
 
 function outcomePillVariant(outcome: CallOutcome): "success" | "warning" | "critical" {
@@ -114,13 +115,13 @@ export function CallDetailPage() {
         {state.status === "success" && (
           <>
             <div className="breadcrumb">
-              {t("callLog")} / {new Date(state.data.call.startedAt).toLocaleString()}
+              {t("callLog")} / {formatDayMonthTime(state.data.call.startedAt, language)}
             </div>
             <h1
               className="page-title"
               style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}
             >
-              {new Date(state.data.call.startedAt).toLocaleString()}{" "}
+              {formatDayMonthTime(state.data.call.startedAt, language)}{" "}
               <Pill variant={outcomePillVariant(state.data.call.outcome)}>
                 {translateEnum(callOutcomeLabels, state.data.call.outcome, language)}
               </Pill>

@@ -41,9 +41,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.ToTable("Products", DbSchemas.Orders);
         builder.ConfigureBaseEntity();
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
-        builder.Property(p => p.Description).HasMaxLength(1000);
         builder.Property(p => p.Aliases).HasMaxLength(500);
         builder.Property(p => p.UnitPrice).HasColumnType("decimal(10,2)");
+
+        // Same precision as an order line, so a cap can be expressed in whatever the product is
+        // measured in — 2.5 kg is a sensible maximum, 2.5 bidons is not, and the unit decides.
+        builder.Property(p => p.MaxOrderQuantity).HasPrecision(12, 3);
 
         builder.HasIndex(p => p.TenantId);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Restrict);
