@@ -384,6 +384,23 @@ public sealed class LiveVoiceCallOrchestrator
         }
     }
 
+    /// <summary>Whether a turn that made no sound is ours to re-ask for.
+    ///
+    /// Three separate questions, and getting any of them wrong is audible. Is somebody else
+    /// going to speak? Was the silence deliberate? And have we already tried?
+    ///
+    /// ⚠ A tool call used to disqualify recovery outright, on the reasoning that the follow-up
+    /// would do the talking. That holds only where the follow-up is ours to start. Where the
+    /// provider resumes the turn itself, a resumed turn cancelled before it makes a sound has
+    /// nothing behind it — and that is not hypothetical: a caller was identified, Gemini reported
+    /// the turn interrupted 310 ms after the tool result with no audio, and the line sat silent
+    /// for fourteen seconds until they said "Aló. Aló."</summary>
+    internal static bool ShouldReAskAfterSilence(
+        bool toolCallInResponse, bool providerResumesTurn, string? statusReason, int retriesSoFar)
+        => (providerResumesTurn || !toolCallInResponse)
+           && ShouldRecoverFromSilence(statusReason)
+           && retriesSoFar < MaxSilentRetries;
+
     /// <summary>An empty response is only OUR problem to fix when nobody meant it to be empty.
     /// The two cancellation reasons below are the system working as designed: the caller took
     /// the turn (their own turn produces the next response) or we cancelled on barge-in. Re-
@@ -728,9 +745,10 @@ public sealed class LiveVoiceCallOrchestrator
                         break;
                     }
 
-                    // Nothing was said and nothing was called: the turn produced dead air.
-                    // Whether that's worth fixing depends entirely on WHY it ended.
-                    if (toolCallInCurrentResponse || !ShouldRecoverFromSilence(statusReason) || silentRetries >= MaxSilentRetries)
+                    // The turn produced dead air.
+                    if (!ShouldReAskAfterSilence(
+                            toolCallInCurrentResponse, _realtimeSession.ContinuesTurnAfterToolResult,
+                            statusReason, silentRetries))
                     {
                         break;
                     }
@@ -738,8 +756,9 @@ public sealed class LiveVoiceCallOrchestrator
                     silentRetries++;
                     var retryDelay = RetryDelayFor(failureMessage);
                     _logger.LogWarning(
-                        "Turn: response produced no audio and no tool call (status={Status}, reason={Reason}) — will re-ask in {Ms} ms.",
-                        status, statusReason, retryDelay.TotalMilliseconds);
+                        "Turn: response produced no audio (status={Status}, reason={Reason}, toolCall={ToolCall}) "
+                        + "— will re-ask in {Ms} ms.",
+                        status, statusReason, toolCallInCurrentResponse, retryDelay.TotalMilliseconds);
                     _ = RetrySilentResponseAsync(currentGeneration, retryDelay, cancellationToken);
                     break;
 
