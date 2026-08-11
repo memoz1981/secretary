@@ -17,30 +17,28 @@ public static class GeminiUsageTranslator
             return null;
         }
 
-        var promptText = TokensFor(usage.PromptTokensDetails, MediaModality.Text);
+        // Audio comes from the breakdown; everything else is whatever the headline total has
+        // left over.
+        //
+        // ⚠ The breakdown does NOT add up to the total, and the gap is not small. A measured
+        // Gemini call reported 2,739 prompt tokens against 2,136 text + 201 audio, and the
+        // shortfall grew to 1,125 by the end of the call. Summing only the two modalities we
+        // recognise dropped all of it, so every cost this wrote was 5–15% light. Deriving text
+        // by subtraction keeps the total whole whatever Gemini reports the rest under, and puts
+        // the unknown on the cheaper modality, which is the same safe direction the OpenAI
+        // translator errs in.
         var promptAudio = TokensFor(usage.PromptTokensDetails, MediaModality.Audio);
-        var responseText = TokensFor(usage.ResponseTokensDetails, MediaModality.Text);
         var responseAudio = TokensFor(usage.ResponseTokensDetails, MediaModality.Audio);
-        var cachedText = TokensFor(usage.CacheTokensDetails, MediaModality.Text);
         var cachedAudio = TokensFor(usage.CacheTokensDetails, MediaModality.Audio);
 
-        // No breakdown at all: attribute the headline count to text, the cheaper modality, so an
-        // unknown mix understates rather than inflates what we report having spent. Same choice
-        // as the OpenAI translator makes, and wrong in the same safe direction.
-        if (promptText == 0 && promptAudio == 0)
-        {
-            promptText = usage.PromptTokenCount ?? 0;
-        }
+        var promptText = TextFromTotal(
+            usage.PromptTokenCount, promptAudio, usage.PromptTokensDetails);
 
-        if (responseText == 0 && responseAudio == 0)
-        {
-            responseText = usage.ResponseTokenCount ?? 0;
-        }
+        var responseText = TextFromTotal(
+            usage.ResponseTokenCount, responseAudio, usage.ResponseTokensDetails);
 
-        if (cachedText == 0 && cachedAudio == 0)
-        {
-            cachedText = usage.CachedContentTokenCount ?? 0;
-        }
+        var cachedText = TextFromTotal(
+            usage.CachedContentTokenCount, cachedAudio, usage.CacheTokensDetails);
 
         // Thinking tokens are billed at the output text rate and reported outside the modality
         // breakdown, so they would otherwise vanish from the bill entirely.
@@ -54,6 +52,12 @@ public static class GeminiUsageTranslator
             outputTextTokens: responseText,
             outputAudioTokens: responseAudio);
     }
+
+    /// <summary>Everything in the total that is not audio. Falls back to the reported text
+    /// modality when there is no total to subtract from, which is what a provider that only
+    /// fills in the breakdown would give us.</summary>
+    private static int TextFromTotal(int? total, int audio, List<ModalityTokenCount>? details)
+        => total is > 0 ? Math.Max(0, total.Value - audio) : TokensFor(details, MediaModality.Text);
 
     private static int TokensFor(List<ModalityTokenCount>? details, MediaModality modality)
         => details?
