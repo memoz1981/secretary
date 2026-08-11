@@ -229,7 +229,7 @@ public sealed class GeminiLiveSession : IRealtimeSession
             content?.TurnComplete,
             content?.Interrupted,
             message.ToolCall?.FunctionCalls?.Count ?? 0,
-            message.UsageMetadata is null ? "-" : $"prompt={message.UsageMetadata.PromptTokenCount} response={message.UsageMetadata.ResponseTokenCount} thoughts={message.UsageMetadata.ThoughtsTokenCount}",
+            DescribeUsage(message.UsageMetadata),
             message.SetupComplete is not null,
             message.GoAway is not null,
             message.VoiceActivityDetectionSignal?.ToString() ?? "-",
@@ -237,6 +237,35 @@ public sealed class GeminiLiveSession : IRealtimeSession
 
         static string Trim(string? text)
             => string.IsNullOrWhiteSpace(text) ? "-" : text.Trim();
+    }
+
+    /// <summary>The totals plus the modality split behind them.
+    ///
+    /// The totals alone were not enough to read a real call: the prompt more than doubled on the
+    /// turn that made the first tool call, and nothing in a headline number says whether that is
+    /// audio accumulating, text, or content that was cached and is now being counted. The split
+    /// is already parsed for billing — GeminiUsageTranslator reads exactly these fields — so this
+    /// only puts it where a log can be read at the time.</summary>
+    private static string DescribeUsage(UsageMetadata? usage)
+    {
+        if (usage is null)
+        {
+            return "-";
+        }
+
+        return $"prompt={usage.PromptTokenCount}(txt {Modality(usage.PromptTokensDetails, MediaModality.Text)}"
+               + $"/aud {Modality(usage.PromptTokensDetails, MediaModality.Audio)}) "
+               + $"cached={usage.CachedContentTokenCount ?? 0}"
+               + $"(txt {Modality(usage.CacheTokensDetails, MediaModality.Text)}"
+               + $"/aud {Modality(usage.CacheTokensDetails, MediaModality.Audio)}) "
+               + $"response={usage.ResponseTokenCount}(txt {Modality(usage.ResponseTokensDetails, MediaModality.Text)}"
+               + $"/aud {Modality(usage.ResponseTokensDetails, MediaModality.Audio)}) "
+               + $"thoughts={usage.ThoughtsTokenCount}";
+
+        static string Modality(List<ModalityTokenCount>? details, MediaModality modality)
+            => details is null
+                ? "-"
+                : details.Where(d => d.Modality == modality).Sum(d => d.TokenCount ?? 0).ToString();
     }
 
     private IEnumerable<RealtimeEvent> Translate(LiveServerMessage message)
