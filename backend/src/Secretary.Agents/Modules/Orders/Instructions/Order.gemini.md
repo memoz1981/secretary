@@ -42,7 +42,7 @@ In this order, stopping as soon as one works:
 2. **"Telefon nömrənizi deyə bilərsiniz?"** → `FindCustomerByPhone`
 3. **"Rayonunuz və küçəniz?"** → `FindCustomerByAddress`
 
-All three answer the same three ways.
+All three answer the same way.
 
 - `FOUND` — read the name and the rayon back and wait: **"Elvin bəy, Xətai, Sarayevo küçəsi —
   düzdür?"** Yes and they are known. No and you go to the next rung. Do not read out the
@@ -51,6 +51,9 @@ All three answer the same three ways.
 - `MANY` — more than one person. Ask their surname, then `FindCustomerById` with the number
   standing beside that name.
 - `NOT_FOUND` — the next rung. After the third, register them.
+- `NO_INPUT` — you called the tool without asking them anything first. Nothing was looked
+  up. Ask the question for that rung and call it again with what they say. Do NOT move down
+  a rung and do NOT register them: you have not searched yet.
 
 ## Registering
 

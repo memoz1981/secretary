@@ -44,24 +44,38 @@ public sealed class OrderTools
         _logger = logger;
     }
 
-    [Description("Finds the caller by the customer number they quoted.")]
+    [Description("Finds the caller by the customer number they quoted. Only once they have said one.")]
     public async Task<string> FindCustomerById(
-        [Description("The customer number they said")] int customerId)
-        => Describe(await _identity.FindByIdAsync(customerId, default));
+        [Description("The customer number they said out loud")] int customerId)
+        => customerId <= 0 ? NoInput : Describe(await _identity.FindByIdAsync(customerId, default));
 
     [Description("Finds the caller by their phone number.")]
     public async Task<string> FindCustomerByPhone(
         [Description("Their phone number as they said it")] string phoneNumber)
-        => Describe(await _identity.FindByPhoneAsync(phoneNumber, default));
+        => string.IsNullOrWhiteSpace(phoneNumber)
+            ? NoInput
+            : Describe(await _identity.FindByPhoneAsync(phoneNumber, default));
 
     [Description("Finds the caller by where they live. Only after a customer number and a phone number both failed.")]
     public async Task<string> FindCustomerByAddress(
         [Description("Baku rayon, e.g. Xətai")] string district,
         [Description("Street name only, e.g. Sarayevo")] string street)
-        => Describe(await _identity.FindByAddressAsync(district, street, default));
+        => string.IsNullOrWhiteSpace(district) || string.IsNullOrWhiteSpace(street)
+            ? NoInput
+            : Describe(await _identity.FindByAddressAsync(district, street, default));
+
+    /// <summary>Nothing was searched for, because nothing was given to search with.
+    ///
+    /// ⚠ Distinct from NOT_FOUND on purpose, and it is not a nicety. The model calls a find tool
+    /// with 0 or an empty string the moment a caller says "yes, I have ordered before" — before
+    /// asking them for anything — and NOT_FOUND told it the customer does not exist. It then
+    /// worked down the ladder, or started registering somebody who already had a record. Watched
+    /// happen on two builds, so it is the model's habit rather than a wording problem: the tool
+    /// has to be able to say "you did not ask me anything".</summary>
+    private const string NoInput = "NO_INPUT.";
 
     /// <summary>One shape for all three lookups, which is the point: the instruction file
-    /// describes these three markers once instead of a ladder of outcomes per route.
+    /// describes these markers once instead of a ladder of outcomes per route.
     ///
     /// Nobody is identified here. The agent reads the name and the rayon back and the caller
     /// agrees or does not — a misheard digit is caught by the same person who would have

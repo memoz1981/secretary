@@ -410,6 +410,30 @@ public sealed class OrderToolsTests
     private OrdersAgentModule BuildModule()
         => new(_sut, _escalation, new CallControlTools(), _session, _orderCalls);
 
+    /// <summary>Nothing was given to search on, so nothing was searched for.
+    ///
+    /// NOT_FOUND here is a lie the model acts on: watched on two builds, it called this the
+    /// moment a caller said "yes, I have ordered before" — before asking them for anything — and
+    /// then worked down the ladder as though the customer did not exist.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task A_lookup_with_no_number_says_so_rather_than_not_found(int customerId)
+    {
+        (await _sut.FindCustomerById(customerId)).ShouldBe("NO_INPUT.");
+
+        _customers.Verify(
+            c => c.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_lookup_with_no_phone_number_says_so_too()
+        => (await _sut.FindCustomerByPhone("  ")).ShouldBe("NO_INPUT.");
+
+    [Fact]
+    public async Task A_lookup_with_half_an_address_says_so_too()
+        => (await _sut.FindCustomerByAddress("Xətai", "")).ShouldBe("NO_INPUT.");
+
     private void GivenCatalog(params Product[] products)
     {
         _products.Setup(p => p.GetCatalogAsync(It.IsAny<CancellationToken>())).ReturnsAsync(products);
