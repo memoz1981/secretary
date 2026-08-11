@@ -9,6 +9,7 @@ import { useApiData } from "@/shared/lib/useApiData";
 import { getTenants } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
+import { MODULE_PRESENTATION } from "@/modules/presentation";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 
 export function TenantListPage() {
@@ -55,7 +56,7 @@ export function TenantListPage() {
               ) : (
                 <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
                   {tenant.enabledModules.map((module) => (
-                    <Pill key={module} variant="neutral">
+                    <Pill key={module} tone={MODULE_PRESENTATION[module].tone}>
                       {translateEnum(moduleLabels, module, language)}
                     </Pill>
                   ))}
