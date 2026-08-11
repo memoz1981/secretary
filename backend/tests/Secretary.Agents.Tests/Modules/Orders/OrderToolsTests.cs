@@ -135,6 +135,9 @@ public sealed class OrderToolsTests
         var result = await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 2m), new OrderLineInput(7, 1m)]);
 
         result.ShouldStartWith("OVER_MAXIMUM.");
+
+        // A maximum is a quantity of something, so it carries the unit too.
+        result.ShouldContain("2 ədəd");
         result.ShouldContain("Sirab 19L");
         _orders.Verify(o => o.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -169,7 +172,11 @@ public sealed class OrderToolsTests
 
         // The readback is built from what went into the database, not from what the model
         // remembers saying — that is the reason the order is one call.
-        result.ShouldContain("Sirab 19L × 5");
+        //
+        // Quantity, unit, product — the way it is said. It used to read "Sirab 19L × 5" and the
+        // agent said the multiplication sign out loud: "Sirab vuraq beş".
+        result.ShouldContain("5 ədəd Sirab 19L");
+        result.ShouldNotContain("×");
         result.ShouldContain("Çatdırılma:");
 
         // Never a year. A caller was once offered, and accepted, the 31st of December 2031.

@@ -132,7 +132,7 @@ public sealed class OrderTools
 
         return string.Join("; ", catalog.Select(p =>
         {
-            var cap = p.MaxOrderQuantity is { } max ? $", maks {Trim(max)}" : string.Empty;
+            var cap = p.MaxOrderQuantity is { } max ? $", maks {Trim(max)} {p.Unit}" : string.Empty;
             return $"{p.Id} {p.Name} — {p.UnitPrice:0.##} AZN / {p.Unit}{cap}";
         }));
     }
@@ -176,7 +176,7 @@ public sealed class OrderTools
             var product = byId[productId];
             if (product.MaxOrderQuantity is { } cap && quantity > cap)
             {
-                return $"OVER_MAXIMUM. {product.Name}: {Trim(cap)} maks.";
+                return $"OVER_MAXIMUM. {product.Name}: {Trim(cap)} {product.Unit} maks.";
             }
         }
 
@@ -230,7 +230,7 @@ public sealed class OrderTools
             // The readback comes from here rather than from the model's memory of the
             // conversation. That is the whole reason the order is one call: what it repeats to
             // the caller is what went into the database, not what it believes it heard.
-            var what = string.Join(", ", wanted.Select(kv => $"{byId[kv.Key].Name} × {Trim(kv.Value)}"));
+            var what = string.Join(", ", wanted.Select(kv => Say(byId[kv.Key], kv.Value)));
             return $"ORDER_PLACED. Sifariş {order.Id}: {what}. Çatdırılma: {AzerbaijanTime.SpokenDate(deliveryDay.Value)}";
         }
         catch (Exception ex)
@@ -257,6 +257,14 @@ public sealed class OrderTools
         _session.Cancelled();
         return $"ORDER_CANCELLED. Sifariş {orderId}";
     }
+
+    /// <summary>One order line the way it is said out loud: "3 ədəd Sirab".
+    ///
+    /// It used to read "Sirab × 3", and the agent said "Sirab vuraq üç" — it read the symbol. A
+    /// tool result is spoken almost verbatim, so it has to be written the way a person would say
+    /// it, in the order they would say it, with the unit the product is actually sold in.</summary>
+    private static string Say(ProductResponse product, decimal quantity)
+        => $"{Trim(quantity)} {product.Unit} {product.Name}".Replace("  ", " ");
 
     /// <summary>Three, not 3.000 — the agent reads this aloud.</summary>
     private static string Trim(decimal quantity)
