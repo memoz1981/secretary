@@ -8,21 +8,26 @@ using Microsoft.Extensions.Logging;
 namespace Secretary.Agents.Tools;
 
 /// <summary>One line of an order tool's result. Ids, never names: the id came out of
-/// ListProducts moments earlier, so there is nothing for the model to spell and nothing for the
-/// Azerbaijani fold to get wrong.</summary>
+/// the customer lookup moments earlier, so there is nothing for the model to spell and nothing
+/// for the Azerbaijani fold to get wrong.</summary>
 public sealed record OrderLineInput(
-    [property: Description("Product id from ListProducts")] int ProductId,
+    [property: Description("Product id from the list you were given")] int ProductId,
     [property: Description("How many")] decimal Quantity);
 
 /// <summary>The order line's tools. Results are DATA — never sentences telling the model how to
 /// behave, because anything phrased as instruction gets read aloud to the caller. Order.md says
 /// what to do with each marker.
 ///
-/// Seven tools where there were eleven, and the shape changed more than the count. Identity is
+/// Six order tools where there were nine, and the shape changed more than the count. Identity is
 /// three plain lookups whose result the agent reads back out loud instead of a lookup, a
 /// generated challenge and a confirm tool. The order arrives in one call rather than one call
-/// per product. The delivery day is assigned here rather than negotiated. Together that is most
-/// of the instruction file, which was ~70% of what every model response paid for.</summary>
+/// per product. The delivery day is assigned here rather than negotiated. The catalogue rides
+/// back with the customer instead of costing a round trip of its own.
+///
+/// Round trips are the expensive thing, not the tool count. A tool call is two model
+/// invocations — one to ask, one to speak afterwards — and each carries the whole prompt, so
+/// every tool a call does not have to make is worth about 4,700 tokens and a second of silence
+/// the caller would otherwise sit through.</summary>
 public sealed class OrderTools
 {
     private readonly CustomerIdentityService _identity;
@@ -47,14 +52,16 @@ public sealed class OrderTools
     [Description("Finds the caller by the customer number they quoted. Only once they have said one.")]
     public async Task<string> FindCustomerById(
         [Description("The customer number they said out loud")] int customerId)
-        => customerId <= 0 ? NoInput : Describe(await _identity.FindByIdAsync(customerId, default));
+        => customerId <= 0
+            ? NoInput
+            : await DescribeAsync(await _identity.FindByIdAsync(customerId, default));
 
     [Description("Finds the caller by their phone number.")]
     public async Task<string> FindCustomerByPhone(
         [Description("Their phone number as they said it")] string phoneNumber)
         => string.IsNullOrWhiteSpace(phoneNumber)
             ? NoInput
-            : Describe(await _identity.FindByPhoneAsync(phoneNumber, default));
+            : await DescribeAsync(await _identity.FindByPhoneAsync(phoneNumber, default));
 
     [Description("Finds the caller by where they live. Only after a customer number and a phone number both failed.")]
     public async Task<string> FindCustomerByAddress(
@@ -62,7 +69,7 @@ public sealed class OrderTools
         [Description("Street name only, e.g. Sarayevo")] string street)
         => string.IsNullOrWhiteSpace(district) || string.IsNullOrWhiteSpace(street)
             ? NoInput
-            : Describe(await _identity.FindByAddressAsync(district, street, default));
+            : await DescribeAsync(await _identity.FindByAddressAsync(district, street, default));
 
     /// <summary>Nothing was searched for, because nothing was given to search with.
     ///
@@ -80,7 +87,7 @@ public sealed class OrderTools
     /// Nobody is identified here. The agent reads the name and the rayon back and the caller
     /// agrees or does not — a misheard digit is caught by the same person who would have
     /// answered a challenge question, one turn earlier.</summary>
-    private string Describe(IReadOnlyList<CallerMatch> matches)
+    private async Task<string> DescribeAsync(IReadOnlyList<CallerMatch> matches)
     {
         if (matches.Count == 0)
         {
@@ -108,7 +115,33 @@ public sealed class OrderTools
         // afterwards, so this is the only moment the record can be attributed to a person.
         _session.Identified(match.CustomerId);
 
-        return $"FOUND. Müştəri {match.CustomerId}, {match.Name ?? "adsız"}. {where}";
+        return $"FOUND. Müştəri {match.CustomerId}, {match.Name ?? "adsız"}. {where}. "
+               + await DescribeCatalogAsync();
+    }
+
+    /// <summary>The catalogue, carried back with whoever the call is about.
+    ///
+    /// It used to be a tool of its own, and that tool was a whole round trip to deliver two
+    /// lines of text. A tool call is two model invocations — one to ask for it, one to speak
+    /// afterwards — so each one costs the full prompt twice over, about 4,700 tokens and a
+    /// second of silence the caller sits through. Riding along with a call the agent was making
+    /// anyway costs fifty tokens and no silence at all.
+    ///
+    /// Every path to placing an order passes through identification or registration, so the ids
+    /// are always in hand by the time they are needed.</summary>
+    private async Task<string> DescribeCatalogAsync()
+    {
+        var catalog = await _directory.GetProductsAsync(default);
+        if (catalog.Count == 0)
+        {
+            return "NO_PRODUCTS.";
+        }
+
+        return "Məhsullar: " + string.Join("; ", catalog.Select(p =>
+        {
+            var cap = p.MaxOrderQuantity is { } max ? $", maks {Trim(max)} {p.Unit}" : string.Empty;
+            return $"{p.Id} {p.Name} — {p.UnitPrice:0.##} AZN / {p.Unit}{cap}";
+        }));
     }
 
     [Description("Records a first-time caller and returns their customer number.")]
@@ -126,29 +159,13 @@ public sealed class OrderTools
                 new NewCustomerDetails(name, phoneNumber, district, street, building, apartment), default);
 
             _session.Identified(result.CustomerId);
-            return $"REGISTERED. Müştəri {result.CustomerId}.";
+            return $"REGISTERED. Müştəri {result.CustomerId}. " + await DescribeCatalogAsync();
         }
         catch (ArgumentException ex)
         {
             // Almost always the rayon: the model heard somewhere that is not one of the twelve.
             return $"NOT_REGISTERED. {ex.Message}";
         }
-    }
-
-    [Description("What this business sells, with the product id needed to order it.")]
-    public async Task<string> ListProducts()
-    {
-        var catalog = await _directory.GetProductsAsync(default);
-        if (catalog.Count == 0)
-        {
-            return "NO_PRODUCTS.";
-        }
-
-        return string.Join("; ", catalog.Select(p =>
-        {
-            var cap = p.MaxOrderQuantity is { } max ? $", maks {Trim(max)} {p.Unit}" : string.Empty;
-            return $"{p.Id} {p.Name} — {p.UnitPrice:0.##} AZN / {p.Unit}{cap}";
-        }));
     }
 
     [Description("Places the whole order at once and returns the delivery day. Call it after the caller has said "

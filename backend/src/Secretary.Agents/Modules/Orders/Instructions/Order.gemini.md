@@ -66,8 +66,9 @@ in. `NOT_REGISTERED` means you misheard the rayon; ask for it again.
 
 ## The order
 
-`ListProducts` before you order — the ids come from it. Read the list aloud only if they ask
-for it; otherwise answer what they asked.
+The product list arrives with the customer, in the `FOUND` or `REGISTERED` result — prices,
+units and the ids you order by. You never have to ask for it. Read it aloud only if they
+ask what there is; otherwise answer the question they asked.
 
 **Never take a product without a quantity.** Ask **"Neçə ədəd?"** and wait. A caller who said
 only "su" was told one had been added and had to interrupt.

@@ -115,7 +115,6 @@ public sealed class OrderToolsTests
                 nameof(OrderTools.FindCustomerByPhone),
                 nameof(OrderTools.FindCustomerByAddress),
                 nameof(OrderTools.RegisterCustomer),
-                nameof(OrderTools.ListProducts),
                 nameof(OrderTools.PlaceOrder),
                 nameof(OrderTools.CancelOrder),
                 nameof(EscalationTools.EscalateToHuman),
@@ -229,9 +228,8 @@ public sealed class OrderToolsTests
     [Fact]
     public async Task A_lookup_returns_the_name_and_the_address_for_the_agent_to_read_back()
     {
-        var customer = WithId(Customer.Create(1, "Elvin Məmmədov", Now), 11);
-        _customers.Setup(c => c.GetByIdAsync(11, It.IsAny<CancellationToken>())).ReturnsAsync(customer);
-        GivenAddresses(11, WithId(Address(11, "Xətai", "Sarayevo", "12"), 87));
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+        GivenIdentifiableCustomer();
 
         var result = await _sut.FindCustomerById(11);
 
@@ -282,9 +280,10 @@ public sealed class OrderToolsTests
     public async Task The_catalogue_is_read_once_and_then_held()
     {
         GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+        GivenIdentifiableCustomer();
 
-        await _sut.ListProducts();
-        await _sut.ListProducts();
+        await _sut.FindCustomerById(11);
+        await _sut.FindCustomerById(11);
 
         _products.Verify(p => p.GetCatalogAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -295,10 +294,11 @@ public sealed class OrderToolsTests
     public async Task Changing_the_catalogue_is_picked_up_on_the_next_call()
     {
         GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
-        await _sut.ListProducts();
+        GivenIdentifiableCustomer();
+        await _sut.FindCustomerById(11);
 
         new AgentDirectoryChangeNotifier().NotifyChanged(1);
-        await _sut.ListProducts();
+        await _sut.FindCustomerById(11);
 
         _products.Verify(p => p.GetCatalogAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
@@ -410,6 +410,22 @@ public sealed class OrderToolsTests
     private OrdersAgentModule BuildModule()
         => new(_sut, _escalation, new CallControlTools(), _session, _orderCalls);
 
+    /// <summary>The catalogue no longer costs a round trip of its own: it comes back attached to
+    /// whoever the call is about. A tool call is two model invocations, so the tool this replaced
+    /// was worth about 4,700 tokens and a second of silence every call.</summary>
+    [Fact]
+    public async Task Finding_the_caller_hands_back_the_catalogue_with_them()
+    {
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, maxOrderQuantity: 10m, Now), 7));
+        GivenIdentifiableCustomer();
+
+        var result = await _sut.FindCustomerById(11);
+
+        result.ShouldStartWith("FOUND.");
+        result.ShouldContain("7 Sirab 19L");
+        result.ShouldContain("maks 10 ədəd");
+    }
+
     /// <summary>Nothing was given to search on, so nothing was searched for.
     ///
     /// NOT_FOUND here is a lie the model acts on: watched on two builds, it called this the
@@ -433,6 +449,15 @@ public sealed class OrderToolsTests
     [Fact]
     public async Task A_lookup_with_half_an_address_says_so_too()
         => (await _sut.FindCustomerByAddress("Xətai", "")).ShouldBe("NO_INPUT.");
+
+    private void GivenIdentifiableCustomer()
+    {
+        _customers
+            .Setup(c => c.GetByIdAsync(11, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WithId(Customer.Create(1, "Elvin Məmmədov", Now), 11));
+
+        GivenAddresses(11, WithId(Address(11, "Xətai", "Sarayevo", "12"), 87));
+    }
 
     private void GivenCatalog(params Product[] products)
     {

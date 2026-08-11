@@ -41,7 +41,6 @@ public sealed class OrdersAgentModule : IAgentModule
         AIFunctionFactory.Create(_orderTools.FindCustomerByPhone),
         AIFunctionFactory.Create(_orderTools.FindCustomerByAddress),
         AIFunctionFactory.Create(_orderTools.RegisterCustomer),
-        AIFunctionFactory.Create(_orderTools.ListProducts),
         AIFunctionFactory.Create(_orderTools.PlaceOrder),
         AIFunctionFactory.Create(_orderTools.CancelOrder),
         AIFunctionFactory.Create(_escalationTools.EscalateToHuman),
