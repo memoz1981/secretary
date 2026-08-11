@@ -244,10 +244,10 @@ public sealed class OrderTools
             : $"DELIVERY_DAY. {soonest.Value:yyyy-MM-dd}";
     }
 
-    [Description("Places the order. Only after the caller has confirmed what they want and which day.")]
+    [Description("Places the order. Only after the caller has confirmed what they want and which day. It goes to " +
+                 "the address already on the customer's record.")]
     public async Task<string> PlaceOrder(
         [Description("The confirmed customer number")] int customerId,
-        [Description("The delivery address id, from ConfirmCustomer")] int addressId,
         [Description("Delivery day as 2026-08-10, from GetDeliveryDay")] string deliveryDayLocal,
         [Description("Anything else the caller mentioned, empty if nothing")] string? notes)
     {
@@ -286,7 +286,19 @@ public sealed class OrderTools
         // producing a string that looks like a confirmation unless a row exists.
         try
         {
-            var order = await _orders.PlaceAsync(customerId, addressId, _draft.Lines, deliveryDay, notes, default);
+            // The address is resolved here rather than asked of the model. It used to be a
+            // parameter and the model filled it with 43 — the mənzil out of "Xətai r., Sarayevo,
+            // ev 12, mənzil 43". Asking it to copy an id out of a sentence holding three other
+            // numbers gets the wrong one, and the wrong one is a foreign-key violation that
+            // kills the order.
+            var addresses = await _identity.GetAddressesAsync(customerId, default);
+            if (addresses.Count == 0)
+            {
+                return "NO_ADDRESS_ON_FILE.";
+            }
+
+            var address = addresses.FirstOrDefault(a => a.IsDefault) ?? addresses[0];
+            var order = await _orders.PlaceAsync(customerId, address.Id, _draft.Lines, deliveryDay, notes, default);
             if (order.Id <= 0)
             {
                 return await FailWithoutConfirming(
@@ -309,6 +321,7 @@ public sealed class OrderTools
     {
         DeliveryDayVerdict.Ok => $"DAY_OK. {day:yyyy-MM-dd}",
         DeliveryDayVerdict.InThePast => $"DAY_IN_THE_PAST. {day:yyyy-MM-dd}",
+        DeliveryDayVerdict.TooSoon => $"DAY_TOO_SOON. {day:yyyy-MM-dd}",
         DeliveryDayVerdict.TooFarAhead => $"DAY_TOO_FAR_AHEAD. {day:yyyy-MM-dd}",
         _ => $"CLOSED_THAT_DAY. {day:yyyy-MM-dd}",
     };
@@ -318,6 +331,11 @@ public sealed class OrderTools
     private async Task<string> FailWithoutConfirming(int customerId, string reason, Exception? exception)
     {
         _logger.LogError(exception, "Order for customer {CustomerId} was not placed: {Reason}", customerId, reason);
+
+        // Before anything else that writes. The rejected order is still tracked, and without
+        // this the escalation below re-submits it, fails for the same reason, and the caller
+        // ends up neither transferred nor recorded — which is exactly what happened.
+        _orders.DiscardPendingChanges();
 
         try
         {

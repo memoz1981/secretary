@@ -22,6 +22,10 @@ export function isLanguage(value: unknown): value is Language {
 type Dict = Record<Language, string>;
 
 export const translations = {
+  modulesSaved: { az: "Yadda saxlanıldı", ru: "Сохранено", en: "Saved" },
+  colQuantity: { az: "Miqdar", ru: "Количество", en: "Quantity" },
+  markDelivered: { az: "Çatdırıldı", ru: "Доставлен", en: "Delivered" },
+  markCancelled: { az: "Ləğv et", ru: "Отменить", en: "Cancel" },
   noModules: { az: "Modul yoxdur", ru: "Нет модулей", en: "No modules" },
   maxOrderQuantity: { az: "Maksimum sifariş sayı", ru: "Максимум в заказе", en: "Max per order" },
   maxOrderQuantityHelp: {
@@ -872,6 +876,12 @@ export const dayOfWeekLabels: Record<string, Dict> = {
   Saturday: { az: "Şənbə", ru: "Суббота", en: "Saturday" },
   Sunday: { az: "Bazar", ru: "Воскресенье", en: "Sunday" },
 };
+export const orderStatusLabels: Record<string, Dict> = {
+  Placed: { az: "Qəbul edilib", ru: "Принят", en: "Placed" },
+  Delivered: { az: "Çatdırılıb", ru: "Доставлен", en: "Delivered" },
+  Cancelled: { az: "Ləğv edilib", ru: "Отменён", en: "Cancelled" },
+};
+
 export function translateEnum(map: Record<string, Dict>, value: string, language: Language): string {
   return map[value]?.[language] ?? value;
 }

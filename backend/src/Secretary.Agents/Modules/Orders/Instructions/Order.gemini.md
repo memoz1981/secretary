@@ -126,6 +126,8 @@ If they ask for a different day, call `GetDeliveryDay` again with that day.
 - `DAY_OK` — take it.
 - `CLOSED_THAT_DAY` — say so and offer the soonest instead.
 - `DAY_IN_THE_PAST` — you misheard the day. Ask again; do not point out that it has gone.
+- `DAY_TOO_SOON` — earlier than this business delivers. Say the soonest day `GetDeliveryDay`
+  gave you and ask whether that works. Do not apologise for it and do not offer to try.
 - `DAY_TOO_FAR_AHEAD` — almost always a misheard year. Ask which day they mean, do not read the
   date back at them.
 - `NO_WORKING_DAY` — apologise and `EscalateToHuman`.

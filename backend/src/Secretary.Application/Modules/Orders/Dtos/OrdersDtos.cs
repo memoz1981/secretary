@@ -1,4 +1,5 @@
 using Secretary.Domain.Entities;
+using Secretary.Domain.Enums;
 using NodaTime;
 
 namespace Secretary.Application.Dtos;
@@ -83,6 +84,11 @@ public enum DeliveryDayVerdict
 
     InThePast = 2,
 
+    /// <summary>Sooner than the tenant's lead time. The lead is a floor, not a suggestion — a
+    /// business that says ten working days and then delivers tomorrow because the caller asked
+    /// has no lead time at all.</summary>
+    TooSoon = 4,
+
     /// <summary>Beyond the window an order may be placed in. Almost always a misheard year — a
     /// caller was offered and accepted the 31st of December 2031.</summary>
     TooFarAhead = 3,
@@ -109,6 +115,8 @@ public sealed record OrderResponse(
 
 public sealed record CustomerResponse(
     int Id, string? Name, IReadOnlyList<string> PhoneNumbers, IReadOnlyList<string> Addresses, Instant CreatedAt);
+
+public sealed record SetOrderStatusRequest(OrderStatus Status);
 
 public sealed record OrderSettingsResponse(int LeadWorkingDays, int MaxDeliveryDaysAhead);
 

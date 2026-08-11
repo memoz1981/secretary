@@ -2,6 +2,8 @@ using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
 using Secretary.Application.Dtos;
 using Secretary.Domain.Entities;
+using Secretary.Domain.Enums;
+using Secretary.Domain.Exceptions;
 using Secretary.Domain.ValueObjects;
 using NodaTime;
 
@@ -23,6 +25,9 @@ public sealed class OrderService
         _clock = clock;
         _currentTenant = currentTenant;
     }
+
+    /// <summary>For a caller recovering from a failed write — see IUnitOfWork.</summary>
+    public void DiscardPendingChanges() => _uow.DiscardPendingChanges();
 
     public async Task<IReadOnlyList<ProductResponse>> GetCatalogAsync(CancellationToken cancellationToken)
     {
@@ -91,8 +96,10 @@ public sealed class OrderService
     public async Task<bool> IsWorkingDayAsync(LocalDate day, CancellationToken cancellationToken)
         => await CheckDeliveryDayAsync(day, cancellationToken) == DeliveryDayVerdict.Ok;
 
-    /// <summary>Why a day will not do, so the agent can say the right thing. "We are closed that
-    /// day" is a different sentence from "did you mean this year?".</summary>
+    /// <summary>The window is closed at both ends: the lead time is where it starts, the cap is
+    /// where it ends, and nothing outside is bookable. The lead used only to pick the day the
+    /// agent offered first, which meant any caller naming an earlier date got it — a lead time
+    /// that anyone can undercut on request is not a lead time.</summary>
     public async Task<DeliveryDayVerdict> CheckDeliveryDayAsync(LocalDate day, CancellationToken cancellationToken)
     {
         var today = _clock.GetCurrentInstant().InZone(DateTimeZoneProviders.Tzdb["Asia/Baku"]).Date;
@@ -109,6 +116,17 @@ public sealed class OrderService
         }
 
         var week = await _businessHours.GetWeekByDayAsync(cancellationToken);
+
+        // The floor is the first day the business would offer, not the raw lead number — the
+        // lead counts working days and the cap counts calendar days, so comparing the two
+        // numbers directly is only right when the business never closes.
+        var leadDays = settings?.LeadWorkingDays ?? OrderSettings.DefaultLeadWorkingDays;
+        var earliest = BusinessHoursService.NextWorkingDay(week, today, leadDays);
+        if (earliest is not null && day < earliest)
+        {
+            return DeliveryDayVerdict.TooSoon;
+        }
+
         return week.TryGetValue(day.DayOfWeek, out var hours) && !hours.IsClosed
             ? DeliveryDayVerdict.Ok
             : DeliveryDayVerdict.Closed;
@@ -176,6 +194,31 @@ public sealed class OrderService
         }
 
         return responses;
+    }
+
+    /// <summary>Marks an order delivered or cancelled from the Orders page. The one thing staff
+    /// do to an order after the call: an order is taken by phone, but whether it arrived is
+    /// something only a person knows.</summary>
+    public async Task<OrderResponse> SetStatusAsync(int id, OrderStatus status, CancellationToken cancellationToken)
+    {
+        var order = await _uow.Orders.GetByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(Order), id);
+
+        var now = _clock.GetCurrentInstant();
+        switch (status)
+        {
+            case OrderStatus.Delivered:
+                order.MarkDelivered(now);
+                break;
+            case OrderStatus.Cancelled:
+                order.Cancel(now);
+                break;
+            default:
+                throw new InvalidOperationException($"An order cannot be set back to {status}.");
+        }
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return (await ListAsync(cancellationToken)).First(o => o.Id == id);
     }
 
     public async Task<OrderSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken)

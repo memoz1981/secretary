@@ -40,6 +40,10 @@ export function TenantDetailPage() {
   const [moduleDraft, setModuleDraft] = useState<Record<string, boolean> | null>(null);
   const [savingModules, setSavingModules] = useState(false);
 
+  /// Saving modules changes nothing visible — the toggles already show what you chose — so
+  /// without a word confirming it, the only way to know it worked was to leave and come back.
+  const [justSaved, setJustSaved] = useState(false);
+
   const serverModules = modulesState.status === "success" ? modulesState.data : null;
   if (serverModules && !moduleDraft) {
     setModuleDraft(Object.fromEntries(serverModules.map((m) => [m.module, m.enabled])));
@@ -72,10 +76,14 @@ export function TenantDetailPage() {
         await setTenantModule(token!, tenantId, changed.module, moduleDraft![changed.module]);
       }
 
-      // Re-read rather than trusting the draft — the server is what decides, and clearing the
-      // draft makes the refreshed response repopulate it.
-      setModuleDraft(null);
+      // The draft is kept, not cleared. Clearing it unmounted every toggle until the reload
+      // came back, so a successful save looked like the selections vanishing and then flipping
+      // to something else — the save worked, but nothing on screen said so. Re-reading still
+      // happens; when the server's answer arrives it simply agrees, and the Save button
+      // disables itself because there is nothing left to change.
       setRefreshKey((k) => k + 1);
+      setJustSaved(true);
+      window.setTimeout(() => setJustSaved(false), 3000);
     } finally {
       setSavingModules(false);
     }
@@ -154,7 +162,10 @@ export function TenantDetailPage() {
                     module={row.module}
                     checked={moduleDraft[row.module] ?? false}
                     disabled={savingModules}
-                    onChange={(next) => setModuleDraft({ ...moduleDraft, [row.module]: next })}
+                    // Functional update, not a spread of the captured draft: two toggles clicked
+                    // before a re-render both read the same stale object and the second undoes
+                    // the first, which is the selections appearing to flip.
+                    onChange={(next) => setModuleDraft((current) => ({ ...current, [row.module]: next }))}
                   />
                 ))}
                 <div className="actions" style={{ marginTop: "var(--space-3)" }}>
@@ -165,6 +176,9 @@ export function TenantDetailPage() {
                     <Button type="button" variant="secondary" onClick={() => setModuleDraft(null)} disabled={savingModules}>
                       {t("cancel")}
                     </Button>
+                  )}
+                  {justSaved && moduleChanges.length === 0 && (
+                    <span className="sub" style={{ alignSelf: "center" }}>{t("modulesSaved")}</span>
                   )}
                 </div>
               </>
