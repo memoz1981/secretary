@@ -231,7 +231,11 @@ public sealed class OrderTools
             // conversation. That is the whole reason the order is one call: what it repeats to
             // the caller is what went into the database, not what it believes it heard.
             var what = string.Join(", ", wanted.Select(kv => Say(byId[kv.Key], kv.Value)));
-            return $"ORDER_PLACED. Sifariş {order.Id}: {what}. Çatdırılma: {AzerbaijanTime.SpokenDate(deliveryDay.Value)}";
+            // The number rides inside the marker rather than in the sentence. The caller does
+            // not want an order number read at them, and "never speak a marker" is a rule the
+            // instructions already carry — so putting it here is worth more than another line
+            // asking the model not to say it. CancelOrder still reads it straight back off.
+            return $"ORDER_PLACED#{order.Id}. {what}. Çatdırılma: {AzerbaijanTime.SpokenDate(deliveryDay.Value)}";
         }
         catch (Exception ex)
         {
@@ -241,7 +245,7 @@ public sealed class OrderTools
 
     [Description("Cancels the order just placed on this call, so a corrected one can replace it.")]
     public async Task<string> CancelOrder(
-        [Description("The order number PlaceOrder returned")] int orderId,
+        [Description("The number in the ORDER_PLACED marker")] int orderId,
         [Description("The customer number")] int customerId)
     {
         if (!_session.CanCancel(orderId))
@@ -255,7 +259,7 @@ public sealed class OrderTools
         }
 
         _session.Cancelled();
-        return $"ORDER_CANCELLED. Sifariş {orderId}";
+        return $"ORDER_CANCELLED#{orderId}.";
     }
 
     /// <summary>One order line the way it is said out loud: "3 ədəd Sirab".

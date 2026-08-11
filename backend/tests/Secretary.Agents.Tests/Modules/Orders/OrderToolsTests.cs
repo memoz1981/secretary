@@ -168,7 +168,10 @@ public sealed class OrderToolsTests
 
         var result = await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 5m)]);
 
-        result.ShouldStartWith("ORDER_PLACED. Sifariş 42:");
+        // The number lives in the marker, not in the sentence — the caller does not want it
+        // read at them, and "never speak a marker" is a rule the instructions already carry.
+        result.ShouldStartWith("ORDER_PLACED#42.");
+        result.ShouldNotContain("Sifariş");
 
         // The readback is built from what went into the database, not from what the model
         // remembers saying — that is the reason the order is one call.
@@ -215,7 +218,7 @@ public sealed class OrderToolsTests
         await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 1m)]);
         _orders.Setup(o => o.GetByIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(placed);
 
-        (await _sut.CancelOrder(42, 11)).ShouldBe("ORDER_CANCELLED. Sifariş 42");
+        (await _sut.CancelOrder(42, 11)).ShouldBe("ORDER_CANCELLED#42.");
 
         // Twice would throw out of the domain and read to the model as something to escalate.
         (await _sut.CancelOrder(42, 11)).ShouldBe("NOT_THIS_CALL.");
