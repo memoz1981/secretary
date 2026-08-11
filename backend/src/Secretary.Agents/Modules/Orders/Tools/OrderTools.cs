@@ -45,6 +45,14 @@ public sealed class OrderTools
         }
 
         var result = await _identity.FindAsync(customerId, phoneNumber, default);
+
+        // A customer number settles it on the spot; only the phone route still asks a question.
+        if (result.Outcome == CallerIdentityOutcome.Identified && result.CustomerId is { } known)
+        {
+            _session.Confirmed(known);
+            return await DescribeIdentified(known, result.CustomerName);
+        }
+
         if (result.Outcome == CallerIdentityOutcome.NeedsConfirmation && result.CustomerId is { } found)
         {
             _session.Found(found);

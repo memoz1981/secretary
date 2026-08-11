@@ -83,11 +83,24 @@ public sealed class CustomerIdentityService
         if (customerId is > 0)
         {
             var byId = await _uow.Customers.GetByIdAsync(customerId.Value, cancellationToken);
+
+            // A customer number identifies outright — no challenge.
+            //
+            // It was confirmed like the phone route at first, and on real calls that was simply
+            // wrong. A caller who quotes their number has already produced the one piece of
+            // evidence nobody else has, and being asked for their street straight afterwards
+            // reads as not being believed. Worse, they answer by repeating the number, the
+            // address check fails on it, and the call goes round again — which is exactly what
+            // happened, twice.
+            //
+            // The number is not secret and this is a real trade: someone else's number gets
+            // their address read out and an order billed to them. For water on cash delivery
+            // that is worth one turn saved on every call. It would not be for anything valuable.
             return byId is null
                 ? new CallerIdentityResult(
                     CallerIdentityOutcome.NoSuchCustomer, null, null,
                     "Müştəri nömrənizi rəqəm-rəqəm təkrar edə bilərsiniz?")
-                : await ChallengeFor(byId, cancellationToken);
+                : new CallerIdentityResult(CallerIdentityOutcome.Identified, byId.Id, byId.Name, null);
         }
 
         if (string.IsNullOrWhiteSpace(phoneNumber))
