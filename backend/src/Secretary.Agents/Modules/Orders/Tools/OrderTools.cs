@@ -66,7 +66,7 @@ public sealed class OrderTools
     /// Nobody is identified here. The agent reads the name and the rayon back and the caller
     /// agrees or does not — a misheard digit is caught by the same person who would have
     /// answered a challenge question, one turn earlier.</summary>
-    private static string Describe(IReadOnlyList<CallerMatch> matches)
+    private string Describe(IReadOnlyList<CallerMatch> matches)
     {
         if (matches.Count == 0)
         {
@@ -89,6 +89,11 @@ public sealed class OrderTools
             ? $"Ünvan {match.Addresses[0].Id}: {match.Addresses[0].Spoken()}"
             : "Ünvanlar: " + string.Join("; ", match.Addresses.Select(a => $"{a.Id} — {a.Spoken()}"));
 
+        // Remembered for the call log. Not proof they are who they say — the caller still has
+        // to agree out loud — but a browser call carries no number to look them up by
+        // afterwards, so this is the only moment the record can be attributed to a person.
+        _session.Identified(match.CustomerId);
+
         return $"FOUND. Müştəri {match.CustomerId}, {match.Name ?? "adsız"}. {where}";
     }
 
@@ -106,6 +111,7 @@ public sealed class OrderTools
             var result = await _identity.RegisterAsync(
                 new NewCustomerDetails(name, phoneNumber, district, street, building, apartment), default);
 
+            _session.Identified(result.CustomerId);
             return $"REGISTERED. Müştəri {result.CustomerId}.";
         }
         catch (ArgumentException ex)
@@ -219,6 +225,7 @@ public sealed class OrderTools
             }
 
             _session.Placed(order.Id);
+            _session.Identified(customerId);
 
             // The readback comes from here rather than from the model's memory of the
             // conversation. That is the whole reason the order is one call: what it repeats to

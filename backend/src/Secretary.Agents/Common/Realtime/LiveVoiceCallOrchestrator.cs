@@ -26,7 +26,6 @@ public sealed class LiveVoiceCallOrchestrator
 
     private readonly RealtimeSessionResolver _sessionResolver;
     private readonly RealtimeToolInvoker _toolInvoker;
-    private readonly CallService _callService;
     private readonly AgentInstructionContext _instructionContext;
     private readonly AgentModuleRegistry _agentModules;
     private readonly ICurrentTenantModules _modules;
@@ -38,13 +37,12 @@ public sealed class LiveVoiceCallOrchestrator
     private IRealtimeSession _realtimeSession = null!;
 
     public LiveVoiceCallOrchestrator(
-        RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker, CallService callService,
+        RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker,
         AgentInstructionContext instructionContext, AgentModuleRegistry agentModules,
         ICurrentTenantModules modules, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
     {
         _sessionResolver = sessionResolver;
         _toolInvoker = toolInvoker;
-        _callService = callService;
         _instructionContext = instructionContext;
         _agentModules = agentModules;
         _modules = modules;
@@ -270,10 +268,13 @@ public sealed class LiveVoiceCallOrchestrator
             // passing it through meant every such call aborted its own Call Log write.
             try
             {
-                await _callService.LogAsync(
-                    new LogCallRequest(
-                        LocalDeviceCallerIdentifier, null, _classification, outcome,
-                        durationSeconds, _answerCount, _callerTurnCount, null,
+                // The module writes its own row, into its own module's table. This used to call
+                // CallService directly, which meant every order call landed in app.Calls beside
+                // the appointments with no way to tell them apart afterwards.
+                await agentModule.LogCallAsync(
+                    new CallLogEntry(
+                        LocalDeviceCallerIdentifier, _classification, outcome,
+                        durationSeconds, _answerCount, _callerTurnCount,
                         "local-device-call (no recording stored)", null, startedAt, pipeline,
                         // One model does everything on this path — that is what the realtime
                         // API is. The chained pipelines report three entries here instead.

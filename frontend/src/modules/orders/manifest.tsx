@@ -5,6 +5,7 @@ import { LiveCallPage } from "@/shared/components/LiveCallPage";
 import { ProductsPage } from "@/modules/orders/pages/Products";
 import { OrdersPage } from "@/modules/orders/pages/Orders";
 import { OrderCustomersPage } from "@/modules/orders/pages/Customers";
+import { OrderCallLogPage } from "@/modules/orders/pages/CallLog";
 import type { ModuleManifest } from "@/modules/registry";
 
 /** Sifariş qəbulu — the order line.
@@ -24,6 +25,7 @@ export const ordersModule: ModuleManifest = {
     { label: t("products"), to: "/orders/products" },
     { label: t("orders"), to: "/orders/list" },
     { label: t("navOrderCustomers"), to: "/orders/customers" },
+    { label: t("navOrderCalls"), to: "/orders/calls" },
     ...(role === "Owner" ? [{ label: t("navCall"), to: "/orders/call" }] : []),
   ],
 
@@ -55,6 +57,16 @@ export const ordersModule: ModuleManifest = {
           <RequireRole roles={["Owner", "Staff"]}>
             <RequireModule module="Order">
               <OrderCustomersPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
+      <Route
+        path="calls"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <OrderCallLogPage />
             </RequireModule>
           </RequireRole>
         }

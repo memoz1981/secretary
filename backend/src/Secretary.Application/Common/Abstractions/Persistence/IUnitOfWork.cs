@@ -20,6 +20,7 @@ public interface IUnitOfWork
     ICustomerRepository Customers { get; }
     IOrderRepository Orders { get; }
     IOrderSettingsRepository OrderSettings { get; }
+    IOrderCallRepository OrderCalls { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 

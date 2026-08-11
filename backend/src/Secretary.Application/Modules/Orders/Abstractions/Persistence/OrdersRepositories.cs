@@ -1,4 +1,6 @@
 using Secretary.Domain.Entities;
+using Secretary.Domain.Enums;
+using NodaTime;
 
 namespace Secretary.Application.Abstractions.Persistence;
 
@@ -42,6 +44,14 @@ public interface ICustomerRepository : IRepository<Customer>
 public interface IOrderRepository : IRepository<Order>
 {
     Task<IReadOnlyList<Order>> GetForCustomerAsync(int customerId, CancellationToken cancellationToken);
+}
+
+public interface IOrderCallRepository : IRepository<OrderCall>
+{
+    /// <summary>Newest first, optionally bounded. The call log is read as "what happened
+    /// today", so the default order is the one the page wants.</summary>
+    Task<IReadOnlyList<OrderCall>> SearchAsync(
+        Instant? from, Instant? to, CallOutcome? outcome, CancellationToken cancellationToken);
 }
 
 public interface IOrderSettingsRepository : IRepository<OrderSettings>

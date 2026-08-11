@@ -152,3 +152,35 @@ public sealed class OrderLineConfiguration : IEntityTypeConfiguration<OrderLine>
         builder.HasOne<Product>().WithMany().HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>The order line's call log — ord.Calls, its own table beside app.Calls rather than a
+/// Module column on it. Same rule as every other table here: a module owns its own, and these
+/// two records carry foreign keys that cannot both live on one row.</summary>
+public sealed class OrderCallConfiguration : IEntityTypeConfiguration<OrderCall>
+{
+    public void Configure(EntityTypeBuilder<OrderCall> builder)
+    {
+        builder.ToTable("Calls", DbSchemas.Orders);
+        builder.ConfigureBaseEntity();
+        builder.Property(c => c.CallerPhoneNumber).HasMaxLength(32).IsRequired();
+        builder.Property(c => c.RecordingUrl).IsRequired();
+
+        // No explicit column type for Transcript — every provider maps an unbounded string
+        // sensibly on its own, and hardcoding one breaks these same configurations on SQLite.
+        builder.Property(c => c.AgentModel).HasMaxLength(64).IsRequired();
+
+        // decimal(18,8), not money or a float: a call lands around three cents, but the line
+        // items behind it are fractions of a cent and a month's spend is their sum.
+        builder.Property(c => c.CostUsd).HasPrecision(18, 8);
+
+        // A read-only projection over the six token columns, not state of its own.
+        builder.Ignore(c => c.TokenUsage);
+
+        builder.HasIndex(c => new { c.TenantId, c.StartedAt });
+        builder.HasIndex(c => c.RelatedOrderId);
+
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(c => c.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Customer>().WithMany().HasForeignKey(c => c.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Order>().WithMany().HasForeignKey(c => c.RelatedOrderId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

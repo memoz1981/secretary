@@ -14,6 +14,13 @@ public sealed class OrderCallSession
 {
     public int? PlacedOrderId { get; private set; }
 
+    /// <summary>Who the agent identified or registered. Read once at the end of the call, for
+    /// the call log — it is the difference between a row saying "Mehdi" and one saying nothing,
+    /// and a browser call carries no number to look them up by afterwards.</summary>
+    public int? CustomerId { get; private set; }
+
+    public void Identified(int customerId) => CustomerId = customerId;
+
     public void Placed(int orderId) => PlacedOrderId = orderId;
 
     /// <summary>Cleared on cancel so the same order cannot be cancelled twice — the second

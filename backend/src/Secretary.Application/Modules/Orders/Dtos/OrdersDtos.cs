@@ -1,5 +1,7 @@
+using Secretary.Application.Pricing;
 using Secretary.Domain.Entities;
 using Secretary.Domain.Enums;
+using Secretary.Domain.ValueObjects;
 using NodaTime;
 
 namespace Secretary.Application.Dtos;
@@ -117,3 +119,52 @@ public sealed record UpdateBusinessHoursRequest(IReadOnlyList<BusinessHoursDay> 
 /// stay on the entity for addresses that already carry them.</summary>
 public sealed record NewCustomerDetails(
     string Name, string PhoneNumber, string District, string Street, string Building, string? Apartment);
+
+/// <summary>One row of the order line's call log. Deliberately narrower than the appointment
+/// equivalent: no classification, and the customer reduced to a name, because the question the
+/// page answers is "what did this call cost and did the agent get it done".</summary>
+public sealed record OrderCallResponse(
+    int Id,
+    int? CustomerId,
+    string? CustomerName,
+    string CallerPhoneNumber,
+    int? RelatedOrderId,
+    CallOutcome Outcome,
+    int DurationSeconds,
+    int TurnCount,
+    int CallerTurnCount,
+    Instant StartedAt,
+    string AgentModel,
+    CallPipeline Pipeline,
+    TokenUsage TokenUsage,
+    decimal CostUsd)
+{
+    /// <summary>Null rather than zero for a call too short to divide by.</summary>
+    public decimal? CostPerMinuteUsd => DurationSeconds <= 0 ? null : CostUsd * 60m / DurationSeconds;
+
+    /// <summary>Cost per answer, which is the rate that actually tracks the bill: every answer
+    /// is a round trip billed the whole conversation so far, while minutes vary with how long
+    /// the caller spends thinking.</summary>
+    public decimal? CostPerAnswerUsd => TurnCount <= 0 ? null : CostUsd / TurnCount;
+
+    /// <summary>The plain version of "could the agent handle it" — one boolean rather than
+    /// asking the page to know which of six outcomes count as success.</summary>
+    public bool ResolvedByAgent => Outcome == CallOutcome.ResolvedByAgent;
+}
+
+public sealed record OrderCallDetailResponse(OrderCallResponse Call, string? Transcript);
+
+public sealed record LogOrderCallRequest(
+    int? CustomerId,
+    string CallerPhoneNumber,
+    int? RelatedOrderId,
+    CallOutcome Outcome,
+    int DurationSeconds,
+    int TurnCount,
+    int CallerTurnCount,
+    int? WaitTimeSeconds,
+    string RecordingUrl,
+    string? Transcript,
+    Instant StartedAt,
+    CallPipeline Pipeline,
+    IReadOnlyList<ModelUsage>? ModelUsages);

@@ -6,7 +6,11 @@ using Secretary.Application.Abstractions.Persistence;
 using Secretary.Application.Services;
 using Secretary.Domain.Abstractions;
 using Secretary.Domain.Entities;
+using Secretary.Domain.Enums;
+using Secretary.Domain.ValueObjects;
+using Secretary.Application.Pricing;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using NodaTime;
 using Shouldly;
@@ -31,6 +35,7 @@ public sealed class OrderToolsTests
     private readonly Mock<IOrderRepository> _orders = new();
     private readonly Mock<IOrderSettingsRepository> _settings = new();
     private readonly Mock<IBusinessHoursRepository> _hours = new();
+    private readonly Mock<IOrderCallRepository> _orderCallRepo = new();
     private readonly OrderCallSession _session = new();
 
     /// <summary>Movable, so a test can prove the delivery day is worked out per call rather than
@@ -39,6 +44,7 @@ public sealed class OrderToolsTests
 
     private readonly OrderTools _sut;
     private readonly EscalationTools _escalation;
+    private readonly OrderCallService _orderCalls;
 
     public OrderToolsTests()
     {
@@ -48,6 +54,7 @@ public sealed class OrderToolsTests
         _uow.SetupGet(u => u.Orders).Returns(_orders.Object);
         _uow.SetupGet(u => u.OrderSettings).Returns(_settings.Object);
         _uow.SetupGet(u => u.BusinessHours).Returns(_hours.Object);
+        _uow.SetupGet(u => u.OrderCalls).Returns(_orderCallRepo.Object);
         _uow.SetupGet(u => u.Clients).Returns(new Mock<IClientRepository>().Object);
         _uow.SetupGet(u => u.Escalations).Returns(new Mock<IEscalationRepository>().Object);
 
@@ -80,6 +87,10 @@ public sealed class OrderToolsTests
         OrderDirectoryStore.Invalidate(1);
         var directory = new TenantOrderDirectory(orderService, businessHours, clock.Object, tenant.Object);
 
+        _orderCalls = new OrderCallService(
+            _uow.Object, clock.Object, tenant.Object,
+            new TokenPricebook(Options.Create(new ModelPricingOptions())));
+
         _sut = new OrderTools(
             identity, orderService, directory, _session, _escalation, NullLogger<OrderTools>.Instance);
     }
@@ -89,7 +100,7 @@ public sealed class OrderToolsTests
     [Fact]
     public void The_module_exposes_its_tools_under_the_names_the_instructions_use()
     {
-        var tools = new OrdersAgentModule(_sut, _escalation, new CallControlTools()).BuildTools();
+        var tools = BuildModule().BuildTools();
 
         tools.OfType<Microsoft.Extensions.AI.AIFunction>().Select(f => f.Name).ShouldBe(
             new[]
@@ -236,7 +247,7 @@ public sealed class OrderToolsTests
     [Fact]
     public void The_order_lines_reach_the_model_as_an_array_of_id_and_quantity()
     {
-        var placeOrder = new OrdersAgentModule(_sut, _escalation, new CallControlTools())
+        var placeOrder = BuildModule()
             .BuildTools()
             .OfType<Microsoft.Extensions.AI.AIFunction>()
             .Single(f => f.Name == nameof(OrderTools.PlaceOrder));
@@ -297,6 +308,62 @@ public sealed class OrderToolsTests
         _settings.Verify(
             s => s.GetForCurrentTenantAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    /// <summary>The row lands in ord.Calls carrying the two things only this module could know.
+    /// A browser call has no number to look anyone up by afterwards, so if the session does not
+    /// remember who was identified, the log says nothing about who called.</summary>
+    [Fact]
+    public async Task The_logged_call_carries_the_customer_and_the_order_it_produced()
+    {
+        GivenCatalog(WithId(Product.Create(1, "Sirab 19L", 1, 4.50m, null, null, Now), 7));
+        GivenAddresses(11, WithId(Address(11, "Xətai", "Sarayevo", "12"), 87));
+        GivenOrdersSave(orderId: 42);
+        await _sut.PlaceOrder(11, 0, [new OrderLineInput(7, 3m)]);
+
+        OrderCall? logged = null;
+        _orderCallRepo
+            .Setup(r => r.AddAsync(It.IsAny<OrderCall>(), It.IsAny<CancellationToken>()))
+            .Callback<OrderCall, CancellationToken>((call, _) => logged = call);
+
+        await BuildModule().LogCallAsync(
+            new CallLogEntry(
+                "local-device-call", CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+                DurationSeconds: 39, TurnCount: 7, CallerTurnCount: 6, "no recording", Transcript: null,
+                Now, CallPipeline.GeminiLive_3_1, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
+            default);
+
+        logged.ShouldNotBeNull();
+        logged!.CustomerId.ShouldBe(11);
+        logged.RelatedOrderId.ShouldBe(42);
+        logged.DurationSeconds.ShouldBe(39);
+        logged.AgentModel.ShouldBe("gemini-3.1-flash-live-preview");
+    }
+
+    /// <summary>A call that never identified anyone still gets a row — the caller identifier
+    /// stands in, and a page full of those is how you find out identification is failing.</summary>
+    [Fact]
+    public async Task A_call_that_identified_nobody_is_still_logged()
+    {
+        OrderCall? logged = null;
+        _orderCallRepo
+            .Setup(r => r.AddAsync(It.IsAny<OrderCall>(), It.IsAny<CancellationToken>()))
+            .Callback<OrderCall, CancellationToken>((call, _) => logged = call);
+
+        await BuildModule().LogCallAsync(
+            new CallLogEntry(
+                "local-device-call", CallClassification.InquiryOther, CallOutcome.FailedAgentLimitation,
+                DurationSeconds: 8, TurnCount: 1, CallerTurnCount: 1, "no recording", Transcript: null,
+                Now, CallPipeline.GeminiLive_3_1, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
+            default);
+
+        logged.ShouldNotBeNull();
+        logged!.CustomerId.ShouldBeNull();
+        logged.RelatedOrderId.ShouldBeNull();
+        logged.CallerPhoneNumber.ShouldBe("local-device-call");
+    }
+
+    private OrdersAgentModule BuildModule()
+        => new(_sut, _escalation, new CallControlTools(), _session, _orderCalls);
 
     private void GivenCatalog(params Product[] products)
     {
