@@ -222,9 +222,7 @@ public sealed class OrderTools
             }
 
             var asked = parsed.InZone(AzerbaijanTime.Zone).Date;
-            return await _orders.IsWorkingDayAsync(asked, default)
-                ? $"DAY_OK. {asked:yyyy-MM-dd}"
-                : $"CLOSED_THAT_DAY. {asked:yyyy-MM-dd}";
+            return DescribeDay(await _orders.CheckDeliveryDayAsync(asked, default), asked);
         }
 
         var soonest = await _orders.ProposeDeliveryDayAsync(default);
@@ -259,9 +257,10 @@ public sealed class OrderTools
             // called that: on a real call it worked through three dates, was told twice the
             // business was closed, and then placed the order on a fourth day it had never asked
             // about. A promise made on a closed day is a delivery that does not arrive.
-            if (!await _orders.IsWorkingDayAsync(deliveryDay.Value, default))
+            var verdict = await _orders.CheckDeliveryDayAsync(deliveryDay.Value, default);
+            if (verdict != DeliveryDayVerdict.Ok)
             {
-                return $"CLOSED_THAT_DAY. {deliveryDay.Value:yyyy-MM-dd}";
+                return DescribeDay(verdict, deliveryDay.Value);
             }
         }
 
@@ -289,6 +288,17 @@ public sealed class OrderTools
             return await FailWithoutConfirming(customerId, ex.Message, ex);
         }
     }
+
+    /// <summary>One marker per verdict, shared by the two tools that reach one. Two spellings of
+    /// the same refusal is two things for the instructions to cover and one of them to be
+    /// missing.</summary>
+    private static string DescribeDay(DeliveryDayVerdict verdict, LocalDate day) => verdict switch
+    {
+        DeliveryDayVerdict.Ok => $"DAY_OK. {day:yyyy-MM-dd}",
+        DeliveryDayVerdict.InThePast => $"DAY_IN_THE_PAST. {day:yyyy-MM-dd}",
+        DeliveryDayVerdict.TooFarAhead => $"DAY_TOO_FAR_AHEAD. {day:yyyy-MM-dd}",
+        _ => $"CLOSED_THAT_DAY. {day:yyyy-MM-dd}",
+    };
 
     /// <summary>The order did not happen. Get a person on the line and give the model nothing it
     /// could mistake for a confirmation — no order number, no products, no day.</summary>

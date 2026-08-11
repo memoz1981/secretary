@@ -2,6 +2,7 @@ using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
 using Secretary.Application.Dtos;
 using Secretary.Domain.Entities;
+using Secretary.Domain.ValueObjects;
 using NodaTime;
 
 namespace Secretary.Application.Services;
@@ -46,12 +47,26 @@ public sealed class OrderService
         }
 
         var catalog = await _uow.Products.GetCatalogAsync(cancellationToken);
-        var needle = spokenName.Trim();
 
-        return catalog.FirstOrDefault(p => p.SpokenNames().Any(n => n.Equals(needle, StringComparison.OrdinalIgnoreCase)))
-            ?? catalog.FirstOrDefault(p => p.SpokenNames().Any(
-                n => n.Contains(needle, StringComparison.OrdinalIgnoreCase)
-                     || needle.Contains(n, StringComparison.OrdinalIgnoreCase)));
+        // Folded, not compared raw. A caller said "Şirab" — correctly — and the catalogue spells
+        // it "Sirab" with a Latin S, so an OrdinalIgnoreCase comparison said the business does
+        // not sell it. Azerbaijani names will differ by ş/s, ə/e, ç/c, ğ/g, ı/i, ö/o or ü/u from
+        // however anyone typed them in, every time. AddressText.Normalize already folds exactly
+        // these, and it strips street words that no product name contains.
+        var needle = AddressText.Normalize(spokenName);
+        if (needle.Length == 0)
+        {
+            return null;
+        }
+
+        return catalog.FirstOrDefault(p => p.SpokenNames().Any(n => AddressText.Normalize(n) == needle))
+            ?? catalog.FirstOrDefault(p => p.SpokenNames().Any(n =>
+            {
+                var folded = AddressText.Normalize(n);
+                return folded.Length > 0
+                    && (folded.Contains(needle, StringComparison.Ordinal)
+                        || needle.Contains(folded, StringComparison.Ordinal));
+            }));
     }
 
     /// <summary>The first day the tenant will promise, counting working days so that "tomorrow"
@@ -68,13 +83,38 @@ public sealed class OrderService
         return BusinessHoursService.NextWorkingDay(week, today, leadDays);
     }
 
-    /// <summary>Whether a day the caller asked for instead is one the business works. "Birigün
-    /// olar?" is a normal thing to say, and the answer has to come from the tenant's days rather
-    /// than from the model's sense of the calendar.</summary>
+    /// <summary>How far ahead an order may be placed. A phone order for water is for this week,
+    /// and a date beyond this is a mishearing rather than a request — a caller was offered and
+    /// accepted the 31st of December 2031, which is a Wednesday and so passed a weekday check
+    /// with nothing else to stop it.</summary>
+    private const int MaxDeliveryDaysAhead = 30;
+
+    /// <summary>Whether a day the caller asked for instead is one the business works, and is a
+    /// day it makes sense to promise at all. "Birigün olar?" is a normal thing to say, and the
+    /// answer has to come from the tenant's days rather than the model's sense of the
+    /// calendar.</summary>
     public async Task<bool> IsWorkingDayAsync(LocalDate day, CancellationToken cancellationToken)
+        => await CheckDeliveryDayAsync(day, cancellationToken) == DeliveryDayVerdict.Ok;
+
+    /// <summary>Why a day will not do, so the agent can say the right thing. "We are closed that
+    /// day" is a different sentence from "did you mean this year?".</summary>
+    public async Task<DeliveryDayVerdict> CheckDeliveryDayAsync(LocalDate day, CancellationToken cancellationToken)
     {
+        var today = _clock.GetCurrentInstant().InZone(DateTimeZoneProviders.Tzdb["Asia/Baku"]).Date;
+        if (day < today)
+        {
+            return DeliveryDayVerdict.InThePast;
+        }
+
+        if (day > today.PlusDays(MaxDeliveryDaysAhead))
+        {
+            return DeliveryDayVerdict.TooFarAhead;
+        }
+
         var week = await _businessHours.GetWeekByDayAsync(cancellationToken);
-        return week.TryGetValue(day.DayOfWeek, out var hours) && !hours.IsClosed;
+        return week.TryGetValue(day.DayOfWeek, out var hours) && !hours.IsClosed
+            ? DeliveryDayVerdict.Ok
+            : DeliveryDayVerdict.Closed;
     }
 
     /// <summary>The Orders page. Reads the whole thing in three queries rather than one per

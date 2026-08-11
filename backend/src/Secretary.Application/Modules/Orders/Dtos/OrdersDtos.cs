@@ -73,6 +73,21 @@ public sealed record CustomerAddressResponse(
 
 public sealed record ProductResponse(int Id, string Name, string? Description, string Unit, decimal UnitPrice);
 
+/// <summary>Why a requested delivery day will or will not do.</summary>
+public enum DeliveryDayVerdict
+{
+    Ok = 0,
+
+    /// <summary>The business is shut that weekday.</summary>
+    Closed = 1,
+
+    InThePast = 2,
+
+    /// <summary>Beyond the window an order may be placed in. Almost always a misheard year — a
+    /// caller was offered and accepted the 31st of December 2031.</summary>
+    TooFarAhead = 3,
+}
+
 public sealed record UnitResponse(int Id, string Name);
 
 public sealed record ProductDetailResponse(
