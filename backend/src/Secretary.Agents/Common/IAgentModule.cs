@@ -33,6 +33,17 @@ public interface IAgentModule
     /// False by default: a module that has not thought about it should not be charged for it.</summary>
     bool RequiresCallerTranscription => false;
 
+    /// <summary>Anything about THIS call the agent should know before it speaks, appended to the
+    /// instructions.
+    ///
+    /// Worth a seam of its own because the alternative is a tool call, and a tool call is two
+    /// model invocations carrying the whole prompt — measured at roughly 4,700 tokens and a
+    /// second of silence. A survey knowing whose name to open with should not cost that.
+    ///
+    /// Null for a module with nothing to add, which is most of them: an inbound line does not
+    /// know who is ringing until it asks.</summary>
+    Task<string?> BuildCallContextAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
     /// <summary>The tools for one call. Built per call rather than held, because every tool
     /// object closes over request-scoped services.</summary>
     IList<AITool> BuildTools();

@@ -211,9 +211,16 @@ public sealed class LiveVoiceCallOrchestrator
 
         try
         {
+            // Whatever this particular call needs known up front — a survey's subject, say —
+            // rides in the instructions rather than costing a tool round trip to fetch.
+            var callContext = await agentModule.BuildCallContextAsync(cancellationToken);
+            var instructions = _instructionContext.BuildPhoneAgentInstructions(
+                agentModule.InstructionName, _realtimeSession.ProviderKey);
+
             await _realtimeSession.ConnectAsync(
-                _instructionContext.BuildPhoneAgentInstructions(
-                    agentModule.InstructionName, _realtimeSession.ProviderKey),
+                string.IsNullOrWhiteSpace(callContext)
+                    ? instructions
+                    : instructions + Environment.NewLine + Environment.NewLine + callContext,
                 tools,
                 modelOverride,
                 agentModule.RequiresCallerTranscription,

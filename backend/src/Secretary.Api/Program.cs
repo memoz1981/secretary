@@ -248,6 +248,32 @@ app.MapMethods("/voice/live-call", new[] { HttpMethods.Get, HttpMethods.Connect 
         return;
     }
 
+    // A survey call is queued before it is dialled — the form (later the scheduler) creates the
+    // row and the id arrives here. Everything else about this module follows from the subject
+    // being known before anybody speaks, so a missing id is a refusal rather than a default:
+    // answers filed against no call, or the wrong one, would appear under another person's name.
+    if (module == Module.Feedback)
+    {
+        if (!int.TryParse(context.Request.Query["callId"], out var feedbackCallId) || feedbackCallId <= 0)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("A feedback call must be queued first — callId is required.");
+            return;
+        }
+
+        // Gemini only, and refused here rather than merely hidden in the picker. There is one
+        // instruction file for this module and it is written for that model.
+        if (requested.Pipeline != CallPipeline.GeminiLive_3_1)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("The feedback line runs on Gemini Live only.");
+            return;
+        }
+
+        context.RequestServices.GetRequiredService<Secretary.Agents.Feedback.FeedbackCallSession>()
+            .For(feedbackCallId);
+    }
+
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
 
     var orchestrator = context.RequestServices.GetRequiredService<LiveVoiceCallOrchestrator>();

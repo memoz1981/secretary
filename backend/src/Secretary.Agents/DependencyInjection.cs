@@ -35,10 +35,16 @@ public static class AgentsServiceCollectionExtensions
         services.AddScoped<Orders.OrderCallSession>();
         services.AddScoped<OrderTools>();
 
+        // Scoped to the call: which queued survey call this conversation is. Set before the
+        // agent starts, not discovered by it — that is what makes the module outbound-shaped.
+        services.AddScoped<Feedback.FeedbackCallSession>();
+        services.AddScoped<FeedbackTools>();
+
         // One IAgentModule per module that can answer a phone, and no shared IList<AITool> any
         // more: a toolset belongs to a module, and a call always knows which module it is.
         services.AddScoped<IAgentModule, AppointmentAgentModule>();
         services.AddScoped<IAgentModule, OrdersAgentModule>();
+        services.AddScoped<IAgentModule, FeedbackAgentModule>();
         services.AddScoped<AgentModuleRegistry>();
 
         services.AddScoped<AgentInstructionContext>();
