@@ -622,3 +622,51 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
 }
 
 .api-failure-close:hover { opacity: .7; }
+
+/* ---- Feedback module ----
+   The dashboard is generated from a questionnaire nobody has seen yet, so these have to hold
+   for one question or fifteen, and for an option label of one word or ten. */
+
+.headline-metric { text-align: center; padding: var(--space-5) 0; }
+.headline-value {
+  font-size: 44px; font-weight: 700; line-height: 1; color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+.headline-label { font-size: var(--text-md); margin-top: var(--space-2); }
+.headline-sub { font-size: var(--text-sm); color: var(--color-muted); margin-top: var(--space-1); }
+
+.stat-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+.result-block { padding: var(--space-4) 0; border-bottom: 1px solid var(--color-border); }
+.result-block:last-of-type { border-bottom: none; }
+.result-question { font-weight: 600; margin-bottom: var(--space-1); }
+.result-meta { font-size: var(--text-sm); color: var(--color-muted); margin-bottom: var(--space-3); }
+
+.answer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.answer { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.answer:last-child { border-bottom: none; }
+.answer-question { font-size: var(--text-sm); color: var(--color-muted); }
+.answer-value { font-size: var(--text-md); margin-top: var(--space-1); }
+.answer-time { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-1); }
+
+/* The caller's own words, set apart from an option they picked — one is a quotation and the
+   other is a category, and they should not look like the same kind of thing. */
+.verbatim { font-style: italic; }
+
+.transcript {
+  white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono);
+  font-size: var(--text-sm); background: var(--color-surface-sunken);
+  padding: var(--space-3); margin: 0; overflow-x: auto;
+}
+
+.detail-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4);
+}
+.detail-grid .label {
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em;
+  color: var(--color-muted); font-weight: 600;
+}
+.detail-grid .value { font-size: var(--text-md); margin-top: var(--space-1); }
+
+.checkbox-row { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0; }
+.grow { flex: 1; }

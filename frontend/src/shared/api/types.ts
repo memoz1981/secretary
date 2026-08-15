@@ -415,3 +415,156 @@ export interface BusinessHoursDay {
   opensAt: string | null;
   closesAt: string | null;
 }
+
+// ---- Feedback module ----
+
+export type FeedbackQuestionType = "Open" | "Choice";
+export type FeedbackCallStatus = "Created" | "InProgress" | "Completed" | "Abandoned";
+
+export interface SurveyOptionResponse {
+  id: number;
+  position: number;
+  text: string;
+  /** The number behind the words, when there is one. Null means countable but not averageable —
+   *  which is the only difference between "Yaxşı / Pis" and a 1-5 scale. */
+  value: number | null;
+}
+
+export interface SurveyQuestionResponse {
+  id: number;
+  position: number;
+  text: string;
+  questionType: FeedbackQuestionType;
+  /** The one question the dashboard leads with. At most one per questionnaire. */
+  isHeadline: boolean;
+  options: SurveyOptionResponse[];
+  /** Every option carries a number, so these answers can be averaged rather than only counted. */
+  isScored: boolean;
+}
+
+export interface SurveyResponse {
+  id: number;
+  name: string;
+  questionCount: number;
+}
+
+export interface SurveyDetailResponse {
+  id: number;
+  name: string;
+  questions: SurveyQuestionResponse[];
+}
+
+export interface SaveSurveyRequest {
+  name: string;
+}
+
+export interface SaveOptionRequest {
+  text: string;
+  value: number | null;
+}
+
+export interface SaveQuestionRequest {
+  text: string;
+  questionType: FeedbackQuestionType;
+  isHeadline: boolean;
+  options: SaveOptionRequest[];
+}
+
+export interface FeedbackSettingsResponse {
+  maxSurveys: number;
+  usedSurveys: number;
+}
+
+export interface QueueFeedbackCallRequest {
+  surveyId: number;
+  personName: string;
+  phoneNumber: string;
+}
+
+export interface FeedbackCallResponse {
+  id: number;
+  surveyId: number;
+  surveyName: string;
+  personName: string;
+  phoneNumber: string;
+  status: FeedbackCallStatus;
+  createdAt: string;
+  completedAt: string | null;
+  durationSeconds: number;
+  turnCount: number;
+  callerTurnCount: number;
+  agentModel: string;
+  pipeline: CallPipeline;
+  tokenUsage: TokenUsage;
+  costUsd: number;
+  answeredCount: number;
+  questionCount: number;
+  isCompleted: boolean;
+  costPerMinuteUsd: number | null;
+}
+
+export interface FeedbackAnswerResponse {
+  questionId: number;
+  position: number;
+  questionText: string;
+  questionType: FeedbackQuestionType;
+  optionText: string | null;
+  optionValue: number | null;
+  text: string | null;
+  /** Asked, and would not say. Distinct from never having been asked. */
+  declined: boolean;
+  answeredAt: string;
+}
+
+export interface FeedbackCallDetailResponse {
+  call: FeedbackCallResponse;
+  answers: FeedbackAnswerResponse[];
+  transcript: string | null;
+}
+
+export interface FeedbackAgentStats {
+  callsQueued: number;
+  callsStarted: number;
+  callsCompleted: number;
+  callsAbandoned: number;
+  averageDurationSeconds: number;
+  totalCostUsd: number;
+  completionRate: number | null;
+}
+
+export interface QuestionDropOff {
+  questionId: number;
+  position: number;
+  questionText: string;
+  reached: number;
+  answered: number;
+}
+
+export interface OptionBreakdown {
+  optionId: number;
+  text: string;
+  value: number | null;
+  count: number;
+}
+
+export interface QuestionResult {
+  questionId: number;
+  position: number;
+  questionText: string;
+  isHeadline: boolean;
+  isScored: boolean;
+  answeredCount: number;
+  declinedCount: number;
+  average: number | null;
+  options: OptionBreakdown[];
+}
+
+export interface FeedbackDashboardResponse {
+  surveyId: number;
+  surveyName: string;
+  agent: FeedbackAgentStats;
+  /** Choice questions only. Open answers have nothing honest to chart and are read on the call
+   *  detail page instead. */
+  results: QuestionResult[];
+  dropOff: QuestionDropOff[];
+}
