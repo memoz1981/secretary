@@ -650,19 +650,19 @@ export const translations = {
 
   // ---- Feedback module ----
   navFeedbackDashboard: { az: "Panel", ru: "Панель", en: "Dashboard" },
-  questionnaires: { az: "Sorgəular", ru: "Опросы", en: "Questionnaires" },
-  questionnaire: { az: "Sorgəu", ru: "Опрос", en: "Questionnaire" },
-  addQuestionnaire: { az: "Sorgəu əlavə et", ru: "Добавить опрос", en: "Add questionnaire" },
-  noQuestionnairesYet: { az: "Hələ sorgəu yoxdur.", ru: "Опросов пока нет.", en: "No questionnaires yet." },
+  questionnaires: { az: "Sorğular", ru: "Опросы", en: "Questionnaires" },
+  questionnaire: { az: "Sorğu", ru: "Опрос", en: "Questionnaire" },
+  addQuestionnaire: { az: "Sorğu əlavə et", ru: "Добавить опрос", en: "Add questionnaire" },
+  noQuestionnairesYet: { az: "Hələ sorğu yoxdur.", ru: "Опросов пока нет.", en: "No questionnaires yet." },
   questionnaireQuotaReached: {
-    az: "Sorgəu limitinə çatmısınız. Platforma ilə əlaqə saxlayın.",
+    az: "Sorğu limitinə çatmısınız. Platforma ilə əlaqə saxlayın.",
     ru: "Достигнут лимит опросов.",
     en: "You have reached your questionnaire limit. Ask the platform to raise it.",
   },
-  chooseQuestionnaire: { az: "Sorgəu seçin", ru: "Выберите опрос", en: "Choose a questionnaire" },
-  allQuestionnaires: { az: "Bütün sorgəular", ru: "Все опросы", en: "All questionnaires" },
+  chooseQuestionnaire: { az: "Sorğu seçin", ru: "Выберите опрос", en: "Choose a questionnaire" },
+  allQuestionnaires: { az: "Bütün sorğular", ru: "Все опросы", en: "All questionnaires" },
   needAQuestionnaireFirst: {
-    az: "Ǝvvəlcə sualları olan bir sorgəu yaradın.",
+    az: "Ǝvvəlcə sualları olan bir sorğu yaradın.",
     ru: "Сначала создайте опрос с вопросами.",
     en: "Create a questionnaire with questions first.",
   },
@@ -705,7 +705,7 @@ export const translations = {
   },
   newFeedbackCall: { az: "Yeni zəng", ru: "Новый звонок", en: "New call" },
   newFeedbackCallSubtitle: {
-    az: "Müştərini seçdiyiniz sorgəu ilə zəng edin.",
+    az: "Müştərini seçdiyiniz sorğu ilə zəng edin.",
     ru: "Позвоните клиенту по выбранному опросу.",
     en: "Call a customer with the questionnaire you choose.",
   },
@@ -752,7 +752,7 @@ export const translations = {
   declinedN: { az: "{n} imtina", ru: "{n} отказов", en: "{n} declined" },
   basedOnAnswers: { az: "{n} cavaba əsasən", ru: "На основе {n} ответов", en: "Based on {n} answers" },
   noChoiceQuestions: {
-    az: "Bu sorgəuda seçimli sual yoxdur.",
+    az: "Bu sorğuda seçimli sual yoxdur.",
     ru: "В этом опросе нет вопросов с вариантами.",
     en: "This questionnaire has no multiple-choice questions.",
   },

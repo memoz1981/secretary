@@ -328,40 +328,39 @@ function QuestionEditor({
   const [text, setText] = useState(existing?.text ?? "");
   const [type, setType] = useState<FeedbackQuestionType>(existing?.questionType ?? "Choice");
   const [isHeadline, setIsHeadline] = useState(existing?.isHeadline ?? false);
-  const [options, setOptions] = useState<SaveOptionRequest[]>(
-    existing?.options.map((o) => ({ text: o.text, value: o.value })) ?? [
-      { text: "", value: null },
-      { text: "", value: null },
-    ],
+  const [optionTexts, setOptionTexts] = useState<string[]>(
+    existing?.options.map((o) => o.text) ?? ["", ""],
   );
+
+  // Off by default: most questions are "Yaxşı / Pis" and only want counting. Ticked, the options
+  // are numbered 1..n in the order they are listed, which is what a rating scale is — and it
+  // replaced a free value box that invited 20/40/60/80/100 on a question people answer by saying
+  // "dörd".
+  const [numbered, setNumbered] = useState(existing?.isScored ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  function setOption(index: number, patch: Partial<SaveOptionRequest>) {
-    setOptions((current) => current.map((o, i) => (i === index ? { ...o, ...patch } : o)));
+  function setOptionText(index: number, text: string) {
+    setOptionTexts((current) => current.map((o, i) => (i === index ? text : o)));
   }
 
-  /** Numbers 1..n down the list, which is what a rating scale is and what people would
-   *  otherwise type by hand and get wrong. */
-  function numberThem() {
-    setOptions((current) => current.map((o, i) => ({ ...o, value: i + 1 })));
-  }
-
-  function clearNumbers() {
-    setOptions((current) => current.map((o) => ({ ...o, value: null })));
+  /** What actually gets saved: the values are derived from the tick and the position, never
+   *  typed. Nothing can end up half-numbered, which the server refuses anyway. */
+  function buildOptions(): SaveOptionRequest[] {
+    return optionTexts
+      .map((text, index) => ({ text, value: numbered ? index + 1 : null }))
+      .filter((o) => isRequired(o.text));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    const filled = type === "Choice" ? options.filter((o) => isRequired(o.text)) : [];
+    const filled = type === "Choice" ? buildOptions() : [];
 
     if (!isRequired(text)) next.text = t("questionTextRequired");
     if (type === "Choice" && filled.length < 2) next.options = t("atLeastTwoOptions");
-
-    const valued = filled.filter((o) => o.value !== null).length;
-    if (valued !== 0 && valued !== filled.length) next.options = t("numberAllOptionsOrNone");
     if (type === "Open" && isHeadline) next.headline = t("headlineMustBeChoice");
+    if (isHeadline && type === "Choice" && !numbered) next.headline = t("headlineMustBeChoice");
 
     setErrors(next);
     if (Object.keys(next).length > 0) return;
@@ -405,43 +404,34 @@ function QuestionEditor({
         {type === "Choice" && (
           <>
             <div className="section-label">{t("colOptions")}</div>
-            {options.map((option, index) => (
+            {optionTexts.map((option, index) => (
               <div key={index} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
                 <TextField
-                  label={`${index + 1}`}
-                  value={option.text}
-                  onChange={(e) => setOption(index, { text: e.target.value })}
+                  label={numbered ? `${index + 1}` : "•"}
+                  value={option}
+                  onChange={(e) => setOptionText(index, e.target.value)}
                   className="grow"
-                />
-                <TextField
-                  label={t("colValue")}
-                  value={option.value === null ? "" : String(option.value)}
-                  style={{ width: "72px" }}
-                  onChange={(e) =>
-                    setOption(index, { value: e.target.value.trim() === "" ? null : Number(e.target.value) })
-                  }
                 />
                 <button
                   type="button"
                   className="link danger"
-                  onClick={() => setOptions((c) => c.filter((_, i) => i !== index))}
+                  onClick={() => setOptionTexts((c) => c.filter((_, i) => i !== index))}
                 >
                   ✕
                 </button>
               </div>
             ))}
             {errors.options && <div className="field-error">{errors.options}</div>}
-            <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
-              <button type="button" className="link" onClick={() => setOptions((c) => [...c, { text: "", value: null }])}>
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <button type="button" className="link" onClick={() => setOptionTexts((c) => [...c, ""])}>
                 + {t("addOption")}
               </button>
-              <button type="button" className="link" onClick={numberThem}>
-                {t("numberOptions")}
-              </button>
-              <button type="button" className="link" onClick={clearNumbers}>
-                {t("clearNumbers")}
-              </button>
             </div>
+
+            <label className="checkbox-row" style={{ marginTop: "var(--space-4)" }}>
+              <input type="checkbox" checked={numbered} onChange={(e) => setNumbered(e.target.checked)} />
+              <span>{t("numberOptions")}</span>
+            </label>
             <div className="note">{t("numberedOptionsExplain")}</div>
 
             <label className="checkbox-row" style={{ marginTop: "var(--space-4)" }}>

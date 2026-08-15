@@ -1,6 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { AppShell } from "@/shared/components/AppShell";
-import { Button } from "@/shared/components/Button";
 import { Card } from "@/shared/components/Card";
 import { SelectField, TextField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
@@ -11,6 +10,7 @@ import { isRequired } from "@/shared/lib/validation";
 import { getSurveys, queueFeedbackCall } from "@/modules/feedback/api/feedback";
 import { formatAzPhone, isValidAzPhone, toApiPhone } from "@/modules/feedback/api/phone";
 import { LiveVoiceCall } from "@/shared/lib/liveVoiceCall";
+import { CallButton } from "@/shared/components/CallButton";
 
 type Status = "idle" | "queueing" | "connecting" | "inCall" | "ended";
 
@@ -39,6 +39,7 @@ export function NewFeedbackCallPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [call, setCall] = useState<LiveVoiceCall | null>(null);
   const [queued, setQueued] = useState<{ id: number; personName: string } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -99,7 +100,7 @@ export function NewFeedbackCallPage() {
       <div className="subtitle">{t("newFeedbackCallSubtitle")}</div>
 
       <Card>
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} onSubmit={handleSubmit}>
           <SelectField
             label={t("questionnaire")}
             value={surveyId}
@@ -127,16 +128,27 @@ export function NewFeedbackCallPage() {
             disabled={busy}
           />
 
-          <div className="panel-actions">
-            {status === "inCall" || status === "connecting" ? (
-              <Button type="button" variant="danger" onClick={hangUp}>
-                {t("hangUp")}
-              </Button>
-            ) : (
-              <Button type="submit" disabled={busy || options.length === 0}>
-                {t("makeCall")}
-              </Button>
-            )}
+          {/* The same round button the demo Call page uses — one control for "place a call",
+              wherever a call is placed from. */}
+          <div className="call-controls" style={{ marginTop: "var(--space-5)" }}>
+            <CallButton
+              inCall={status === "inCall"}
+              connecting={status === "connecting" || status === "queueing"}
+              onDial={() => formRef.current?.requestSubmit()}
+              onHangUp={hangUp}
+              dialLabel={t("makeCall")}
+              hangUpLabel={t("hangUp")}
+              disabled={options.length === 0}
+            />
+            <div className="call-status">
+              {status === "inCall"
+                ? t("callInProgressWith").replace("{name}", queued?.personName ?? "")
+                : status === "connecting" || status === "queueing"
+                  ? t("connecting")
+                  : status === "ended"
+                    ? t("callEndedSeeCalls")
+                    : t("makeCall")}
+            </div>
           </div>
         </form>
 
@@ -144,15 +156,6 @@ export function NewFeedbackCallPage() {
           <div className="note">{t("needAQuestionnaireFirst")}</div>
         )}
 
-        {queued && status !== "idle" && (
-          <div className="note">
-            {status === "inCall"
-              ? t("callInProgressWith").replace("{name}", queued.personName)
-              : status === "ended"
-                ? t("callEndedSeeCalls")
-                : t("connecting")}
-          </div>
-        )}
       </Card>
     </AppShell>
   );

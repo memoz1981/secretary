@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CallButton } from "@/shared/components/CallButton";
 import { AppShell } from "@/shared/components/AppShell";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
@@ -13,13 +14,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
 type PageStatus = "idle" | LiveCallStatus;
 
-function PhoneIcon({ size = 34 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.85 21 3 13.15 3 3.5a1 1 0 0 1 1-1H7.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2Z" />
-    </svg>
-  );
-}
 
 /** The demo call page: a microphone, a pipeline picker, and a line to dial.
  *
@@ -127,29 +121,14 @@ export function LiveCallPage({ module }: { module: Module }) {
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={inCall || status === "connecting" ? endCall : startCall}
-            disabled={status === "connecting"}
-            aria-label={inCall ? t("callHangUp") : t("callDial")}
-            style={{
-              width: 76,
-              height: 76,
-              borderRadius: "50%",
-              border: "none",
-              cursor: status === "connecting" ? "wait" : "pointer",
-              color: "white",
-              background: inCall ? "#d92d20" : status === "connecting" ? "#98a2b3" : "#12b76a",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 6px 18px rgba(16, 24, 40, 0.2)",
-              transform: inCall ? "rotate(135deg)" : "none",
-              transition: "background 0.2s, transform 0.2s",
-            }}
-          >
-            <PhoneIcon size={28} />
-          </button>
+          <CallButton
+            inCall={inCall}
+            connecting={status === "connecting"}
+            onDial={startCall}
+            onHangUp={endCall}
+            dialLabel={t("callDial")}
+            hangUpLabel={t("callHangUp")}
+          />
 
           <div className="call-status">{statusText[status]}</div>
           {/* The instruction only earns its space before the call starts — once the line is
