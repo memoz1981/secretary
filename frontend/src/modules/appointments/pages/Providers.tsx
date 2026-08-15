@@ -15,7 +15,6 @@ import {
   updateProvider,
 } from "@/modules/appointments/api/providers";
 import type { ProviderResponse } from "@/shared/api/types";
-import { ApiError } from "@/shared/api/client";
 import { isRequired } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 
@@ -27,10 +26,6 @@ export function ProvidersPage() {
   const matrixState = useApiData(() => getProviderServiceMatrix(token!), [token, refreshKey]);
   const [editing, setEditing] = useState<ProviderResponse | "new" | null>(null);
 
-  // Removing a provider is the one action here the server can refuse on a business rule —
-  // somebody with appointments still to come. The await had no catch, so the rejection went
-  // nowhere, the refresh never ran, and the row simply stayed put with no explanation.
-  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const canEdit = role === "Owner";
   const matrix = matrixState.status === "success" ? matrixState.data : null;
@@ -76,7 +71,6 @@ export function ProvidersPage() {
           )}
         </div>
         {matrixState.status === "error" && <div className="field-error">{t("failedToLoadProviders")}</div>}
-        {removeError && <div className="field-error">{removeError}</div>}
         <DataTable
           loading={matrixState.status === "loading"}
           rows={providers}
@@ -96,14 +90,13 @@ export function ProvidersPage() {
                         <button
                           className="link danger"
                           onClick={async () => {
-                            setRemoveError(null);
                             try {
                               await removeProvider(token!, p.id);
                               setRefreshKey((k) => k + 1);
-                            } catch (e) {
-                              // The server's own sentence, which says WHICH rule refused it.
-                              // A generic "could not remove" would send the Owner hunting.
-                              setRemoveError(e instanceof ApiError && e.message ? e.message : t("removeFailed"));
+                            } catch {
+                              // Already on screen: ApiFailureBanner reports every refused write.
+                              // Caught only so the rejection is handled, and so the refresh below
+                              // does not run — the row stays where it is, which is the truth.
                             }
                           }}
                         >

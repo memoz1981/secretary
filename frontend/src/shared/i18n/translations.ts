@@ -556,10 +556,10 @@ export const translations = {
     ru: "Отмеченные услуги выполняет специалист. ИИ-агент предлагает только подходящих специалистов.",
     en: "A ticked service is one the provider performs. The AI agent only offers providers who can do the job.",
   },
-  removeFailed: {
-    az: "Silinmədi",
-    ru: "Не удалось удалить",
-    en: "Could not remove",
+  actionFailed: {
+    az: "Əməliyyat alınmadı",
+    ru: "Действие не выполнено",
+    en: "That did not go through",
   },
   failedToLoadProviders: {
     az: "İcraçılar yüklənmədi.",
