@@ -39,6 +39,10 @@ public sealed class FeedbackAgentModule : IAgentModule
 
     public string InstructionName => "Feedback";
 
+    /// <summary>Gemini alone. There is one instruction file and it is written for this model —
+    /// see IAgentModule.SupportedPipelines for why there is no fallback.</summary>
+    public IReadOnlyCollection<CallPipeline>? SupportedPipelines => [CallPipeline.GeminiLive_3_1];
+
     /// <summary>The only module that needs it. Open answers are the caller's own words, and
     /// without the transcript there is nothing to record — see IAgentModule.</summary>
     public bool RequiresCallerTranscription => true;

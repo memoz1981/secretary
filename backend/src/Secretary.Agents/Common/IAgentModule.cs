@@ -22,6 +22,16 @@ public interface IAgentModule
     /// provider), per decision F3.</summary>
     string InstructionName { get; }
 
+    /// <summary>Which pipelines may answer this module's line, or null for any of them.
+    ///
+    /// A module needs one complete instruction file per provider it can be dialled on, and the
+    /// files are not interchangeable — answering a Gemini call with OpenAI-tuned instructions
+    /// looks like it worked and quietly poisons every comparison between them. So a module
+    /// written for one provider says so here, and both the startup guard and the endpoint read
+    /// it: the guard stops asking for a file that should not exist, and the endpoint refuses the
+    /// call rather than trusting a picker.</summary>
+    IReadOnlyCollection<CallPipeline>? SupportedPipelines => null;
+
     /// <summary>Whether this module needs the caller's words written down.
     ///
     /// A property of the module, not a tenant preference and not one switch for the deployment.

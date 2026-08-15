@@ -169,7 +169,7 @@ using (var instructionScope = app.Services.CreateScope())
 {
     InstructionFileGuard.EnsureEveryDialablePipelineHasInstructions(
         instructionScope.ServiceProvider.GetRequiredService<AgentModuleRegistry>()
-            .All.Select(m => m.InstructionName));
+            .All.Select(m => (m.InstructionName, m.SupportedPipelines)));
 }
 
 if (app.Environment.IsDevelopment())
@@ -261,17 +261,22 @@ app.MapMethods("/voice/live-call", new[] { HttpMethods.Get, HttpMethods.Connect 
             return;
         }
 
-        // Gemini only, and refused here rather than merely hidden in the picker. There is one
-        // instruction file for this module and it is written for that model.
-        if (requested.Pipeline != CallPipeline.GeminiLive_3_1)
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsync("The feedback line runs on Gemini Live only.");
-            return;
-        }
-
         context.RequestServices.GetRequiredService<Secretary.Agents.Feedback.FeedbackCallSession>()
             .For(feedbackCallId);
+    }
+
+    // A module written for one provider refuses the others rather than trusting the picker —
+    // the instruction files are not interchangeable. Read from the module itself so the rule
+    // lives in one place: the startup guard reads the same property.
+    var supported = context.RequestServices.GetRequiredService<AgentModuleRegistry>()
+        .For(module).SupportedPipelines;
+
+    if (supported is not null && !supported.Contains(requested.Pipeline))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync(
+            $"The {module} line runs on {string.Join(", ", supported)} only.");
+        return;
     }
 
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
