@@ -112,8 +112,9 @@ public sealed class ProviderServiceTests
             Instant.FromUtc(2026, 7, 12, 9, 0), Instant.FromUtc(2026, 7, 12, 9, 30), null, AppointmentCreatedBy.Staff,
             Now);
 
+        // From now, not from the beginning of time — see the second test below for why.
         _uow.Appointments
-            .Setup(a => a.GetForDateRangeAsync(Instant.MinValue, Instant.MaxValue, provider.Id, default))
+            .Setup(a => a.GetForDateRangeAsync(Now, Instant.MaxValue, provider.Id, default))
             .ReturnsAsync([appointment]);
 
         await Should.ThrowAsync<InvalidStateTransitionException>(() => _sut.RemoveAsync(provider.Id, default));
@@ -125,7 +126,7 @@ public sealed class ProviderServiceTests
         var provider = Provider.Create(TenantId, "Rasim (chair 1)", Now);
         _uow.Providers.Setup(p => p.GetByIdAsync(provider.Id, default)).ReturnsAsync(provider);
         _uow.Appointments
-            .Setup(a => a.GetForDateRangeAsync(Instant.MinValue, Instant.MaxValue, provider.Id, default))
+            .Setup(a => a.GetForDateRangeAsync(Now, Instant.MaxValue, provider.Id, default))
             .ReturnsAsync([]);
 
         await _sut.RemoveAsync(provider.Id, default);
@@ -133,6 +134,32 @@ public sealed class ProviderServiceTests
         provider.Status.ShouldBe(EntityStatus.Inactive);
         _uow.Providers.Verify(p => p.Remove(It.IsAny<Provider>()), Times.Never);
         _uow.UnitOfWork.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    /// <summary>Only work still to come may refuse a removal.
+    ///
+    /// ⚠ The check used to span Instant.MinValue to Instant.MaxValue — every appointment that
+    /// had ever existed — so one completed haircut made a provider permanently undeletable, and
+    /// a tenant running for a season could remove nobody who had ever worked for them. The name
+    /// said "upcoming" and the range said "ever". This pins the range, because that disagreement
+    /// is invisible from the outside: both versions throw, just on different days.</summary>
+    [Fact]
+    public async Task RemoveAsync_only_asks_about_appointments_still_to_come()
+    {
+        var provider = Provider.Create(TenantId, "Rasim (chair 1)", Now);
+        _uow.Providers.Setup(p => p.GetByIdAsync(provider.Id, default)).ReturnsAsync(provider);
+        _uow.Appointments
+            .Setup(a => a.GetForDateRangeAsync(It.IsAny<Instant>(), It.IsAny<Instant>(), provider.Id, default))
+            .ReturnsAsync([]);
+
+        await _sut.RemoveAsync(provider.Id, default);
+
+        _uow.Appointments.Verify(
+            a => a.GetForDateRangeAsync(Now, Instant.MaxValue, provider.Id, default), Times.Once);
+
+        _uow.Appointments.Verify(
+            a => a.GetForDateRangeAsync(Instant.MinValue, It.IsAny<Instant>(), It.IsAny<int?>(), default),
+            Times.Never);
     }
 
     [Fact]
