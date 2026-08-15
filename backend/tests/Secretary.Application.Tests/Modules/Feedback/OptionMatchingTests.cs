@@ -89,6 +89,27 @@ public sealed class OptionMatchingTests
         match!.Value.ShouldBe(expected);
     }
 
+    /// <summary>⚠ The one this test file originally missed, and a real call found.
+    ///
+    /// The value is a SCORE the business chose — this question was set up 20/40/60/80/100 — and
+    /// has nothing to do with what the caller says. Matching "dörd" against the value found
+    /// nothing, so every spoken number was refused on the one question people always answer with
+    /// a number. The original test used values 1-5 and passed happily.</summary>
+    [Theory]
+    [InlineData("dörd", "4")]
+    [InlineData("3", "3")]
+    [InlineData("beş", "5")]
+    public async Task A_spoken_number_matches_the_option_text_whatever_the_score_behind_it_is(
+        string spoken, string expected)
+    {
+        GivenQuestion(("1", 20), ("2", 40), ("3", 60), ("4", 80), ("5", 100));
+
+        var match = await _sut.MatchOptionAsync(10, spoken, default);
+
+        match.ShouldNotBeNull();
+        match!.Text.ShouldBe(expected);
+    }
+
     /// <summary>⚠ Number words only match options that carry numbers. Otherwise "iki" would pick
     /// the second item of a list that has nothing to do with counting — a caller answering a
     /// question about which service they used would be filed as having said "2".</summary>

@@ -144,10 +144,27 @@ public sealed class FeedbackCallService
             return exact;
         }
 
-        // A number, said either way round. Only for options that carry one — otherwise "iki"
-        // would match the second option of a list that has nothing to do with counting.
+        // A number, said either way round.
+        //
+        // ⚠ Matched against the option's TEXT first, not its value. The value is a score the
+        // business chose — a 1-5 question was set up with 20/40/60/80/100 — and it has nothing
+        // to do with what the caller says. Comparing "dörd" to the value found nothing and every
+        // spoken number was refused, on a question whose whole point is being answered with one.
+        //
+        // Still only where the option is itself a number, or "iki" would pick the second item of
+        // a list that has nothing to do with counting.
         if (SpokenNumber(said) is { } number)
         {
+            var byText = question.Options.FirstOrDefault(
+                o => SpokenNumber(AddressText.Normalize(o.Text)) == number);
+
+            if (byText is not null)
+            {
+                return byText;
+            }
+
+            // And by value, for a question whose options are words carrying numbers — "Yaxşı"
+            // worth 5 — where a caller answering "5" means that one.
             var byValue = question.Options.FirstOrDefault(o => o.Value == number);
             if (byValue is not null)
             {
