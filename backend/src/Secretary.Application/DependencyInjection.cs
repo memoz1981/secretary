@@ -33,6 +33,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<AppointmentService>();
         services.AddScoped<CallService>();
         services.AddScoped<OrderCallService>();
+        services.AddScoped<SurveyService>();
+        services.AddScoped<FeedbackCallService>();
+        services.AddScoped<FeedbackSettingsService>();
         services.AddScoped<EscalationService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<TenantModuleService>();
