@@ -30,4 +30,10 @@ public static class DbSchemas
     /// person who orders water and the person who books a haircut are different records, which
     /// is the whole reason a module owns a schema.</summary>
     public const string Orders = "ord";
+
+    /// <summary>The Feedback module: questionnaires, their questions, the calls that asked them
+    /// and the answers given. Self-contained by the same rule — the person surveyed is named on
+    /// the call row rather than joined to a customer or a client, because the call is about one
+    /// visit and nothing else needs to know who they are.</summary>
+    public const string Feedback = "fd";
 }

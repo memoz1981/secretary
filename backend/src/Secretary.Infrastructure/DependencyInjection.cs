@@ -39,6 +39,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrderSettingsRepository, OrderSettingsRepository>();
         services.AddScoped<IOrderCallRepository, OrderCallRepository>();
+        services.AddScoped<ISurveyRepository, SurveyRepository>();
+        services.AddScoped<ISurveyQuestionRepository, SurveyQuestionRepository>();
+        services.AddScoped<IFeedbackCallRepository, FeedbackCallRepository>();
+        services.AddScoped<IFeedbackAnswerRepository, FeedbackAnswerRepository>();
+        services.AddScoped<IFeedbackSettingsRepository, FeedbackSettingsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddSingleton<IClock>(SystemClock.Instance);

@@ -24,7 +24,12 @@ internal sealed class UnitOfWork : IUnitOfWork
         ICustomerRepository customers,
         IOrderRepository orders,
         IOrderSettingsRepository orderSettings,
-        IOrderCallRepository orderCalls)
+        IOrderCallRepository orderCalls,
+        ISurveyRepository surveys,
+        ISurveyQuestionRepository surveyQuestions,
+        IFeedbackCallRepository feedbackCalls,
+        IFeedbackAnswerRepository feedbackAnswers,
+        IFeedbackSettingsRepository feedbackSettings)
     {
         _db = db;
         Units = units;
@@ -33,6 +38,11 @@ internal sealed class UnitOfWork : IUnitOfWork
         Orders = orders;
         OrderSettings = orderSettings;
         OrderCalls = orderCalls;
+        Surveys = surveys;
+        SurveyQuestions = surveyQuestions;
+        FeedbackCalls = feedbackCalls;
+        FeedbackAnswers = feedbackAnswers;
+        FeedbackSettings = feedbackSettings;
         Tenants = tenants;
         Accounts = accounts;
         Providers = providers;
@@ -63,6 +73,11 @@ internal sealed class UnitOfWork : IUnitOfWork
     public IOrderRepository Orders { get; }
     public IOrderSettingsRepository OrderSettings { get; }
     public IOrderCallRepository OrderCalls { get; }
+    public ISurveyRepository Surveys { get; }
+    public ISurveyQuestionRepository SurveyQuestions { get; }
+    public IFeedbackCallRepository FeedbackCalls { get; }
+    public IFeedbackAnswerRepository FeedbackAnswers { get; }
+    public IFeedbackSettingsRepository FeedbackSettings { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken) => _db.SaveChangesAsync(cancellationToken);
 

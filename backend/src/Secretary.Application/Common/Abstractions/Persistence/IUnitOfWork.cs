@@ -22,6 +22,13 @@ public interface IUnitOfWork
     IOrderSettingsRepository OrderSettings { get; }
     IOrderCallRepository OrderCalls { get; }
 
+    // Feedback module.
+    ISurveyRepository Surveys { get; }
+    ISurveyQuestionRepository SurveyQuestions { get; }
+    IFeedbackCallRepository FeedbackCalls { get; }
+    IFeedbackAnswerRepository FeedbackAnswers { get; }
+    IFeedbackSettingsRepository FeedbackSettings { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
     /// <summary>Throws away everything pending, so a failed save cannot be retried by the next

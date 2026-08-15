@@ -38,6 +38,14 @@ public sealed class AppDbContext : DbContext
     public DbSet<OrderLine> OrderLines => Set<OrderLine>();
     public DbSet<OrderCall> OrderCalls => Set<OrderCall>();
 
+    // Feedback module.
+    public DbSet<Survey> Surveys => Set<Survey>();
+    public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
+    public DbSet<SurveyQuestionOption> SurveyQuestionOptions => Set<SurveyQuestionOption>();
+    public DbSet<FeedbackCall> FeedbackCalls => Set<FeedbackCall>();
+    public DbSet<FeedbackAnswer> FeedbackAnswers => Set<FeedbackAnswer>();
+    public DbSet<FeedbackSettings> FeedbackSettings => Set<FeedbackSettings>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<NodaTime.Instant>().HaveConversion<InstantConverter>();
@@ -67,6 +75,9 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<BusinessHours>().HasQueryFilter(h => h.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OrderSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OrderCall>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<Survey>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<FeedbackCall>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<FeedbackSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
 
         // Deliberately unfiltered: a customer's phone numbers and addresses, and the order lines
         // under an order. None carries a TenantId, and giving them one to filter on would mean
