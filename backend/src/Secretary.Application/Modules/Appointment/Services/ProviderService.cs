@@ -170,10 +170,21 @@ public sealed class ProviderService
         _changeNotifier.NotifyChanged(tenantId);
     }
 
+    /// <summary>Upcoming means upcoming.
+    ///
+    /// ⚠ This used to scan Instant.MinValue to Instant.MaxValue — every appointment that had ever
+    /// existed — so one completed haircut from months ago made a provider permanently
+    /// undeletable. The name said "upcoming" and the range said "ever", and the two disagreed
+    /// silently: a tenant who has been running for a season cannot remove anybody who has ever
+    /// worked for them.
+    ///
+    /// Past appointments are history and must keep pointing at the provider who did them, which
+    /// is why this deactivates rather than deletes. Only work still to come is a reason to
+    /// refuse.</summary>
     private async Task EnsureNoUpcomingAppointmentsAsync(int id, CancellationToken cancellationToken)
     {
         var upcoming = await _uow.Appointments.GetForDateRangeAsync(
-            Instant.MinValue, Instant.MaxValue, id, cancellationToken);
+            _clock.GetCurrentInstant(), Instant.MaxValue, id, cancellationToken);
 
         if (upcoming.Any(a => a.AppointmentStatus != AppointmentStatus.Cancelled))
         {

@@ -1,3 +1,4 @@
+import { ApiFailureBanner } from "@/shared/components/ApiFailureBanner";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/auth/AuthContext";
@@ -89,7 +90,10 @@ export function AppShell({ brand, domainLabel, navItems, whoText, children }: Ap
             {t("signOut")}
           </button>
         </div>
-        <div className="content">{children}</div>
+        <div className="content">
+          <ApiFailureBanner />
+          {children}
+        </div>
       </div>
     </div>
   );

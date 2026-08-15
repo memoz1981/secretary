@@ -26,6 +26,7 @@ export function ProvidersPage() {
   const matrixState = useApiData(() => getProviderServiceMatrix(token!), [token, refreshKey]);
   const [editing, setEditing] = useState<ProviderResponse | "new" | null>(null);
 
+
   const canEdit = role === "Owner";
   const matrix = matrixState.status === "success" ? matrixState.data : null;
   const providers = matrix?.providers ?? [];
@@ -89,8 +90,14 @@ export function ProvidersPage() {
                         <button
                           className="link danger"
                           onClick={async () => {
-                            await removeProvider(token!, p.id);
-                            setRefreshKey((k) => k + 1);
+                            try {
+                              await removeProvider(token!, p.id);
+                              setRefreshKey((k) => k + 1);
+                            } catch {
+                              // Already on screen: ApiFailureBanner reports every refused write.
+                              // Caught only so the rejection is handled, and so the refresh below
+                              // does not run — the row stays where it is, which is the truth.
+                            }
                           }}
                         >
                           {t("remove")}
