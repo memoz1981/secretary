@@ -22,6 +22,17 @@ public interface IAgentModule
     /// provider), per decision F3.</summary>
     string InstructionName { get; }
 
+    /// <summary>Whether this module needs the caller's words written down.
+    ///
+    /// A property of the module, not a tenant preference and not one switch for the deployment.
+    /// A feedback survey records open answers verbatim and is worthless without it. An order
+    /// line already has everything it needs in the tool arguments, and transcription sits on the
+    /// critical path between the caller finishing and the agent starting — so it pays latency
+    /// for a recording nobody reads.
+    ///
+    /// False by default: a module that has not thought about it should not be charged for it.</summary>
+    bool RequiresCallerTranscription => false;
+
     /// <summary>The tools for one call. Built per call rather than held, because every tool
     /// object closes over request-scoped services.</summary>
     IList<AITool> BuildTools();

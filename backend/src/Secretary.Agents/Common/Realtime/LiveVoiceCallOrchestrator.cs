@@ -216,6 +216,7 @@ public sealed class LiveVoiceCallOrchestrator
                     agentModule.InstructionName, _realtimeSession.ProviderKey),
                 tools,
                 modelOverride,
+                agentModule.RequiresCallerTranscription,
                 cancellationToken);
 
             var toOpenAi = RelayClientAudioToOpenAiAsync(clientSocket, cancellationToken);
