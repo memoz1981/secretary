@@ -81,6 +81,17 @@ public sealed class FeedbackTools
         {
             // Not an answer we can file. Saying so is the whole point — the alternative is the
             // model picking the nearest option and a number on a dashboard that nobody said.
+            //
+            // But the asking has to stop. After two goes the question is recorded as unanswered
+            // and the survey moves on, in code rather than by instruction: a caller repeating an
+            // answer the matcher cannot take is being argued with, and on a real call that ran to
+            // five attempts before they hung up.
+            if (_session.TooManyFailuresFor(question.QuestionId))
+            {
+                await _calls.RecordDeclineAsync(callId, question.QuestionId, default);
+                return "MOVED_ON.";
+            }
+
             return "NO_MATCH. Variantlar: " + string.Join("; ", question.Options.Select(o => o.Text));
         }
 
