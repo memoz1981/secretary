@@ -17,11 +17,15 @@ import { useLanguage } from "@/shared/i18n/LanguageContext";
  */
 export function ApiFailureBanner() {
   const { t } = useLanguage();
-  const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => onApiFailure((error) => setMessage(error.message?.trim() || null)), []);
+  // Undefined is "nothing has failed"; a string — including an empty one — is "something did".
+  // Collapsing those two into null meant a refusal that carried no readable sentence showed
+  // nothing at all, which is the exact silence this component exists to end.
+  const [message, setMessage] = useState<string | undefined>(undefined);
 
-  if (message === null) {
+  useEffect(() => onApiFailure((error) => setMessage(error.message?.trim() ?? "")), []);
+
+  if (message === undefined) {
     return null;
   }
 
@@ -31,7 +35,7 @@ export function ApiFailureBanner() {
       <button
         type="button"
         className="api-failure-close"
-        onClick={() => setMessage(null)}
+        onClick={() => setMessage(undefined)}
         aria-label={t("close")}
       >
         ✕

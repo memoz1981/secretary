@@ -38,6 +38,57 @@ export function onApiFailure(listener: FailureListener): () => void {
   return () => failureListeners.delete(listener);
 }
 
+/**
+ * The sentence out of an error response, whatever shape the API wrapped it in.
+ *
+ * ⚠ Three shapes, and this used to use none of them — it showed the raw body, so a refused
+ * removal read as
+ *   {"error":"Provider '1003' is linked to upcoming appointments and cannot be removed."}
+ * braces, quotes and all.
+ *
+ *   {"error": "..."}            ExceptionHandlingMiddleware, which is most of them
+ *   "..."                       a bare string from BadRequest(...) / Conflict(ex.Message)
+ *   {"title", "errors": {...}}  ASP.NET's own ValidationProblemDetails, for model binding
+ *
+ * Anything unrecognised falls through to the raw text: an ugly message beats no message, which
+ * is the whole reason this exists.
+ */
+function readErrorMessage(body: string): string {
+  const text = body.trim();
+  if (!text) return "";
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object") {
+      const shape = parsed as Record<string, unknown>;
+
+      if (typeof shape.error === "string" && shape.error) return shape.error;
+      if (typeof shape.detail === "string" && shape.detail) return shape.detail;
+
+      // Model-binding failures: every field's complaints, in one sentence.
+      if (shape.errors && typeof shape.errors === "object") {
+        const all = Object.values(shape.errors as Record<string, unknown>)
+          .flatMap((v) => (Array.isArray(v) ? v : [v]))
+          .filter((v): v is string => typeof v === "string" && v.length > 0);
+
+        if (all.length > 0) return all.join(" ");
+      }
+
+      if (typeof shape.title === "string" && shape.title) return shape.title;
+    }
+  } catch {
+    // Not JSON — plain text, or an error page from the host.
+  }
+
+  // IIS answers some failures with a whole HTML page — the WebDAV 405 that hid every edit and
+  // delete was one. Tipping that into a banner would fill the screen with markup, so it is
+  // treated as no message and the caller's fallback wording is used instead.
+  return text.startsWith("<") ? "" : text;
+}
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, token } = options;
 
@@ -52,7 +103,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    const error = new ApiError(response.status, text || response.statusText);
+    const error = new ApiError(response.status, readErrorMessage(text) || response.statusText);
 
     // 401 is not a refusal worth a banner — it means the session went, and the guards send the
     // caller to the login page, which explains itself.
