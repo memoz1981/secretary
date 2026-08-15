@@ -27,14 +27,64 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const STORAGE_KEY = "sekretar.token";
+
 function decode(token: string): DecodedToken {
   const payload = token.split(".")[1];
   return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as DecodedToken;
 }
 
+/** The session, restored from the last visit — or null, which means the login page.
+ *
+ * The token used to live only in React state, so every refresh, every new tab and every time
+ * somebody typed the address again started from null and bounced them back to login. The 8-hour
+ * expiry the server issues was meaningless: the session died on the first F5.
+ *
+ * ⚠ Every access is wrapped. Reading localStorage unguarded during the first render is what
+ * takes the whole app down when a browser blocks site data — the provider wraps the router, so
+ * the throw is a white screen rather than a degraded page. See the theme bootstrap in index.html,
+ * which learned this first.
+ *
+ * An expired token is discarded here rather than restored. Handing it back would produce a
+ * session that looks logged in and 401s on every request — worse than the login page, because
+ * there is nothing on screen to explain it.
+ */
+function readStoredSession(): { token: string; decoded: DecodedToken } | null {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const decoded = decode(stored);
+    if (typeof decoded.exp !== "number" || decoded.exp * 1000 <= Date.now()) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return { token: stored, decoded };
+  } catch {
+    // Unreadable storage, or a token that is not a JWT any more. Either way: log in again.
+    return null;
+  }
+}
+
+function writeStoredToken(token: string | null) {
+  try {
+    if (token) {
+      window.localStorage.setItem(STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // Storage blocked. The session still works for this tab, it just will not survive a reload.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [decoded, setDecoded] = useState<DecodedToken | null>(null);
+  // Read once, lazily, before the first paint — so a reload never flashes the login page at
+  // somebody who is already signed in.
+  const [restored] = useState(readStoredSession);
+  const [token, setToken] = useState<string | null>(restored?.token ?? null);
+  const [decoded, setDecoded] = useState<DecodedToken | null>(restored?.decoded ?? null);
   const [me, setMe] = useState<MeResponse | null>(null);
   const { pathname } = useLocation();
 
@@ -60,12 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function login(newToken: string) {
     setToken(newToken);
     setDecoded(decode(newToken));
+    writeStoredToken(newToken);
   }
 
   function logout() {
     setToken(null);
     setDecoded(null);
     setMe(null);
+    writeStoredToken(null);
   }
 
   return (
