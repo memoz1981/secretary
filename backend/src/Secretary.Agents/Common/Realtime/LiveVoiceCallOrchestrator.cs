@@ -90,6 +90,46 @@ public sealed class LiveVoiceCallOrchestrator
         _callerTurnCount++;
     }
 
+    /// <summary>What the caller said, in the order they said it, timestamped from the start of
+    /// the call.
+    ///
+    /// ⚠ The caller's side only. The providers transcribe what they hear for free; transcribing
+    /// what they say back is a second setup option and a second bill, and no module has asked for
+    /// it. Called a caller transcript everywhere for that reason, rather than a "transcript" that
+    /// quietly turns out to be half a conversation.
+    ///
+    /// This column existed for months and was written null on every call in every module, because
+    /// the value was hardcoded at the one place it is constructed. The Feedback module is the one
+    /// that cannot work without it: an open answer is the caller's own words, and there was
+    /// nowhere for them to come from.</summary>
+    private readonly List<string> _callerLines = [];
+
+    /// <summary>When the call started, so a line can say how far into it the caller spoke. A field
+    /// rather than the local RunAsync already has, because the event loop is where the words
+    /// arrive.</summary>
+    private Instant _startedAt;
+
+    private void RecordCallerLine(string? text)
+    {
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            _callerLines.Add(CallerLine(_clock.GetCurrentInstant() - _startedAt, text));
+        }
+    }
+
+    /// <summary>One line: how far into the call, then what they said.
+    ///
+    /// Minutes come from the total rather than from a minutes component, so a call past the hour
+    /// reads 61:40 instead of wrapping round to 01:40 and putting the end of the call before the
+    /// middle of it.</summary>
+    internal static string CallerLine(Duration elapsed, string text)
+    {
+        var seconds = Math.Max(0, (int)elapsed.TotalSeconds);
+        return $"[{seconds / 60:00}:{seconds % 60:00}] {text.Trim()}";
+    }
+
+    private string? CallerTranscript() => _callerLines.Count == 0 ? null : string.Join("\n", _callerLines);
+
     // ---- Turn state ----
     // A response.create is only legal once the previous response has finished. OpenAI emits
     // response.function_call_arguments.done BEFORE response.done, so asking for the follow-up
@@ -174,7 +214,7 @@ public sealed class LiveVoiceCallOrchestrator
         WebSocket clientSocket, Module module, CallPipeline pipeline, string? modelOverride,
         CancellationToken cancellationToken)
     {
-        var startedAt = _clock.GetCurrentInstant();
+        var startedAt = _startedAt = _clock.GetCurrentInstant();
         var outcome = CallOutcome.ResolvedByAgent;
 
         // The module check the HTTP layer cannot do for us.
@@ -303,7 +343,7 @@ public sealed class LiveVoiceCallOrchestrator
                     new CallLogEntry(
                         LocalDeviceCallerIdentifier, _classification, outcome,
                         durationSeconds, _answerCount, _callerTurnCount,
-                        "local-device-call (no recording stored)", null, startedAt, pipeline,
+                        "local-device-call (no recording stored)", CallerTranscript(), startedAt, pipeline,
                         // One model does everything on this path — that is what the realtime
                         // API is. The chained pipelines report three entries here instead.
                         // Taken from the session, not from configuration, so a mini call is
@@ -601,11 +641,12 @@ public sealed class LiveVoiceCallOrchestrator
                     responseStarted.Restart();
                     break;
 
-                // Only logged, never acted on: the transcript is what makes a recorded call
-                // reviewable afterwards, and it is how we can tell a real caller turn from the
-                // microphone tripping over background noise or the agent's own voice.
+                // The transcript is what makes a recorded call reviewable afterwards, and it is
+                // how we can tell a real caller turn from the microphone tripping over background
+                // noise or the agent's own voice.
                 case RealtimeEvent.CallerTranscript transcription:
                     _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+                    RecordCallerLine(transcription.Text);
 
                     // Also a question, and on Gemini it is usually the only sign of one. Gemini
                     // reports speech starting only when the caller talks OVER the agent, so a

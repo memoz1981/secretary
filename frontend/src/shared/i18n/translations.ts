@@ -740,7 +740,10 @@ export const translations = {
   answers: { az: "Cavablar", ru: "Ответы", en: "Answers" },
   noAnswersRecorded: { az: "Cavab qeydə alınmayıb.", ru: "Ответы не записаны.", en: "No answers recorded." },
   declinedToAnswer: { az: "Cavab vermədi", ru: "Отказался отвечать", en: "Declined to answer" },
-  transcript: { az: "Danışığın mətni", ru: "Расшифровка", en: "Transcript" },
+  // Named for what it actually is. Only the caller's side is transcribed — the providers do that
+  // as part of the session, while transcribing the agent's own voice is a separate bill nothing
+  // has asked for — and calling it "the transcript" would have people looking for the other half.
+  transcript: { az: "Müştərinin dedikləri", ru: "Слова клиента", en: "What the caller said" },
   feedbackDashboard: { az: "Rəy paneli", ru: "Панель отзывов", en: "Feedback dashboard" },
   agentQuality: { az: "Agentin işi", ru: "Работа агента", en: "Agent quality" },
   callsQueued: { az: "Növbədə", ru: "В очереди", en: "Queued" },
