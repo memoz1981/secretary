@@ -61,12 +61,22 @@ public sealed class FeedbackAgentModule : IAgentModule
         }
 
         var subject = await _calls.GetSubjectAsync(callId, cancellationToken);
+
+        // ⚠ Each name is labelled with the job it does. On a real call the agent introduced
+        // itself as "Toyota Servis" — the questionnaire, not the business. Two proper nouns
+        // arrived in the same paragraph, one of them was who you are and the other was what you
+        // are asking about, and nothing said which was which.
         return $"""
                 ## This call
 
                 - You are calling **{subject.PersonName}**. Greet them by name.
-                - The questionnaire is "{subject.SurveyName}" and it has {subject.QuestionCount} question(s).
-                - Say at the start how many questions there are, once, so they know what they agreed to.
+                - You are calling **on behalf of the business named at the top of these
+                  instructions**. That is the only name you introduce yourself with.
+                - The questionnaire is called **"{subject.SurveyName}"**. That is what the call is
+                  about, not who you are — "[business] adından {subject.SurveyName} sorğusu ilə
+                  bağlı zəng edirəm", never "{subject.SurveyName} adından".
+                - It has {subject.QuestionCount} question(s). Say how many, once, at the start, so
+                  they know what they agreed to.
                 """;
     }
 

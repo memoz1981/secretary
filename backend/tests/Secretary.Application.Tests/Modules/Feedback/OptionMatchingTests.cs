@@ -61,6 +61,38 @@ public sealed class OptionMatchingTests
     private void GivenScale(int scaleMax)
         => Given(SurveyQuestion.ScaleQuestion(1, 0, "Qiymətləndirin", scaleMax, true, Now));
 
+    private void GivenYesNo()
+        => Given(SurveyQuestion.YesNoQuestion(1, 0, "Məmnun qaldınız?", true, true, Now));
+
+    /// <summary>⚠ The one a real call found: the caller said "hə" and was refused twice, on the
+    /// question type that should be hardest to get wrong. "Bəli" is the written word and the
+    /// stored label; it is not what anybody says.</summary>
+    [Theory]
+    [InlineData("hə", "Bəli")]
+    [InlineData("əlbəttə", "Bəli")]
+    [InlineData("bəli", "Bəli")]
+    [InlineData("yox", "Xeyr")]
+    [InlineData("xeyr", "Xeyr")]
+    public async Task Yes_and_no_match_however_they_are_said(string spoken, string expected)
+    {
+        GivenYesNo();
+
+        var match = await _sut.MatchOptionAsync(10, spoken, default);
+
+        match.ShouldNotBeNull();
+        match!.Text.ShouldBe(expected);
+    }
+
+    /// <summary>The synonyms are for Yes/No questions alone. On a list of names, "yox" is not an
+    /// option and pretending otherwise would file an answer against something nobody offered.</summary>
+    [Fact]
+    public async Task Yes_and_no_words_do_not_leak_into_a_named_list()
+    {
+        GivenChoice("Təmir", "Satış");
+
+        (await _sut.MatchOptionAsync(10, "hə", default)).ShouldBeNull();
+    }
+
     /// <summary>The fold that bites everywhere text is compared here — ş ə ç ğ ı ö ü. A caller
     /// saying the word correctly must match an option somebody typed in ASCII.</summary>
     [Theory]

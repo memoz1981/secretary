@@ -28,7 +28,8 @@ public sealed class PhoneAgentConversationService
 
         // The text path runs on OpenAI, so it reads OpenAI's instruction file — the speech rules
         // in the other one are about how a model sounds, which does not apply here at all.
-        var instructions = _instructionContext.BuildPhoneAgentInstructions(module.InstructionName, "openai");
+        var instructions = await _instructionContext.BuildPhoneAgentInstructionsAsync(
+            module.InstructionName, "openai", cancellationToken);
         var agent = _agentFactory.Create(AgentProvider.OpenAi, instructions, module.BuildTools());
         var response = await agent.RunAsync(callerMessage, cancellationToken: cancellationToken);
         return response.Text;

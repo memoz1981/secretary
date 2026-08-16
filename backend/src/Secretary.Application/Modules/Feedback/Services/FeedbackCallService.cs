@@ -144,6 +144,16 @@ public sealed class FeedbackCallService
             return exact;
         }
 
+        // ⚠ Yes and no are said in a dozen ways and almost never as the stored label. A real
+        // caller answered "hə", was refused twice, and the call ended — on the question type that
+        // should be the hardest to get wrong. Matching the label alone is matching the written
+        // word against the spoken one.
+        if (question.QuestionType == FeedbackQuestionType.YesNo && YesNoWords.Read(spokenAnswer) is { } saidYes)
+        {
+            var wanted = saidYes ? SurveyQuestion.Yes : SurveyQuestion.No;
+            return question.Options.FirstOrDefault(o => o.Text == wanted);
+        }
+
         // A number, said either way round: "dörd" and "4" are the same answer to a 1-5.
         //
         // ⚠ Matched against the option's TEXT, never against its score. It used to fall back to
