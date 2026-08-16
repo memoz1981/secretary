@@ -33,7 +33,7 @@ public sealed class SurveyService
         foreach (var survey in surveys)
         {
             var questions = await _uow.SurveyQuestions.GetForSurveyAsync(survey.Id, cancellationToken);
-            responses.Add(new SurveyResponse(survey.Id, survey.Name, questions.Count));
+            responses.Add(ToResponse(survey, questions.Count));
         }
 
         return responses;
@@ -57,7 +57,7 @@ public sealed class SurveyService
         await _uow.Surveys.AddAsync(survey, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return new SurveyResponse(survey.Id, survey.Name, 0);
+        return ToResponse(survey, questionCount: 0);
     }
 
     public async Task<SurveyResponse> RenameAsync(
@@ -70,7 +70,25 @@ public sealed class SurveyService
         await _uow.SaveChangesAsync(cancellationToken);
 
         var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyId, cancellationToken);
-        return new SurveyResponse(survey.Id, survey.Name, questions.Count);
+        return ToResponse(survey, questions.Count);
+    }
+
+    /// <summary>How hard to chase somebody who never answered.
+    ///
+    /// Applies to nobody who did. A caller who picked up and could not be understood is handed to
+    /// a person, and dialling them again with the same agent would fail identically — a second
+    /// identical call is how a survey becomes a nuisance.</summary>
+    public async Task<SurveyResponse> SetRetryPolicyAsync(
+        int surveyId, SaveRetryPolicyRequest request, CancellationToken cancellationToken)
+    {
+        var survey = await _uow.Surveys.GetByIdAsync(surveyId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Survey), surveyId);
+
+        survey.SetRetryPolicy(request.RetryCount, request.RetryDelayMinutes, _clock.GetCurrentInstant());
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyId, cancellationToken);
+        return ToResponse(survey, questions.Count);
     }
 
     /// <summary>Soft-deactivates, like every other removal here. Calls already made against this
@@ -284,6 +302,9 @@ public sealed class SurveyService
             _ => false,
         };
     }
+
+    private static SurveyResponse ToResponse(Survey survey, int questionCount)
+        => new(survey.Id, survey.Name, questionCount, survey.RetryCount, survey.RetryDelayMinutes);
 
     private static SurveyQuestionResponse ToResponse(SurveyQuestion question)
         => new(

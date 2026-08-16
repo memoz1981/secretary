@@ -33,6 +33,31 @@ public enum FeedbackQuestionType
     Scale = 3,
 }
 
+/// <summary>What became of one person we set out to survey — across every attempt, not one dial.
+///
+/// ⚠ There is no "partial". A survey that stopped half way is not half a result: its answers are
+/// not reported and the person is not counted as surveyed. That is a decision, and the reason for
+/// it is that a partial result is the kind of number people quote without the caveat.</summary>
+public enum SurveyRequestOutcome
+{
+    /// <summary>Queued, and nothing has happened yet.</summary>
+    Pending = 0,
+
+    /// <summary>Dialled, and nobody was there — or the line opened and produced nothing. The only
+    /// outcome that is retried, because it is the only one where nobody decided anything.</summary>
+    NotReached = 1,
+
+    /// <summary>They answered and would not take part. An answer, and never rung again: calling
+    /// back somebody who said no is how a number gets blocked.</summary>
+    Refused = 2,
+
+    /// <summary>The survey broke down mid-way. A person rings them; the agent does not.</summary>
+    NeedsHuman = 3,
+
+    /// <summary>Every question was put to them. The only outcome whose answers are reported.</summary>
+    Complete = 4,
+}
+
 /// <summary>Where a feedback call got to.
 ///
 /// Only Completed contributes answers to the dashboard. Everything else is a to-do — somebody to

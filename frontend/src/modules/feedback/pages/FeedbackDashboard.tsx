@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/shared/components/AppShell";
 import { Card } from "@/shared/components/Card";
 import { StatTile } from "@/shared/components/StatTile";
-import { BarRow } from "@/shared/components/BarRow";
+import { MAX_PIE_SLICES, SharePie, ShareBars, type Share } from "@/shared/components/SharePie";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { getFeedbackDashboard, getSurveys } from "@/modules/feedback/api/feedback";
+import type { QuestionResult } from "@/shared/api/types";
 
 type Range = "week" | "month" | "all";
 
@@ -26,6 +26,16 @@ function since(range: Range): string | undefined {
   return from.toISOString();
 }
 
+function percent(value: number | null): string {
+  return value === null ? "—" : `${Math.round(value * 100)}%`;
+}
+
+/** What the customers said. Nothing here is about the machine.
+ *
+ * ⚠ Cost, duration, tokens and attempts used to sit at the top of this page under the heading
+ * "agent quality", and they answer a different person's question. They live on the Calls page
+ * now; the only process number that survives here is coverage, because a score means nothing
+ * without knowing how many people it came from. */
 export function FeedbackDashboardPage() {
   const { token } = useAuth();
   const { t } = useLanguage();
@@ -54,16 +64,10 @@ export function FeedbackDashboardPage() {
   );
 
   const data = state.status === "success" ? state.data : null;
-
-  // Every question the owner ticked, averaged into one percentage. Replaced a single "headline"
-  // question, because "Məmnun qaldınız?" is satisfaction and "Servis kitabçası verildi?" is a
-  // fact — one number built from both moves for two unrelated reasons.
-  const counting = (data?.results ?? []).filter((r) => r.countsTowardScore && r.averagePercent !== null);
-  const score =
-    counting.length === 0
-      ? null
-      : counting.reduce((sum, r) => sum + (r.averagePercent ?? 0), 0) / counting.length;
-  const scoreAnswers = counting.reduce((sum, r) => sum + r.answeredCount, 0);
+  const trend =
+    data?.scorePercent != null && data.previousScorePercent != null
+      ? data.scorePercent - data.previousScorePercent
+      : null;
 
   return (
     <AppShell {...shell}>
@@ -93,56 +97,40 @@ export function FeedbackDashboardPage() {
 
       {data && (
         <>
-          {/* The one number, and never without its denominator: 92% from four people is not 92%. */}
-          {score !== null && (
-            <Card>
-              <div className="headline-metric">
-                <div className="headline-value mono">{Math.round(score)}%</div>
-                <div className="headline-label">{t("satisfactionScore")}</div>
-                <div className="headline-sub">
-                  {t("basedOnAnswers").replace("{n}", String(scoreAnswers))}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* How the agent itself did. Same shape whatever was asked, which is the point —
-              it says whether the thing works, not what customers think. */}
+          {/* The one number, and never without what it rests on. 92% from four people is not
+              92%, so the count and the response rate sit under it rather than elsewhere. */}
           <Card>
-            <h2>{t("agentQuality")}</h2>
-            <div className="stat-row">
-              <StatTile label={t("callsQueued")} value={String(data.agent.callsQueued)} />
-              <StatTile label={t("callsStarted")} value={String(data.agent.callsStarted)} />
-              <StatTile label={t("callsCompleted")} value={String(data.agent.callsCompleted)} />
-              <StatTile label={t("callsAbandoned")} value={String(data.agent.callsAbandoned)} />
-              <StatTile
-                label={t("completionRate")}
-                value={
-                  data.agent.completionRate === null
-                    ? "—"
-                    : `${Math.round(data.agent.completionRate * 100)}%`
-                }
-              />
-              <StatTile label={t("avgDuration")} value={formatDuration(data.agent.averageDurationSeconds)} />
-              <StatTile label={t("totalCost")} value={formatUsd(data.agent.totalCostUsd)} />
+            <div className="score-figure mono">
+              {data.scorePercent === null ? "—" : `${Math.round(data.scorePercent)}%`}
+            </div>
+            <div className="share-label">{t("satisfactionScore")}</div>
+            {trend !== null && (
+              <div className={`score-trend ${trend >= 0 ? "up" : "down"}`}>
+                {trend >= 0 ? "▲" : "▼"} {Math.abs(Math.round(trend))} {t("vsPreviousPeriod")}
+              </div>
+            )}
+            <div className="score-caption">
+              {data.scorePercent === null
+                ? t("noScoredQuestions")
+                : t("basedOnAnswers").replace("{n}", String(data.scoreAnswerCount))}
             </div>
           </Card>
 
-          {/* Where people hang up. Needs no knowledge of the questions, and is usually the most
-              actionable thing here — a question that loses a third of callers is one to rewrite. */}
+          {/* Coverage, which qualifies everything above it. Counted in people — the version this
+              replaces counted rows in the calls table, so four dead connections in nine seconds
+              read as four surveys attempted. */}
           <Card>
-            <h2>{t("whereCallersStop")}</h2>
-            {data.dropOff.length === 0 ? (
-              <div className="note">{t("noDataYet")}</div>
-            ) : (
-              data.dropOff.map((d) => (
-                <BarRow
-                  key={d.questionId}
-                  label={`${d.position + 1}. ${d.questionText} — ${d.answered}/${d.reached}`}
-                  pct={d.reached === 0 ? 0 : (d.answered / d.reached) * 100}
-                />
-              ))
-            )}
+            <h2>{t("coverage")}</h2>
+            <div className="stat-row">
+              <StatTile label={t("peopleRequested")} value={String(data.coverage.requested)} />
+              <StatTile label={t("peopleReached")} value={String(data.coverage.reached)} />
+              <StatTile label={t("surveysCompleted")} value={String(data.coverage.completed)} />
+              <StatTile label={t("responseRate")} value={percent(data.coverage.responseRate)} />
+              <StatTile label={t("completionRate")} value={percent(data.coverage.completionRate)} />
+              <StatTile label={t("notReached")} value={String(data.coverage.notReached)} />
+              <StatTile label={t("needsAPerson")} value={String(data.coverage.needsHuman)} />
+            </div>
+            <div className="note">{t("coverageExplain")}</div>
           </Card>
 
           <Card>
@@ -150,34 +138,7 @@ export function FeedbackDashboardPage() {
             {data.results.length === 0 ? (
               <div className="note">{t("noChoiceQuestions")}</div>
             ) : (
-              data.results.map((result) => {
-                const total = result.options.reduce((sum, o) => sum + o.count, 0);
-                return (
-                  <div key={result.questionId} className="result-block">
-                    <div className="result-question">
-                      {result.position + 1}. {result.questionText}
-                    </div>
-                    <div className="result-meta mono">
-                      {result.isScored && result.averagePercent !== null && (
-                        <span>
-                          {t("average")} {Math.round(result.averagePercent)}% ·{" "}
-                        </span>
-                      )}
-                      {t("answeredN").replace("{n}", String(result.answeredCount))}
-                      {result.declinedCount > 0 && (
-                        <span> · {t("declinedN").replace("{n}", String(result.declinedCount))}</span>
-                      )}
-                    </div>
-                    {result.options.map((o) => (
-                      <BarRow
-                        key={o.optionId}
-                        label={`${o.text}${o.scorePercent === null ? "" : ` (${o.scorePercent}%)`} — ${o.count}`}
-                        pct={total === 0 ? 0 : (o.count / total) * 100}
-                      />
-                    ))}
-                  </div>
-                );
-              })
+              data.results.map((result) => <QuestionPanel key={result.questionId} result={result} />)
             )}
             {/* Said plainly rather than left as an absence somebody has to notice. */}
             <div className="note">{t("openQuestionsNotCharted")}</div>
@@ -185,5 +146,44 @@ export function FeedbackDashboardPage() {
         </>
       )}
     </AppShell>
+  );
+}
+
+/** One question.
+ *
+ * ⚠ The form follows the slice count, not the question type. Up to three shares get a pie;
+ * beyond that they get bars, because a pie needs every slice separable from every other and a
+ * fourth hue lands inside the colour-vision floor — a six-slice set had a worst pair at ΔE 0.5,
+ * which is to say two slices nobody could tell apart. See SharePie.tsx. */
+function QuestionPanel({ result }: { result: QuestionResult }) {
+  const { t } = useLanguage();
+  const shares: Share[] = result.options.map((o) => ({ label: o.text, count: o.count }));
+  const total = shares.reduce((sum, s) => sum + s.count, 0);
+
+  return (
+    <div className="question-panel">
+      <h3>
+        {result.position + 1}. {result.questionText}
+      </h3>
+      <div className="meta mono">
+        {result.isScored && result.averagePercent !== null && (
+          <span>
+            {t("average")} {Math.round(result.averagePercent)}% ·{" "}
+          </span>
+        )}
+        {t("answeredN").replace("{n}", String(result.answeredCount))}
+        {result.declinedCount > 0 && (
+          <span> · {t("declinedN").replace("{n}", String(result.declinedCount))}</span>
+        )}
+      </div>
+
+      {total === 0 ? (
+        <div className="note">{t("noDataYet")}</div>
+      ) : shares.length <= MAX_PIE_SLICES ? (
+        <SharePie shares={shares} />
+      ) : (
+        <ShareBars shares={shares} />
+      )}
+    </div>
   );
 }

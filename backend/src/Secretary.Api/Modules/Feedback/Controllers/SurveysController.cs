@@ -59,6 +59,15 @@ public sealed class SurveysController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>How many times to ring somebody who never answered, and how long to leave it.
+    /// Per questionnaire, because a service follow-up and a sales follow-up are not chased with
+    /// the same persistence.</summary>
+    [HttpPut("{id:int}/retry-policy")]
+    [Authorize(Roles = "Owner")]
+    public async Task<ActionResult<SurveyResponse>> SetRetryPolicy(
+        int id, SaveRetryPolicyRequest request, CancellationToken cancellationToken)
+        => Ok(await _surveys.SetRetryPolicyAsync(id, request, cancellationToken));
+
     [HttpPost("{id:int}/questions")]
     [Authorize(Roles = "Owner")]
     public async Task<ActionResult<SurveyQuestionResponse>> AddQuestion(

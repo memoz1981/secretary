@@ -27,6 +27,7 @@ internal sealed class UnitOfWork : IUnitOfWork
         IOrderCallRepository orderCalls,
         ISurveyRepository surveys,
         ISurveyQuestionRepository surveyQuestions,
+        ISurveyRequestRepository surveyRequests,
         IFeedbackCallRepository feedbackCalls,
         IFeedbackAnswerRepository feedbackAnswers,
         IFeedbackSettingsRepository feedbackSettings)
@@ -40,6 +41,7 @@ internal sealed class UnitOfWork : IUnitOfWork
         OrderCalls = orderCalls;
         Surveys = surveys;
         SurveyQuestions = surveyQuestions;
+        SurveyRequests = surveyRequests;
         FeedbackCalls = feedbackCalls;
         FeedbackAnswers = feedbackAnswers;
         FeedbackSettings = feedbackSettings;
@@ -75,6 +77,8 @@ internal sealed class UnitOfWork : IUnitOfWork
     public IOrderCallRepository OrderCalls { get; }
     public ISurveyRepository Surveys { get; }
     public ISurveyQuestionRepository SurveyQuestions { get; }
+    public ISurveyRequestRepository SurveyRequests { get; }
+
     public IFeedbackCallRepository FeedbackCalls { get; }
     public IFeedbackAnswerRepository FeedbackAnswers { get; }
     public IFeedbackSettingsRepository FeedbackSettings { get; }

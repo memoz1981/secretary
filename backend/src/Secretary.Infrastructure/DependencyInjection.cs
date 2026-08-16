@@ -1,4 +1,4 @@
-﻿using Secretary.Application.Abstractions;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Abstractions.Persistence;
 using Secretary.Infrastructure.Persistence;
 using Secretary.Infrastructure.Persistence.Repositories;
@@ -41,6 +41,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IOrderCallRepository, OrderCallRepository>();
         services.AddScoped<ISurveyRepository, SurveyRepository>();
         services.AddScoped<ISurveyQuestionRepository, SurveyQuestionRepository>();
+        services.AddScoped<ISurveyRequestRepository, SurveyRequestRepository>();
         services.AddScoped<IFeedbackCallRepository, FeedbackCallRepository>();
         services.AddScoped<IFeedbackAnswerRepository, FeedbackAnswerRepository>();
         services.AddScoped<IFeedbackSettingsRepository, FeedbackSettingsRepository>();

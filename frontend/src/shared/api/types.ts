@@ -459,6 +459,14 @@ export interface SurveyResponse {
   id: number;
   name: string;
   questionCount: number;
+  /** How many more times to ring somebody who never answered. Zero means one attempt. */
+  retryCount: number;
+  retryDelayMinutes: number;
+}
+
+export interface SaveRetryPolicyRequest {
+  retryCount: number;
+  retryDelayMinutes: number;
 }
 
 export interface SurveyDetailResponse {
@@ -497,12 +505,39 @@ export interface QueueFeedbackCallRequest {
   phoneNumber: string;
 }
 
-export interface FeedbackCallResponse {
+/** What became of one person we set out to survey — across every attempt, not one dial.
+ *
+ *  There is deliberately no "partial": a survey that stopped half way is not half a result, its
+ *  answers are not reported, and the person is not counted as surveyed. */
+export type SurveyRequestOutcome = "Pending" | "NotReached" | "Refused" | "NeedsHuman" | "Complete";
+
+export interface SurveyRequestResponse {
   id: number;
   surveyId: number;
   surveyName: string;
   personName: string;
   phoneNumber: string;
+  outcome: SurveyRequestOutcome;
+  attemptCount: number;
+  createdAt: string;
+  lastAttemptAt: string | null;
+  /** When the next dial is due, or null when there will not be one. */
+  nextAttemptDueAt: string | null;
+  /** Somebody a person still has to deal with — a breakdown, or a number that never answered
+   *  and has run out of retries. A refusal needs nobody. */
+  needsFollowUp: boolean;
+  totalCostUsd: number;
+}
+
+export interface FeedbackCallResponse {
+  id: number;
+  surveyRequestId: number;
+  surveyId: number;
+  surveyName: string;
+  personName: string;
+  phoneNumber: string;
+  /** Which dial this was against the person — 1 for the first. */
+  attemptNumber: number;
   status: FeedbackCallStatus;
   createdAt: string;
   completedAt: string | null;
@@ -538,22 +573,24 @@ export interface FeedbackCallDetailResponse {
   transcript: string | null;
 }
 
-export interface FeedbackAgentStats {
-  callsQueued: number;
-  callsStarted: number;
-  callsCompleted: number;
-  callsAbandoned: number;
+/** Counted in people, never in dials. Counting rows in the calls table meant four dead
+ *  connections in nine seconds read as four surveys attempted. */
+export interface FeedbackCoverage {
+  requested: number;
+  completed: number;
+  notReached: number;
+  refused: number;
+  needsHuman: number;
+  attempts: number;
   averageDurationSeconds: number;
   totalCostUsd: number;
-  completionRate: number | null;
-}
-
-export interface QuestionDropOff {
-  questionId: number;
-  position: number;
-  questionText: string;
+  /** People who picked up and engaged. */
   reached: number;
-  answered: number;
+  /** Completed ÷ reached. Never ÷ requested — a wrong phone number is not the agent failing at
+   *  a conversation. */
+  completionRate: number | null;
+  /** Completed ÷ requested. What qualifies the score. */
+  responseRate: number | null;
 }
 
 export interface OptionBreakdown {
@@ -580,9 +617,13 @@ export interface QuestionResult {
 export interface FeedbackDashboardResponse {
   surveyId: number;
   surveyName: string;
-  agent: FeedbackAgentStats;
-  /** Choice questions only. Open answers have nothing honest to chart and are read on the call
-   *  detail page instead. */
+  /** The mean of every answer to a question ticked "counts toward the score". */
+  scorePercent: number | null;
+  /** The same number over the preceding window of equal length. Null for an all-time view. */
+  previousScorePercent: number | null;
+  scoreAnswerCount: number;
+  coverage: FeedbackCoverage;
+  /** Everything except Open questions — free text has nothing honest to chart and is read on
+   *  the call detail page instead. */
   results: QuestionResult[];
-  dropOff: QuestionDropOff[];
 }

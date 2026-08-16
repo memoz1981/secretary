@@ -71,6 +71,55 @@ internal sealed class SurveyQuestionRepository : ISurveyQuestionRepository
         => await _db.FeedbackAnswers.AnyAsync(a => a.SurveyQuestionId == questionId, cancellationToken);
 }
 
+internal sealed class SurveyRequestRepository : ISurveyRequestRepository
+{
+    private readonly AppDbContext _db;
+
+    public SurveyRequestRepository(AppDbContext db) => _db = db;
+
+    public async Task<SurveyRequest?> GetByIdAsync(int id, CancellationToken cancellationToken)
+        => await _db.SurveyRequests.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<SurveyRequest>> GetAllAsync(CancellationToken cancellationToken)
+        => await _db.SurveyRequests.OrderByDescending(r => r.CreatedAtUtc).ToListAsync(cancellationToken);
+
+    public async Task AddAsync(SurveyRequest entity, CancellationToken cancellationToken)
+        => await _db.SurveyRequests.AddAsync(entity, cancellationToken);
+
+    public void Update(SurveyRequest entity) => _db.SurveyRequests.Update(entity);
+
+    public void Remove(SurveyRequest entity) => _db.SurveyRequests.Remove(entity);
+
+    public async Task<IReadOnlyList<SurveyRequest>> SearchAsync(
+        Instant? from, Instant? to, int? surveyId, CancellationToken cancellationToken)
+    {
+        var query = _db.SurveyRequests.AsQueryable();
+
+        if (from is { } start)
+        {
+            query = query.Where(r => r.CreatedAtUtc >= start);
+        }
+
+        if (to is { } end)
+        {
+            query = query.Where(r => r.CreatedAtUtc <= end);
+        }
+
+        if (surveyId is { } id)
+        {
+            query = query.Where(r => r.SurveyId == id);
+        }
+
+        return await query.OrderByDescending(r => r.CreatedAtUtc).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SurveyRequest>> GetDueAsync(Instant asOf, CancellationToken cancellationToken)
+        => await _db.SurveyRequests
+            .Where(r => r.NextAttemptDueAt != null && r.NextAttemptDueAt <= asOf)
+            .OrderBy(r => r.NextAttemptDueAt)
+            .ToListAsync(cancellationToken);
+}
+
 internal sealed class FeedbackCallRepository : IFeedbackCallRepository
 {
     private readonly AppDbContext _db;
@@ -105,13 +154,25 @@ internal sealed class FeedbackCallRepository : IFeedbackCallRepository
             query = query.Where(c => c.CreatedAtUtc <= end);
         }
 
+        // Through the request, because that is where the questionnaire is recorded. Copying the
+        // survey id onto the attempt would make this a column comparison and a second answer to
+        // the same question, free to disagree with the first.
         if (surveyId is { } id)
         {
-            query = query.Where(c => c.SurveyId == id);
+            query = query.Where(c => _db.SurveyRequests.Any(r => r.Id == c.SurveyRequestId && r.SurveyId == id));
         }
 
         return await query.OrderByDescending(c => c.CreatedAtUtc).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<FeedbackCall>> GetForRequestsAsync(
+        IReadOnlyCollection<int> requestIds, CancellationToken cancellationToken)
+        => requestIds.Count == 0
+            ? []
+            : await _db.FeedbackCalls
+                .Where(c => requestIds.Contains(c.SurveyRequestId))
+                .OrderBy(c => c.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
 }
 
 internal sealed class FeedbackAnswerRepository : IFeedbackAnswerRepository

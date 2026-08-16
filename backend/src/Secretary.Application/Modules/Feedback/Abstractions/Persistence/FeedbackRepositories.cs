@@ -28,12 +28,29 @@ public interface ISurveyQuestionRepository : IRepository<SurveyQuestion>
     Task<bool> HasAnswersAsync(int questionId, CancellationToken cancellationToken);
 }
 
+public interface ISurveyRequestRepository : IRepository<SurveyRequest>
+{
+    /// <summary>Newest first, optionally bounded and optionally one questionnaire — the filters
+    /// the follow-up list and the dashboard both need.</summary>
+    Task<IReadOnlyList<SurveyRequest>> SearchAsync(
+        Instant? from, Instant? to, int? surveyId, CancellationToken cancellationToken);
+
+    /// <summary>Whose next dial is due. What the scheduler will ask for when telephony lands, and
+    /// what makes the retry policy real rather than a number in a settings page.</summary>
+    Task<IReadOnlyList<SurveyRequest>> GetDueAsync(Instant asOf, CancellationToken cancellationToken);
+}
+
 public interface IFeedbackCallRepository : IRepository<FeedbackCall>
 {
     /// <summary>Newest first, optionally bounded and optionally one questionnaire — the two
-    /// filters the calls page and the dashboard both need.</summary>
+    /// filters the calls page and the dashboard both need. The questionnaire is reached through
+    /// the request, which is the only place it is recorded.</summary>
     Task<IReadOnlyList<FeedbackCall>> SearchAsync(
         Instant? from, Instant? to, int? surveyId, CancellationToken cancellationToken);
+
+    /// <summary>Every attempt against the given requests, in one query.</summary>
+    Task<IReadOnlyList<FeedbackCall>> GetForRequestsAsync(
+        IReadOnlyCollection<int> requestIds, CancellationToken cancellationToken);
 }
 
 public interface IFeedbackAnswerRepository : IRepository<FeedbackAnswer>

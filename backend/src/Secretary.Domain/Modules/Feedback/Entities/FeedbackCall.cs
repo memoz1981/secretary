@@ -5,25 +5,23 @@ using NodaTime;
 
 namespace Secretary.Domain.Entities;
 
-/// <summary>One survey call: who it is about, which questionnaire, and what it cost.
+/// <summary>One dial, and what it cost. Who is being rung lives on the SurveyRequest above it.
 ///
-/// ⚠ Created BEFORE the call, not after it. Every other module logs a call when it ends, because
-/// nobody knows who was on the line until the agent works it out. Here the row comes first — the
-/// form (later the scheduler) says who is being rung and about what, and the agent is handed the
-/// id. That ordering is the whole reason this module can become outbound without being rewritten:
-/// outbound's defining feature is not the dialling, it is knowing the subject before the call
-/// starts, and this already does.
+/// ⚠ This used to be both, and the conflation showed up as soon as somebody pressed the button
+/// twice: four dead connections in nine seconds became four "calls" beside one real survey, and
+/// the owner counted five people surveyed where there had been one.
 ///
-/// So the person is named here rather than joined to an ord.Customer or an app.Client. They may
-/// well be one, but the survey does not care and a link would make a demo call depend on a
-/// customer record existing.</summary>
+/// The row is still created BEFORE the call rather than logged after it, which is what the other
+/// modules do. They have to log after, because nobody knows who was on the line until the agent
+/// works it out; here the subject is known before anybody speaks. That ordering is the whole
+/// reason this module becomes outbound without being rewritten.</summary>
 public sealed class FeedbackCall : BaseEntity
 {
     public int TenantId { get; private set; }
-    public int SurveyId { get; private set; }
 
-    public string PersonName { get; private set; }
-    public string PhoneNumber { get; private set; }
+    /// <summary>The person this dial was for. Everything about who they are is over there — a
+    /// copy here would be a second answer to the same question, free to drift.</summary>
+    public int SurveyRequestId { get; private set; }
 
     public FeedbackCallStatus CallStatus { get; private set; }
     public Instant CreatedAtUtc { get; private set; }
@@ -56,34 +54,33 @@ public sealed class FeedbackCall : BaseEntity
         InputTextTokens, CachedInputTextTokens, InputAudioTokens,
         CachedInputAudioTokens, OutputTextTokens, OutputAudioTokens);
 
-    private FeedbackCall()
+    /// <summary>What this dial means for the person it was for.
+    ///
+    /// ⚠ Read from the turn counts, not from a flag the agent sets, because the case that matters
+    /// is the one where the agent never got to set anything. Four rows on 15 August had zero turns
+    /// and zero cost: the line opened and died in two seconds. Nobody was reached and nobody
+    /// decided anything, so those are the only ones worth dialling again.
+    ///
+    /// Anything with turns on it was a conversation that did not finish, and that is Refused
+    /// whether they said no at the start or hung up at question three. There is no partial
+    /// outcome: half a survey is not half a result, and its answers are not reported.</summary>
+    public SurveyRequestOutcome Outcome => CallStatus switch
     {
-        PersonName = string.Empty;
-        PhoneNumber = string.Empty;
-        AgentModel = string.Empty;
-    }
+        FeedbackCallStatus.Completed => SurveyRequestOutcome.Complete,
+        FeedbackCallStatus.NeedsHuman => SurveyRequestOutcome.NeedsHuman,
+        FeedbackCallStatus.Created => SurveyRequestOutcome.NotReached,
+        _ => CallerTurnCount == 0 ? SurveyRequestOutcome.NotReached : SurveyRequestOutcome.Refused,
+    };
 
-    /// <summary>Queued, ready to be dialled. The only thing known at this point is who and which
-    /// questionnaire — everything else is filled in when the call happens.</summary>
-    public static FeedbackCall Queue(
-        int tenantId, int surveyId, string personName, string phoneNumber, Instant now)
+    private FeedbackCall() => AgentModel = string.Empty;
+
+    /// <summary>One dial against a request, queued and not yet made.</summary>
+    public static FeedbackCall Attempt(int tenantId, int surveyRequestId, Instant now)
     {
-        if (string.IsNullOrWhiteSpace(personName))
-        {
-            throw new ArgumentException("A survey call needs somebody to be about.", nameof(personName));
-        }
-
-        if (string.IsNullOrWhiteSpace(phoneNumber))
-        {
-            throw new ArgumentException("A survey call needs a number.", nameof(phoneNumber));
-        }
-
         var call = new FeedbackCall
         {
             TenantId = tenantId,
-            SurveyId = surveyId,
-            PersonName = personName.Trim(),
-            PhoneNumber = phoneNumber.Trim(),
+            SurveyRequestId = surveyRequestId,
             CallStatus = FeedbackCallStatus.Created,
             CreatedAtUtc = now,
         };

@@ -42,6 +42,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Survey> Surveys => Set<Survey>();
     public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
     public DbSet<SurveyQuestionOption> SurveyQuestionOptions => Set<SurveyQuestionOption>();
+    public DbSet<SurveyRequest> SurveyRequests => Set<SurveyRequest>();
     public DbSet<FeedbackCall> FeedbackCalls => Set<FeedbackCall>();
     public DbSet<FeedbackAnswer> FeedbackAnswers => Set<FeedbackAnswer>();
     public DbSet<FeedbackSettings> FeedbackSettings => Set<FeedbackSettings>();
@@ -76,6 +77,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<OrderSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<OrderCall>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<Survey>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<SurveyRequest>().HasQueryFilter(r => r.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<FeedbackCall>().HasQueryFilter(c => c.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<FeedbackSettings>().HasQueryFilter(s => s.TenantId == _currentTenant.TenantId);
 

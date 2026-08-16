@@ -6,6 +6,7 @@ import { NewFeedbackCallPage } from "@/modules/feedback/pages/NewCall";
 import { FeedbackCallsPage } from "@/modules/feedback/pages/FeedbackCalls";
 import { FeedbackCallDetailPage } from "@/modules/feedback/pages/FeedbackCallDetail";
 import { FeedbackDashboardPage } from "@/modules/feedback/pages/FeedbackDashboard";
+import { FeedbackFollowUpPage } from "@/modules/feedback/pages/FollowUp";
 import type { ModuleManifest } from "@/modules/registry";
 
 /** Rəy və məmnuniyyət — the survey line.
@@ -27,6 +28,7 @@ export const feedbackModule: ModuleManifest = {
     { label: t("navFeedbackDashboard"), to: "/feedback/dashboard" },
     { label: t("questionnaires"), to: "/feedback/questionnaires" },
     { label: t("feedbackCalls"), to: "/feedback/calls" },
+    { label: t("followUp"), to: "/feedback/follow-up" },
     ...(role === "Owner" ? [{ label: t("newFeedbackCall"), to: "/feedback/new-call" }] : []),
   ],
 
@@ -68,6 +70,16 @@ export const feedbackModule: ModuleManifest = {
           <RequireRole roles={["Owner", "Staff"]}>
             <RequireModule module="Feedback">
               <FeedbackCallDetailPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
+      <Route
+        path="follow-up"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Feedback">
+              <FeedbackFollowUpPage />
             </RequireModule>
           </RequireRole>
         }

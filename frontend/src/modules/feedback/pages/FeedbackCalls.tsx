@@ -71,6 +71,9 @@ export function FeedbackCallsPage() {
           // number on it is needed.
           { header: t("colPhone"), render: (c) => maskAzPhone(c.phoneNumber), className: "mono muted" },
           { header: t("questionnaire"), render: (c) => c.surveyName },
+          // ⚠ This column is why the split happened. Five rows here on 15 August were one
+          // person and one survey; without the attempt number they read as five surveys.
+          { header: t("attempt"), render: (c) => String(c.attemptNumber), className: "mono" },
           {
             header: t("colStatus"),
             render: (c) => <Pill variant={statusVariant(c.status)}>{t(`feedbackStatus${c.status}`)}</Pill>,

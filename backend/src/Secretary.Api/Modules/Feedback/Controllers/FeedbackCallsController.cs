@@ -35,6 +35,29 @@ public sealed class FeedbackCallsController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await _calls.SearchAsync(from, to, surveyId, cancellationToken));
 
+    /// <summary>The people rather than the dials. One row per person however many times we rang
+    /// them, which is what the follow-up list is for.</summary>
+    [HttpGet("requests")]
+    public async Task<ActionResult<IReadOnlyList<SurveyRequestResponse>>> Requests(
+        [FromQuery] Instant? from, [FromQuery] Instant? to, [FromQuery] int? surveyId,
+        CancellationToken cancellationToken)
+        => Ok(await _calls.SearchRequestsAsync(from, to, surveyId, cancellationToken));
+
+    /// <summary>Ring somebody again. The same method a scheduler will call for a due retry, so a
+    /// manual attempt and an automatic one cannot be counted differently.</summary>
+    [HttpPost("requests/{requestId:int}/retry")]
+    public async Task<ActionResult<FeedbackCallResponse>> Retry(
+        int requestId, CancellationToken cancellationToken)
+        => Ok(await _calls.RetryAsync(requestId, cancellationToken));
+
+    /// <summary>Stop chasing somebody, without recording a survey that never happened.</summary>
+    [HttpPost("requests/{requestId:int}/close")]
+    public async Task<IActionResult> Close(int requestId, CancellationToken cancellationToken)
+    {
+        await _calls.CloseRequestAsync(requestId, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("{id:int}")]
     public async Task<ActionResult<FeedbackCallDetailResponse>> Detail(
         int id, CancellationToken cancellationToken)

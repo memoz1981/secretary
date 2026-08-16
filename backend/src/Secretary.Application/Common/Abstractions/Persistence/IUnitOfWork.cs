@@ -25,6 +25,7 @@ public interface IUnitOfWork
     // Feedback module.
     ISurveyRepository Surveys { get; }
     ISurveyQuestionRepository SurveyQuestions { get; }
+    ISurveyRequestRepository SurveyRequests { get; }
     IFeedbackCallRepository FeedbackCalls { get; }
     IFeedbackAnswerRepository FeedbackAnswers { get; }
     IFeedbackSettingsRepository FeedbackSettings { get; }

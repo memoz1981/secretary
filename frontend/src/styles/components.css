@@ -670,3 +670,41 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
 
 .checkbox-row { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0; }
 .grow { flex: 1; }
+
+/* ---- Charts ----
+   Two forms and one rule: a pie up to three slices, bars above it. See SharePie.tsx — the cap
+   comes from a colour-vision check, not from taste. Both are built from the same three tokens so
+   the pair reads as one family rather than two widgets. */
+.share-pie { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+.share-legend, .share-bars { list-style: none; margin: 0; padding: 0; min-width: 200px; flex: 1; }
+.share-legend li {
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+}
+.share-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+.share-bars li {
+  display: grid; grid-template-columns: minmax(70px, 26%) 1fr auto;
+  align-items: center; gap: var(--space-3); padding: var(--space-1) 0; font-size: var(--text-sm);
+}
+.share-track { background: var(--chart-track); border-radius: var(--radius-sm); height: 10px; }
+.share-fill {
+  display: block; height: 100%; background: var(--chart-bar);
+  /* Rounded at the data end only, so the bar stays anchored to where it starts. */
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0; min-width: 2px;
+}
+.share-label { color: var(--color-ink); }
+.share-legend .share-label { flex: 1; }
+.share-value { color: var(--color-muted); font-size: var(--text-xs); white-space: nowrap; }
+
+/* The one number, and never without what it rests on. */
+.score-figure { font-size: 48px; font-family: var(--font-display); line-height: 1; }
+.score-trend { font-size: var(--text-sm); margin-top: var(--space-2); }
+.score-trend.up { color: var(--color-success); }
+.score-trend.down { color: var(--color-critical); }
+.score-caption { color: var(--color-muted); font-size: var(--text-sm); margin-top: var(--space-1); }
+
+.question-panel { padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+.question-panel:first-of-type { border-top: none; }
+.question-panel h3 { font-size: var(--text-md); margin: 0 0 var(--space-1); }
+.question-panel .meta { color: var(--color-muted); font-size: var(--text-xs); margin-bottom: var(--space-3); }

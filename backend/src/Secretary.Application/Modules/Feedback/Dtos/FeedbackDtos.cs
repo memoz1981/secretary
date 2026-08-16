@@ -25,7 +25,8 @@ public sealed record SurveyQuestionResponse(
     public bool IsScored => QuestionType is FeedbackQuestionType.YesNo or FeedbackQuestionType.Scale;
 }
 
-public sealed record SurveyResponse(int Id, string Name, int QuestionCount);
+public sealed record SurveyResponse(
+    int Id, string Name, int QuestionCount, int RetryCount, int RetryDelayMinutes);
 
 public sealed record SurveyDetailResponse(int Id, string Name, IReadOnlyList<SurveyQuestionResponse> Questions);
 
@@ -62,12 +63,34 @@ public sealed record UpdateFeedbackSettingsRequest(int MaxSurveys);
 /// would have to be asked twice.</summary>
 public sealed record QueueFeedbackCallRequest(int SurveyId, string PersonName, string PhoneNumber);
 
-public sealed record FeedbackCallResponse(
+/// <summary>One person to be surveyed, with every attempt against them rolled up.
+///
+/// This is what the follow-up list is made of, and the reason it exists: five rows for one person
+/// answered "how many times did we ring" as if it were "how many people did we survey".</summary>
+public sealed record SurveyRequestResponse(
     int Id,
     int SurveyId,
     string SurveyName,
     string PersonName,
     string PhoneNumber,
+    SurveyRequestOutcome Outcome,
+    int AttemptCount,
+    Instant CreatedAt,
+    Instant? LastAttemptAt,
+    Instant? NextAttemptDueAt,
+    bool NeedsFollowUp,
+    decimal TotalCostUsd);
+
+public sealed record SaveRetryPolicyRequest(int RetryCount, int RetryDelayMinutes);
+
+public sealed record FeedbackCallResponse(
+    int Id,
+    int SurveyRequestId,
+    int SurveyId,
+    string SurveyName,
+    string PersonName,
+    string PhoneNumber,
+    int AttemptNumber,
     FeedbackCallStatus Status,
     Instant CreatedAt,
     Instant? CompletedAt,
@@ -105,24 +128,36 @@ public sealed record FeedbackCallDetailResponse(
 
 // ---- Dashboard ----
 
-/// <summary>How the agent itself performed, and it does not depend on what was asked — which is
-/// the point. These numbers are comparable across tenants and across questionnaires.</summary>
-public sealed record FeedbackAgentStats(
-    int CallsQueued,
-    int CallsStarted,
-    int CallsCompleted,
-    int CallsAbandoned,
+/// <summary>How many people we set out to survey, and how far we got with them.
+///
+/// Counted in people, never in dials. The version this replaces counted rows in fd.Calls, so four
+/// dead connections in nine seconds read as four surveys attempted — the numerator and the
+/// denominator both wrong, in opposite directions.</summary>
+public sealed record FeedbackCoverage(
+    int Requested,
+    int Completed,
+    int NotReached,
+    int Refused,
+    int NeedsHuman,
+    int Attempts,
     int AverageDurationSeconds,
     decimal TotalCostUsd)
 {
-    /// <summary>Of the calls that got going, how many reached the last question. Null when none
-    /// started, because a percentage of nothing reads as failure.</summary>
-    public decimal? CompletionRate => CallsStarted == 0 ? null : (decimal)CallsCompleted / CallsStarted;
-}
+    /// <summary>People who picked up and engaged. The honest denominator for anything about how
+    /// well the agent does its job.</summary>
+    public int Reached => Completed + Refused + NeedsHuman;
 
-/// <summary>Where people hang up. Question-agnostic, and the most useful thing on the page —
-/// a question that loses a third of callers is a question worth rewriting.</summary>
-public sealed record QuestionDropOff(int QuestionId, int Position, string QuestionText, int Reached, int Answered);
+    /// <summary>Of the people the agent actually spoke to, how many finished.
+    ///
+    /// ⚠ Divided by Reached and never by Requested. A wrong phone number is not the agent failing
+    /// at a conversation, and putting it in this denominator makes the one number that should say
+    /// "is the agent any good" say "is the phone list any good" instead.</summary>
+    public decimal? CompletionRate => Reached == 0 ? null : (decimal)Completed / Reached;
+
+    /// <summary>Of everybody we meant to survey, how many we got a full survey from. The number
+    /// that qualifies the score: 92% from four people out of two hundred is not 92%.</summary>
+    public decimal? ResponseRate => Requested == 0 ? null : (decimal)Completed / Requested;
+}
 
 public sealed record OptionBreakdown(int OptionId, string Text, decimal? ScorePercent, int Count);
 
@@ -142,12 +177,20 @@ public sealed record QuestionResult(
 
 /// <summary>⚠ Open questions are deliberately absent from the charts. There is nothing honest to
 /// plot, and a word cloud is not an answer — they are read on the call detail page instead.</summary>
+/// <param name="ScorePercent">The mean of every answer to a question ticked "counts toward the
+/// score". Null when no question is ticked, or nobody has answered one.</param>
+/// <param name="PreviousScorePercent">The same number over the preceding window of equal length.
+/// Null for an all-time view, where there is no preceding window to compare with.</param>
+/// <param name="ScoreAnswerCount">How many answers the score rests on. Shown beside it always —
+/// a score without its denominator is the number people quote.</param>
 public sealed record FeedbackDashboardResponse(
     int SurveyId,
     string SurveyName,
-    FeedbackAgentStats Agent,
-    IReadOnlyList<QuestionResult> Results,
-    IReadOnlyList<QuestionDropOff> DropOff);
+    decimal? ScorePercent,
+    decimal? PreviousScorePercent,
+    int ScoreAnswerCount,
+    FeedbackCoverage Coverage,
+    IReadOnlyList<QuestionResult> Results);
 
 // ---- The agent's own view of a call in progress ----
 

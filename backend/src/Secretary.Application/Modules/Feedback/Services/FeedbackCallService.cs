@@ -35,31 +35,82 @@ public sealed class FeedbackCallService
 
     // ---- Queueing ----
 
-    /// <summary>Records who is about to be rung, before anybody is. Today the form calls this;
-    /// when telephony lands the scheduler calls exactly the same method.</summary>
+    /// <summary>Records who is about to be rung, before anybody is, and opens the first attempt.
+    /// Today the form calls this; when telephony lands the scheduler calls exactly the same
+    /// method.</summary>
     public async Task<FeedbackCallResponse> QueueAsync(
         QueueFeedbackCallRequest request, CancellationToken cancellationToken)
     {
         var tenantId = _currentTenant.TenantId
             ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
-        var survey = await _uow.Surveys.GetByIdAsync(request.SurveyId, cancellationToken)
-            ?? throw new NotFoundException(nameof(Survey), request.SurveyId);
+        var survey = await RequireAskableSurveyAsync(request.SurveyId, cancellationToken);
+        var now = _clock.GetCurrentInstant();
 
-        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(survey.Id, cancellationToken);
-        if (questions.Count == 0)
+        var surveyRequest = SurveyRequest.Queue(
+            tenantId, survey.Id, request.PersonName,
+            PhoneNumberNormalizer.Normalize(request.PhoneNumber), now);
+
+        await _uow.SurveyRequests.AddAsync(surveyRequest, cancellationToken);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return await DialAsync(surveyRequest, cancellationToken);
+    }
+
+    /// <summary>Rings somebody we already have a request for, again.
+    ///
+    /// The same method the scheduler will call for a due retry and the same one the follow-up
+    /// list calls when a person presses the button. One path, so an automatic retry and a manual
+    /// one cannot count differently.</summary>
+    public async Task<FeedbackCallResponse> RetryAsync(int requestId, CancellationToken cancellationToken)
+    {
+        var surveyRequest = await _uow.SurveyRequests.GetByIdAsync(requestId, cancellationToken)
+            ?? throw new NotFoundException(nameof(SurveyRequest), requestId);
+
+        if (surveyRequest.Outcome is SurveyRequestOutcome.Complete or SurveyRequestOutcome.Refused)
         {
-            throw new ArgumentException("This questionnaire has no questions yet, so there is nothing to ask.");
+            throw new InvalidStateTransitionException(
+                nameof(SurveyRequest), requestId,
+                surveyRequest.Outcome == SurveyRequestOutcome.Complete ? "already surveyed" : "declined",
+                "rung again");
         }
 
-        var call = FeedbackCall.Queue(
-            tenantId, survey.Id, request.PersonName,
-            PhoneNumberNormalizer.Normalize(request.PhoneNumber), _clock.GetCurrentInstant());
+        await RequireAskableSurveyAsync(surveyRequest.SurveyId, cancellationToken);
+        return await DialAsync(surveyRequest, cancellationToken);
+    }
 
+    /// <summary>One attempt: counted on the request, and its own row for what it costs.
+    ///
+    /// ⚠ The attempt is counted before the dial rather than after it. Counting afterwards fails
+    /// open — a dial that never reports back leaves the count untouched and the request eligible
+    /// forever, which is the failure mode where somebody gets rung all night.</summary>
+    private async Task<FeedbackCallResponse> DialAsync(
+        SurveyRequest surveyRequest, CancellationToken cancellationToken)
+    {
+        var now = _clock.GetCurrentInstant();
+
+        surveyRequest.BeginAttempt(now);
+        _uow.SurveyRequests.Update(surveyRequest);
+
+        var call = FeedbackCall.Attempt(surveyRequest.TenantId, surveyRequest.Id, now);
         await _uow.FeedbackCalls.AddAsync(call, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return ToResponse(call, survey.Name, answered: 0, questions.Count);
+        var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
+        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyRequest.SurveyId, cancellationToken);
+
+        return ToResponse(call, surveyRequest, survey?.Name ?? string.Empty, answered: 0, questions.Count);
+    }
+
+    private async Task<Survey> RequireAskableSurveyAsync(int surveyId, CancellationToken cancellationToken)
+    {
+        var survey = await _uow.Surveys.GetByIdAsync(surveyId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Survey), surveyId);
+
+        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(survey.Id, cancellationToken);
+        return questions.Count == 0
+            ? throw new ArgumentException("This questionnaire has no questions yet, so there is nothing to ask.")
+            : survey;
     }
 
     // ---- What the agent can do ----
@@ -69,8 +120,9 @@ public sealed class FeedbackCallService
     public async Task<FeedbackCallSubject> GetSubjectAsync(int callId, CancellationToken cancellationToken)
     {
         var call = await RequireCallAsync(callId, cancellationToken);
-        var survey = await _uow.Surveys.GetByIdAsync(call.SurveyId, cancellationToken);
-        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(call.SurveyId, cancellationToken);
+        var surveyRequest = await RequireRequestAsync(call.SurveyRequestId, cancellationToken);
+        var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
+        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyRequest.SurveyId, cancellationToken);
 
         if (call.CallStatus == FeedbackCallStatus.Created)
         {
@@ -79,7 +131,8 @@ public sealed class FeedbackCallService
             await _uow.SaveChangesAsync(cancellationToken);
         }
 
-        return new FeedbackCallSubject(call.Id, call.PersonName, survey?.Name ?? string.Empty, questions.Count);
+        return new FeedbackCallSubject(
+            call.Id, surveyRequest.PersonName, survey?.Name ?? string.Empty, questions.Count);
     }
 
     /// <summary>The next question nobody has answered yet, in running order. Null when the last
@@ -88,7 +141,8 @@ public sealed class FeedbackCallService
     public async Task<FeedbackQuestionForAgent?> GetNextQuestionAsync(int callId, CancellationToken cancellationToken)
     {
         var call = await RequireCallAsync(callId, cancellationToken);
-        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(call.SurveyId, cancellationToken);
+        var surveyRequest = await RequireRequestAsync(call.SurveyRequestId, cancellationToken);
+        var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyRequest.SurveyId, cancellationToken);
         var answered = (await _uow.FeedbackAnswers.GetForCallAsync(callId, cancellationToken))
             .Select(a => a.SurveyQuestionId)
             .ToHashSet();
@@ -100,7 +154,10 @@ public sealed class FeedbackCallService
             {
                 call.Complete(_clock.GetCurrentInstant());
                 _uow.FeedbackCalls.Update(call);
-                await _uow.SaveChangesAsync(cancellationToken);
+
+                // Settled here rather than when the call ends, because reaching the last question
+                // is what completion means and the line may drop during the thank-you.
+                await SettleAsync(surveyRequest, call, cancellationToken);
             }
 
             return null;
@@ -212,6 +269,28 @@ public sealed class FeedbackCallService
         var call = await RequireCallAsync(callId, cancellationToken);
         call.HandOverToHuman(_clock.GetCurrentInstant());
         _uow.FeedbackCalls.Update(call);
+
+        await SettleAsync(await RequireRequestAsync(call.SurveyRequestId, cancellationToken), call, cancellationToken);
+    }
+
+    /// <summary>Carries an attempt's outcome up to the person it was for, and decides whether
+    /// there will be another attempt.
+    ///
+    /// The retry policy is read from the questionnaire at the moment it is applied, not copied
+    /// onto the request when it was queued — an owner who turns retries off means it for the
+    /// people already waiting, not only for the next ones.</summary>
+    private async Task SettleAsync(
+        SurveyRequest surveyRequest, FeedbackCall call, CancellationToken cancellationToken)
+    {
+        var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
+
+        surveyRequest.Settle(
+            call.Outcome,
+            survey?.RetryCount ?? 0,
+            survey?.RetryDelayMinutes ?? Survey.DefaultRetryDelayMinutes,
+            _clock.GetCurrentInstant());
+
+        _uow.SurveyRequests.Update(surveyRequest);
         await _uow.SaveChangesAsync(cancellationToken);
     }
 
@@ -237,7 +316,12 @@ public sealed class FeedbackCallService
             _pricebook.CostUsd(usages), _clock.GetCurrentInstant());
 
         _uow.FeedbackCalls.Update(call);
-        await _uow.SaveChangesAsync(cancellationToken);
+
+        // ⚠ Settled again here, after the counts are on the row. The outcome of a dial that never
+        // got anywhere is only knowable once the turn counts are written — before Finish, a line
+        // that opened and died looks identical to one still in progress.
+        await SettleAsync(
+            await RequireRequestAsync(call.SurveyRequestId, cancellationToken), call, cancellationToken);
     }
 
     // ---- Reading ----
@@ -252,30 +336,74 @@ public sealed class FeedbackCallService
         }
 
         var surveys = (await _uow.Surveys.GetAllForCurrentTenantAsync(cancellationToken)).ToDictionary(s => s.Id);
+        var requests = (await _uow.SurveyRequests.SearchAsync(null, null, surveyId, cancellationToken))
+            .ToDictionary(r => r.Id);
+
         var answers = (await _uow.FeedbackAnswers.GetForCallsAsync(calls.Select(c => c.Id).ToList(), cancellationToken))
             .GroupBy(a => a.FeedbackCallId)
             .ToDictionary(g => g.Key, g => g.Count());
 
         var questionCounts = new Dictionary<int, int>();
-        foreach (var surveyId2 in calls.Select(c => c.SurveyId).Distinct())
+        foreach (var id in requests.Values.Select(r => r.SurveyId).Distinct())
         {
-            questionCounts[surveyId2] = (await _uow.SurveyQuestions.GetForSurveyAsync(surveyId2, cancellationToken)).Count;
+            questionCounts[id] = (await _uow.SurveyQuestions.GetForSurveyAsync(id, cancellationToken)).Count;
         }
 
         return calls
-            .Select(c => ToResponse(
-                c,
-                surveys.GetValueOrDefault(c.SurveyId)?.Name ?? string.Empty,
-                answers.GetValueOrDefault(c.Id),
-                questionCounts.GetValueOrDefault(c.SurveyId)))
+            .Where(c => requests.ContainsKey(c.SurveyRequestId))
+            .Select(c =>
+            {
+                var surveyRequest = requests[c.SurveyRequestId];
+                return ToResponse(
+                    c,
+                    surveyRequest,
+                    surveys.GetValueOrDefault(surveyRequest.SurveyId)?.Name ?? string.Empty,
+                    answers.GetValueOrDefault(c.Id),
+                    questionCounts.GetValueOrDefault(surveyRequest.SurveyId));
+            })
             .ToList();
+    }
+
+    /// <summary>The people, not the dials. What the follow-up list reads.</summary>
+    public async Task<IReadOnlyList<SurveyRequestResponse>> SearchRequestsAsync(
+        Instant? from, Instant? to, int? surveyId, CancellationToken cancellationToken)
+    {
+        var requests = await _uow.SurveyRequests.SearchAsync(from, to, surveyId, cancellationToken);
+        if (requests.Count == 0)
+        {
+            return [];
+        }
+
+        var surveys = (await _uow.Surveys.GetAllForCurrentTenantAsync(cancellationToken)).ToDictionary(s => s.Id);
+        var calls = await _uow.FeedbackCalls.GetForRequestsAsync(requests.Select(r => r.Id).ToList(), cancellationToken);
+        var costByRequest = calls
+            .GroupBy(c => c.SurveyRequestId)
+            .ToDictionary(g => g.Key, g => g.Sum(c => c.CostUsd));
+
+        return requests
+            .Select(r => new SurveyRequestResponse(
+                r.Id, r.SurveyId, surveys.GetValueOrDefault(r.SurveyId)?.Name ?? string.Empty,
+                r.PersonName, r.PhoneNumber, r.Outcome, r.AttemptCount, r.CreatedAtUtc,
+                r.LastAttemptAt, r.NextAttemptDueAt, r.NeedsFollowUp,
+                costByRequest.GetValueOrDefault(r.Id)))
+            .ToList();
+    }
+
+    /// <summary>Stops chasing somebody without pretending the survey happened.</summary>
+    public async Task CloseRequestAsync(int requestId, CancellationToken cancellationToken)
+    {
+        var surveyRequest = await RequireRequestAsync(requestId, cancellationToken);
+        surveyRequest.CloseWithoutAnswer(_clock.GetCurrentInstant());
+        _uow.SurveyRequests.Update(surveyRequest);
+        await _uow.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<FeedbackCallDetailResponse> GetDetailAsync(int callId, CancellationToken cancellationToken)
     {
         var call = await RequireCallAsync(callId, cancellationToken);
-        var survey = await _uow.Surveys.GetByIdAsync(call.SurveyId, cancellationToken);
-        var questions = (await _uow.SurveyQuestions.GetForSurveyAsync(call.SurveyId, cancellationToken))
+        var surveyRequest = await RequireRequestAsync(call.SurveyRequestId, cancellationToken);
+        var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
+        var questions = (await _uow.SurveyQuestions.GetForSurveyAsync(surveyRequest.SurveyId, cancellationToken))
             .ToDictionary(q => q.Id);
 
         var answers = await _uow.FeedbackAnswers.GetForCallAsync(callId, cancellationToken);
@@ -301,16 +429,18 @@ public sealed class FeedbackCallService
             .ToList();
 
         return new FeedbackCallDetailResponse(
-            ToResponse(call, survey?.Name ?? string.Empty, answers.Count, questions.Count),
+            ToResponse(call, surveyRequest, survey?.Name ?? string.Empty, answers.Count, questions.Count),
             detailed,
             call.Transcript);
     }
 
-    /// <summary>The dashboard, generated from the questionnaire rather than designed for it.
+    /// <summary>The dashboard: what the customers said, generated from the questionnaire rather
+    /// than designed for it.
     ///
-    /// Two halves that answer different people. The agent statistics are the same shape whatever
-    /// was asked, so they say whether the thing works. The per-question results say what the
-    /// customers think.
+    /// ⚠ Only completed surveys contribute answers. A survey that stopped half way is not half a
+    /// result — its answers are the ones somebody gave before deciding not to continue, and
+    /// including them would mean the numbers are made partly of people who did not want to be
+    /// there. That is also why there is no "partial" outcome to include.
     ///
     /// ⚠ Open questions are absent from the results on purpose. There is nothing honest to chart
     /// from free text, and inventing a summary of it is exactly the failure this codebase keeps
@@ -321,32 +451,71 @@ public sealed class FeedbackCallService
         var survey = await _uow.Surveys.GetByIdAsync(surveyId, cancellationToken)
             ?? throw new NotFoundException(nameof(Survey), surveyId);
 
-        var calls = await _uow.FeedbackCalls.SearchAsync(from, to, surveyId, cancellationToken);
         var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyId, cancellationToken);
-        var answers = await _uow.FeedbackAnswers.GetForCallsAsync(calls.Select(c => c.Id).ToList(), cancellationToken);
+        var now = await AggregateAsync(surveyId, from, to, questions, cancellationToken);
 
-        var started = calls.Count(c => c.CallStatus is FeedbackCallStatus.InProgress
-                                       or FeedbackCallStatus.Completed or FeedbackCallStatus.Abandoned);
+        // The same window again, immediately before this one. A score with no trend beside it is
+        // a number nobody can act on: 78% is good or bad depending entirely on last month.
+        decimal? previous = null;
+        if (from is { } start)
+        {
+            var window = (to ?? _clock.GetCurrentInstant()) - start;
+            previous = (await AggregateAsync(surveyId, start - window, start, questions, cancellationToken))
+                .ScorePercent;
+        }
 
-        var withDuration = calls.Where(c => c.DurationSeconds > 0).ToList();
+        return new FeedbackDashboardResponse(
+            survey.Id, survey.Name, now.ScorePercent, previous, now.ScoreAnswerCount,
+            now.Coverage, now.Results);
+    }
 
-        var agent = new FeedbackAgentStats(
-            CallsQueued: calls.Count,
-            CallsStarted: started,
-            CallsCompleted: calls.Count(c => c.CallStatus == FeedbackCallStatus.Completed),
-            CallsAbandoned: calls.Count(c => c.CallStatus == FeedbackCallStatus.Abandoned),
-            AverageDurationSeconds: withDuration.Count == 0 ? 0 : (int)withDuration.Average(c => c.DurationSeconds),
+    private sealed record Aggregate(
+        FeedbackCoverage Coverage,
+        IReadOnlyList<QuestionResult> Results,
+        decimal? ScorePercent,
+        int ScoreAnswerCount);
+
+    private async Task<Aggregate> AggregateAsync(
+        int surveyId, Instant? from, Instant? to,
+        IReadOnlyList<SurveyQuestion> questions, CancellationToken cancellationToken)
+    {
+        var requests = await _uow.SurveyRequests.SearchAsync(from, to, surveyId, cancellationToken);
+        var calls = await _uow.FeedbackCalls.GetForRequestsAsync(requests.Select(r => r.Id).ToList(), cancellationToken);
+
+        var completed = requests.Where(r => r.Outcome == SurveyRequestOutcome.Complete).Select(r => r.Id).ToHashSet();
+        var countedCalls = calls.Where(c => completed.Contains(c.SurveyRequestId)).Select(c => c.Id).ToList();
+        var answers = await _uow.FeedbackAnswers.GetForCallsAsync(countedCalls, cancellationToken);
+
+        var spoken = calls.Where(c => c.DurationSeconds > 0).ToList();
+
+        var coverage = new FeedbackCoverage(
+            Requested: requests.Count,
+            Completed: completed.Count,
+            NotReached: requests.Count(r => r.Outcome == SurveyRequestOutcome.NotReached),
+            Refused: requests.Count(r => r.Outcome == SurveyRequestOutcome.Refused),
+            NeedsHuman: requests.Count(r => r.Outcome == SurveyRequestOutcome.NeedsHuman),
+            Attempts: calls.Count,
+            AverageDurationSeconds: spoken.Count == 0 ? 0 : (int)spoken.Average(c => c.DurationSeconds),
             TotalCostUsd: calls.Sum(c => c.CostUsd));
 
         var byQuestion = answers.GroupBy(a => a.SurveyQuestionId).ToDictionary(g => g.Key, g => g.ToList());
 
         var results = questions
-            .Where(q => q.QuestionType == FeedbackQuestionType.Choice)
+            .Where(q => q.QuestionType != FeedbackQuestionType.Open)
             .Select(q => BuildResult(q, byQuestion.GetValueOrDefault(q.Id) ?? []))
             .ToList();
 
-        return new FeedbackDashboardResponse(
-            survey.Id, survey.Name, agent, results, BuildDropOff(questions, answers));
+        // ⚠ The mean of the ANSWERS, not the mean of the question averages. Averaging averages
+        // gives a five-answer question the same weight as a fifty-answer one, which is how a
+        // question nobody reaches ends up steering the headline.
+        var counted = results.Where(r => r.CountsTowardScore && r.AveragePercent is not null).ToList();
+        var answerCount = counted.Sum(r => r.AnsweredCount);
+
+        var scorePercent = answerCount == 0
+            ? (decimal?)null
+            : Math.Round(counted.Sum(r => r.AveragePercent!.Value * r.AnsweredCount) / answerCount, 2);
+
+        return new Aggregate(coverage, results, scorePercent, answerCount);
     }
 
     private static QuestionResult BuildResult(SurveyQuestion question, IReadOnlyList<FeedbackAnswer> answers)
@@ -386,33 +555,10 @@ public sealed class FeedbackCallService
             breakdown);
     }
 
-    /// <summary>Where callers stop, and the most useful thing on the page — it needs no knowledge
-    /// of what was asked.
-    ///
-    /// A caller reached a question if they answered it, or answered any question after it: the
-    /// agent works strictly in order, so getting to question four means questions one to three
-    /// were put. Reached minus answered is the number of people who hung up on that question.</summary>
-    private static IReadOnlyList<QuestionDropOff> BuildDropOff(
-        IReadOnlyList<SurveyQuestion> questions, IReadOnlyList<FeedbackAnswer> answers)
-    {
-        var positions = questions.ToDictionary(q => q.Id, q => q.Position);
-
-        var furthest = answers
-            .GroupBy(a => a.FeedbackCallId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Max(a => positions.TryGetValue(a.SurveyQuestionId, out var p) ? p : -1));
-
-        return questions
-            .Select(q => new QuestionDropOff(
-                q.Id,
-                q.Position,
-                q.Text,
-                // They got as far as the previous question, so this one was asked of them.
-                Reached: furthest.Count(f => f.Value >= q.Position - 1),
-                Answered: answers.Count(a => a.SurveyQuestionId == q.Id)))
-            .ToList();
-    }
+    // Per-question drop-off used to be computed here and was the biggest panel on the page. It is
+    // gone: it mixed people who were never reached into a rate about question wording, and now
+    // that only completed surveys contribute answers there is by definition nowhere to drop off.
+    // Who still needs dealing with is a list of people, not a chart — see SearchRequestsAsync.
 
     /// <summary>A number the caller said, as digits or as an Azerbaijani word. Only 1–10 — a
     /// rating scale never runs past it, and neither does a list of options anybody could hold in
@@ -444,10 +590,16 @@ public sealed class FeedbackCallService
         => await _uow.FeedbackCalls.GetByIdAsync(callId, cancellationToken)
            ?? throw new NotFoundException(nameof(FeedbackCall), callId);
 
+    private async Task<SurveyRequest> RequireRequestAsync(int requestId, CancellationToken cancellationToken)
+        => await _uow.SurveyRequests.GetByIdAsync(requestId, cancellationToken)
+           ?? throw new NotFoundException(nameof(SurveyRequest), requestId);
+
     private static FeedbackCallResponse ToResponse(
-        FeedbackCall call, string surveyName, int answered, int questionCount)
+        FeedbackCall call, SurveyRequest surveyRequest, string surveyName, int answered, int questionCount)
         => new(
-            call.Id, call.SurveyId, surveyName, call.PersonName, call.PhoneNumber, call.CallStatus,
-            call.CreatedAtUtc, call.CompletedAt, call.DurationSeconds, call.TurnCount, call.CallerTurnCount,
-            call.AgentModel, call.Pipeline, call.TokenUsage, call.CostUsd, answered, questionCount);
+            call.Id, surveyRequest.Id, surveyRequest.SurveyId, surveyName,
+            surveyRequest.PersonName, surveyRequest.PhoneNumber, surveyRequest.AttemptCount,
+            call.CallStatus, call.CreatedAtUtc, call.CompletedAt, call.DurationSeconds,
+            call.TurnCount, call.CallerTurnCount, call.AgentModel, call.Pipeline, call.TokenUsage,
+            call.CostUsd, answered, questionCount);
 }

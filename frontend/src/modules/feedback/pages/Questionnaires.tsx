@@ -19,6 +19,7 @@ import {
   getSurveys,
   removeQuestion,
   removeSurvey,
+  setRetryPolicy,
   reorderQuestions,
   updateQuestion,
 } from "@/modules/feedback/api/feedback";
@@ -49,6 +50,7 @@ export function QuestionnairesPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [namingNew, setNamingNew] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<SurveyQuestionResponse | "new" | null>(null);
+  const [editingRetries, setEditingRetries] = useState<SurveyResponse | null>(null);
 
   const surveys = useApiData(() => getSurveys(token!), [token, refreshKey]);
   const quota = useApiData(() => getSurveyQuota(token!), [token, refreshKey]);
@@ -120,12 +122,31 @@ export function QuestionnairesPage() {
           columns={[
             { header: t("name"), render: (s) => s.name },
             { header: t("colQuestions"), render: (s) => String(s.questionCount), className: "mono" },
+            {
+              header: t("retries"),
+              render: (s) =>
+                s.retryCount === 0
+                  ? t("noRetries")
+                  : t("retryPolicySummary")
+                      .replace("{n}", String(s.retryCount))
+                      .replace("{m}", String(s.retryDelayMinutes)),
+              className: "mono",
+            },
             ...(canEdit
               ? [
                   {
                     header: "",
                     render: (s: SurveyResponse) => (
                       <span className="row-actions">
+                        <button
+                          className="link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingRetries(s);
+                          }}
+                        >
+                          {t("retries")}
+                        </button>
                         <button
                           className="link danger"
                           onClick={async (e) => {
@@ -250,6 +271,17 @@ export function QuestionnairesPage() {
           onSaved={(id) => {
             setNamingNew(false);
             setSelectedId(id);
+            refresh();
+          }}
+        />
+      )}
+
+      {editingRetries && (
+        <RetryPolicyEditor
+          survey={editingRetries}
+          onClose={() => setEditingRetries(null)}
+          onSaved={() => {
+            setEditingRetries(null);
             refresh();
           }}
         />
@@ -489,6 +521,78 @@ function QuestionEditor({
           </>
         )}
 
+        <div className="panel-actions">
+          <Button type="submit" disabled={submitting}>
+            {t("save")}
+          </Button>
+        </div>
+      </form>
+    </SidePanel>
+  );
+}
+
+/** How hard to chase somebody who never answered.
+ *
+ * ⚠ Applies to nobody who did. A caller who picked up and could not be understood is handed to a
+ * person, and dialling them again with the same agent would fail identically — a second identical
+ * call is how a survey becomes a nuisance. Said on the panel, because the setting reads as if it
+ * governs every failed call and it does not.
+ *
+ * Both fields are pickers rather than number boxes. This module has already shipped one free
+ * numeric input that produced a live questionnaire scoring Bəli=1, Xeyr=2. */
+function RetryPolicyEditor({
+  survey,
+  onClose,
+  onSaved,
+}: {
+  survey: SurveyResponse;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { token } = useAuth();
+  const { t } = useLanguage();
+  const [retryCount, setRetryCount] = useState(survey.retryCount);
+  const [delay, setDelay] = useState(survey.retryDelayMinutes);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await setRetryPolicy(token!, survey.id, { retryCount, retryDelayMinutes: delay });
+      onSaved();
+    } catch {
+      // The banner has it.
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <SidePanel title={t("retries")} onClose={onClose}>
+      <form onSubmit={handleSubmit}>
+        <SelectField
+          label={t("retryCount")}
+          value={String(retryCount)}
+          options={[0, 1, 2, 3, 4, 5].map((n) => ({
+            value: String(n),
+            label: n === 0 ? t("noRetries") : String(n),
+          }))}
+          onChange={(e) => setRetryCount(Number(e.target.value))}
+        />
+        {retryCount > 0 && (
+          <SelectField
+            label={t("retryDelay")}
+            value={String(delay)}
+            options={[15, 30, 60, 180, 360, 1440, 2880].map((m) => ({
+              value: String(m),
+              label: m < 60 ? `${m} dəq` : m < 1440 ? `${m / 60} saat` : `${m / 1440} gün`,
+            }))}
+            onChange={(e) => setDelay(Number(e.target.value))}
+          />
+        )}
+        <div className="note">{t("retriesExplain")}</div>
+        <div className="note">{t("scheduledDialsWaitForTelephony")}</div>
         <div className="panel-actions">
           <Button type="submit" disabled={submitting}>
             {t("save")}

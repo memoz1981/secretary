@@ -6,9 +6,11 @@ import type {
   FeedbackSettingsResponse,
   QueueFeedbackCallRequest,
   SaveQuestionRequest,
+  SaveRetryPolicyRequest,
   SaveSurveyRequest,
   SurveyDetailResponse,
   SurveyQuestionResponse,
+  SurveyRequestResponse,
   SurveyResponse,
 } from "@/shared/api/types";
 
@@ -32,6 +34,16 @@ export function createSurvey(token: string, request: SaveSurveyRequest) {
 
 export function renameSurvey(token: string, id: number, request: SaveSurveyRequest) {
   return apiFetch<SurveyResponse>(`/api/feedback/surveys/${id}`, { method: "PUT", body: request, token });
+}
+
+/** How many times to ring somebody who never answered, and how long to leave it. Per
+ *  questionnaire — a service follow-up and a sales follow-up are not chased alike. */
+export function setRetryPolicy(token: string, id: number, request: SaveRetryPolicyRequest) {
+  return apiFetch<SurveyResponse>(`/api/feedback/surveys/${id}/retry-policy`, {
+    method: "PUT",
+    body: request,
+    token,
+  });
 }
 
 export function removeSurvey(token: string, id: number) {
@@ -95,4 +107,29 @@ export function getFeedbackDashboard(token: string, surveyId: number, params: { 
     `/api/feedback/calls/dashboard/${surveyId}${toQueryString({ ...params })}`,
     { token },
   );
+}
+
+// ---- The people, rather than the dials ----
+
+/** One row per person however many times we rang them. What the follow-up list is made of, and
+ *  the answer to "how many people did we survey" that five rows for one person got wrong. */
+export function getSurveyRequests(token: string, params: FeedbackCallSearchParams) {
+  return apiFetch<SurveyRequestResponse[]>(
+    `/api/feedback/calls/requests${toQueryString({ ...params })}`,
+    { token },
+  );
+}
+
+/** Ring somebody again. The same endpoint a scheduler will use for a due retry, so a manual
+ *  attempt and an automatic one cannot be counted differently. */
+export function retryRequest(token: string, requestId: number) {
+  return apiFetch<FeedbackCallResponse>(`/api/feedback/calls/requests/${requestId}/retry`, {
+    method: "POST",
+    token,
+  });
+}
+
+/** Stop chasing somebody, without recording a survey that never happened. */
+export function closeRequest(token: string, requestId: number) {
+  return apiFetch<void>(`/api/feedback/calls/requests/${requestId}/close`, { method: "POST", token });
 }

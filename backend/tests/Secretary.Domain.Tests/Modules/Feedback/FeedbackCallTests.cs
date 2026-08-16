@@ -13,8 +13,7 @@ public sealed class FeedbackCallTests
 {
     private static readonly Instant Now = Instant.FromUnixTimeSeconds(1_754_000_000);
 
-    private static FeedbackCall Queued()
-        => FeedbackCall.Queue(1, 2, "Mehdi", "+994502505832", Now);
+    private static FeedbackCall Queued() => FeedbackCall.Attempt(tenantId: 1, surveyRequestId: 2, Now);
 
     [Fact]
     public void A_queued_call_has_not_happened_yet()
@@ -87,12 +86,35 @@ public sealed class FeedbackCallTests
         call.CallStatus.ShouldBe(FeedbackCallStatus.Completed);
     }
 
+    /// <summary>What a dial means for the person it was for, and the reason it is read from the
+    /// turn counts rather than from a flag.
+    ///
+    /// ⚠ Four rows on 15 August had zero turns and zero cost — the line opened and died in two
+    /// seconds. Nobody was reached and nobody decided anything, and those are the only ones worth
+    /// dialling again. Anything with a caller turn on it was a conversation that did not finish.</summary>
     [Fact]
-    public void A_call_needs_somebody_to_be_about_and_a_number_to_reach_them_on()
+    public void A_dial_that_produced_nothing_reached_nobody()
     {
-        Should.Throw<ArgumentException>(() => FeedbackCall.Queue(1, 2, "  ", "+994502505832", Now));
-        Should.Throw<ArgumentException>(() => FeedbackCall.Queue(1, 2, "Mehdi", "  ", Now));
+        var call = Queued();
+        call.Begin(Now);
+        call.Finish(2, 0, 0, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0m, Now);
+
+        call.Outcome.ShouldBe(SurveyRequestOutcome.NotReached);
     }
+
+    [Fact]
+    public void A_dial_they_answered_and_abandoned_is_not_retried()
+    {
+        var call = Queued();
+        call.Begin(Now);
+        call.Finish(40, 4, 3, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.02m, Now);
+
+        call.Outcome.ShouldBe(SurveyRequestOutcome.Refused);
+    }
+
+    [Fact]
+    public void A_queued_dial_that_never_happened_reached_nobody()
+        => Queued().Outcome.ShouldBe(SurveyRequestOutcome.NotReached);
 
     [Fact]
     public void A_call_cannot_finish_with_negative_figures()

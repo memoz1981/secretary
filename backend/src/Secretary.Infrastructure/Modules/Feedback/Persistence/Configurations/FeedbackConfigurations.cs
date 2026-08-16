@@ -69,14 +69,35 @@ public sealed class FeedbackSettingsConfiguration : IEntityTypeConfiguration<Fee
     }
 }
 
+public sealed class SurveyRequestConfiguration : IEntityTypeConfiguration<SurveyRequest>
+{
+    public void Configure(EntityTypeBuilder<SurveyRequest> builder)
+    {
+        builder.ToTable("Requests", DbSchemas.Feedback);
+        builder.ConfigureBaseEntity();
+        builder.Property(r => r.PersonName).HasMaxLength(200).IsRequired();
+        builder.Property(r => r.PhoneNumber).HasMaxLength(32).IsRequired();
+
+        builder.Ignore(r => r.NeedsFollowUp);
+
+        builder.HasIndex(r => new { r.TenantId, r.CreatedAtUtc });
+        builder.HasIndex(r => r.SurveyId);
+
+        // The scheduler's only query: whose next dial is due. Filtered so the index covers the
+        // handful of rows waiting rather than every survey ever run.
+        builder.HasIndex(r => r.NextAttemptDueAt).HasFilter("[NextAttemptDueAt] IS NOT NULL");
+
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(r => r.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Survey>().WithMany().HasForeignKey(r => r.SurveyId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class FeedbackCallConfiguration : IEntityTypeConfiguration<FeedbackCall>
 {
     public void Configure(EntityTypeBuilder<FeedbackCall> builder)
     {
         builder.ToTable("Calls", DbSchemas.Feedback);
         builder.ConfigureBaseEntity();
-        builder.Property(c => c.PersonName).HasMaxLength(200).IsRequired();
-        builder.Property(c => c.PhoneNumber).HasMaxLength(32).IsRequired();
         builder.Property(c => c.AgentModel).HasMaxLength(64).IsRequired();
 
         // Same precision and the same reason as the other call logs: a call costs cents, the
@@ -84,12 +105,17 @@ public sealed class FeedbackCallConfiguration : IEntityTypeConfiguration<Feedbac
         builder.Property(c => c.CostUsd).HasPrecision(18, 8);
 
         builder.Ignore(c => c.TokenUsage);
+        builder.Ignore(c => c.Outcome);
 
         builder.HasIndex(c => new { c.TenantId, c.CreatedAtUtc });
-        builder.HasIndex(c => c.SurveyId);
+        builder.HasIndex(c => c.SurveyRequestId);
 
         builder.HasOne<Tenant>().WithMany().HasForeignKey(c => c.TenantId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Survey>().WithMany().HasForeignKey(c => c.SurveyId).OnDelete(DeleteBehavior.Restrict);
+
+        // Cascade: an attempt without the person it was for is nothing. The answers under it are
+        // restricted separately, so a request with results still cannot be deleted by accident.
+        builder.HasOne<SurveyRequest>().WithMany().HasForeignKey(c => c.SurveyRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
