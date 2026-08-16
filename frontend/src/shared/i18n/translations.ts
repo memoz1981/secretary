@@ -734,6 +734,7 @@ export const translations = {
   feedbackStatusInProgress: { az: "Davam edir", ru: "Идёт", en: "In progress" },
   feedbackStatusCompleted: { az: "Tamamlandı", ru: "Завершён", en: "Completed" },
   feedbackStatusAbandoned: { az: "Yarımçıq", ru: "Прерван", en: "Abandoned" },
+  feedbackStatusNeedsHuman: { az: "Operator lazımdır", ru: "Нужен оператор", en: "Needs a person" },
   colAnswered: { az: "Cavablar", ru: "Ответы", en: "Answered" },
   backToCalls: { az: "Zənglərə qayıt", ru: "К звонкам", en: "Back to calls" },
   answers: { az: "Cavablar", ru: "Ответы", en: "Answers" },

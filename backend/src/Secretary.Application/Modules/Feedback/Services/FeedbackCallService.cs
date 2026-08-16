@@ -107,7 +107,7 @@ public sealed class FeedbackCallService
         }
 
         return new FeedbackQuestionForAgent(
-            next.Id, next.Position, next.Text, next.QuestionType,
+            next.Id, next.Position, next.Text, next.QuestionType, next.ScaleMax, next.AllowOther,
             next.Options.OrderBy(o => o.Position)
                 .Select(o => new SurveyOptionResponse(o.Id, o.Position, o.Text, o.ScorePercent, o.IsOther))
                 .ToList());
@@ -186,6 +186,24 @@ public sealed class FeedbackCallService
     public async Task RecordDeclineAsync(int callId, int questionId, CancellationToken cancellationToken)
         => await RecordAsync(
             FeedbackAnswer.Refused(callId, questionId, _clock.GetCurrentInstant()), cancellationToken);
+
+    /// <summary>Their own answer, on a question that invited one. Both halves are kept — the
+    /// option so the count is right, the words so the count means something.</summary>
+    public async Task RecordOtherAsync(
+        int callId, int questionId, int optionId, string text, CancellationToken cancellationToken)
+        => await RecordAsync(
+            FeedbackAnswer.ChoseOther(callId, questionId, optionId, text, _clock.GetCurrentInstant()),
+            cancellationToken);
+
+    /// <summary>The survey broke down. Marked here rather than left to the agent to describe,
+    /// because "a person will call you" has to be true of a row somebody can find.</summary>
+    public async Task HandOverToHumanAsync(int callId, CancellationToken cancellationToken)
+    {
+        var call = await RequireCallAsync(callId, cancellationToken);
+        call.HandOverToHuman(_clock.GetCurrentInstant());
+        _uow.FeedbackCalls.Update(call);
+        await _uow.SaveChangesAsync(cancellationToken);
+    }
 
     private async Task RecordAsync(FeedbackAnswer answer, CancellationToken cancellationToken)
     {

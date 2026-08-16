@@ -107,8 +107,24 @@ public sealed class FeedbackCall : BaseEntity
         Touch(now);
     }
 
+    /// <summary>The survey could not go on: an answer was put twice and understood neither time.
+    ///
+    /// Distinct from abandoned, and the distinction is what happens next. Abandoned is retryable —
+    /// a line dropped, a bad moment. This is not: the same agent ringing again would fail the same
+    /// way, so it goes to a person.</summary>
+    public void HandOverToHuman(Instant now)
+    {
+        if (CallStatus != FeedbackCallStatus.Completed)
+        {
+            CallStatus = FeedbackCallStatus.NeedsHuman;
+        }
+
+        Touch(now);
+    }
+
     /// <summary>Written when the call ends, whatever happened. Completed is not overwritten — a
-    /// survey answered to the last question and then hung up on is finished, not abandoned.</summary>
+    /// survey answered to the last question and then hung up on is finished, not abandoned. Nor is
+    /// NeedsHuman, or the hand-over would be lost the moment the line closed.</summary>
     public void Finish(
         int durationSeconds, int turnCount, int callerTurnCount, string? transcript,
         string agentModel, CallPipeline pipeline, TokenUsage usage, decimal costUsd, Instant now)
@@ -118,7 +134,7 @@ public sealed class FeedbackCall : BaseEntity
             throw new ArgumentOutOfRangeException(nameof(durationSeconds), "A call cannot have negative figures.");
         }
 
-        if (CallStatus != FeedbackCallStatus.Completed)
+        if (CallStatus is not (FeedbackCallStatus.Completed or FeedbackCallStatus.NeedsHuman))
         {
             CallStatus = FeedbackCallStatus.Abandoned;
         }

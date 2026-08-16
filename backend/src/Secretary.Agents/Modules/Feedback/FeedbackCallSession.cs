@@ -30,8 +30,8 @@ public sealed class FeedbackCallSession
         return _failedAttempts[questionId] >= MaxAttemptsPerQuestion;
     }
 
-    /// <summary>Two goes at understanding an answer. A third reading of the same options is a
-    /// caller being argued with.</summary>
+    /// <summary>Two goes at understanding an answer: the first, and one repeat. A third reading
+    /// of the same question is a caller being argued with by a machine.</summary>
     private const int MaxAttemptsPerQuestion = 2;
 
     /// <summary>The id, or a refusal. A survey tool without one has nothing to record against,

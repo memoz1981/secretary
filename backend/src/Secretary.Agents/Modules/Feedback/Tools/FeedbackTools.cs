@@ -31,8 +31,8 @@ public sealed class FeedbackTools
         _escalation = escalation;
     }
 
-    [Description("The next question to ask, with its options. Call it once, ask what it returns, then record the "
-                 + "answer before calling it again.")]
+    [Description("The next question to ask. Call it once, ask what it returns, then record the answer before "
+                 + "calling it again.")]
     public async Task<string> GetNextQuestion()
     {
         var question = await _calls.GetNextQuestionAsync(_session.Require(), default);
@@ -41,13 +41,18 @@ public sealed class FeedbackTools
             return "SURVEY_DONE.";
         }
 
-        if (question.QuestionType == FeedbackQuestionType.Open)
+        // ⚠ Only a Choice carries its options here, and that is deliberate. A yes/no question
+        // already contains its answers, and reading "1, 2, 3, 4, 5" after "birdən beşə qədər" is
+        // the readback a caller sat through five times before hanging up. What is not in the
+        // marker cannot be read out.
+        return question.QuestionType switch
         {
-            return $"OPEN_QUESTION. {question.Text}";
-        }
-
-        var options = string.Join("; ", question.Options.Select(o => o.Text));
-        return $"CHOICE_QUESTION. {question.Text} Variantlar: {options}";
+            FeedbackQuestionType.Open => $"OPEN_QUESTION. {question.Text}",
+            FeedbackQuestionType.YesNo => $"YES_NO_QUESTION. {question.Text}",
+            FeedbackQuestionType.Scale => $"SCALE_QUESTION. {question.Text} (1-{question.ScaleMax})",
+            _ => $"CHOICE_QUESTION. {question.Text} Variantlar: "
+                 + string.Join("; ", question.Options.Select(o => o.Text)),
+        };
     }
 
     [Description("Records what the caller answered to the question you just asked. Pass their words exactly as "
@@ -77,26 +82,37 @@ public sealed class FeedbackTools
         }
 
         var option = await _calls.MatchOptionAsync(question.QuestionId, spokenAnswer, default);
-        if (option is null)
+        if (option is not null)
         {
-            // Not an answer we can file. Saying so is the whole point — the alternative is the
-            // model picking the nearest option and a number on a dashboard that nobody said.
-            //
-            // But the asking has to stop. After two goes the question is recorded as unanswered
-            // and the survey moves on, in code rather than by instruction: a caller repeating an
-            // answer the matcher cannot take is being argued with, and on a real call that ran to
-            // five attempts before they hung up.
-            if (_session.TooManyFailuresFor(question.QuestionId))
-            {
-                await _calls.RecordDeclineAsync(callId, question.QuestionId, default);
-                return "MOVED_ON.";
-            }
-
-            return "NO_MATCH. Variantlar: " + string.Join("; ", question.Options.Select(o => o.Text));
+            await _calls.RecordChoiceAsync(callId, question.QuestionId, option.Id, default);
+            return $"RECORDED. {option.Text}";
         }
 
-        await _calls.RecordChoiceAsync(callId, question.QuestionId, option.Id, default);
-        return $"RECORDED. {option.Text}";
+        // A question that allows "Digər" has no unmatchable answer — that is what allowing it
+        // means. Their words go in beside the option, because a pile of undifferentiated "other"
+        // is a count with nothing behind it.
+        if (question.Options.FirstOrDefault(o => o.IsOther) is { } other)
+        {
+            await _calls.RecordOtherAsync(callId, question.QuestionId, other.Id, spokenAnswer, default);
+            return "RECORDED.";
+        }
+
+        // Not an answer we can file. Saying so is the whole point — the alternative is the model
+        // picking the nearest option and a number on a dashboard that nobody said.
+        //
+        // ⚠ But the asking stops after the second go, in code and not by instruction. One real
+        // call read the same five options back five times because nothing said when to give up.
+        // The survey does not limp on either: a caller whose answers keep failing to land is not
+        // going to be understood on question four, so a person rings them instead.
+        if (_session.TooManyFailuresFor(question.QuestionId))
+        {
+            await _calls.HandOverToHumanAsync(callId, default);
+            return "CANNOT_CONTINUE.";
+        }
+
+        return question.QuestionType == FeedbackQuestionType.Choice
+            ? "NO_MATCH. Variantlar: " + string.Join("; ", question.Options.Select(o => o.Text))
+            : "NO_MATCH.";
     }
 
     [Description("Records that the caller would rather not answer this question. Only after they have made that "

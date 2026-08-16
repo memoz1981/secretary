@@ -9,11 +9,15 @@ namespace Secretary.Agents.Tests;
 /// On a real call the caller answered "dörd", "beş", "üç" and every one was refused, so the agent
 /// read the same five options back five times before they gave up. The matcher was at fault that
 /// day — but no matcher will ever be right about everything anybody says, so the loop needs an end
-/// that does not depend on one being right.</summary>
+/// that does not depend on one being right.
+///
+/// Two goes: the question, and one repeat. What happens after the second is the tool's business —
+/// the call is handed to a person rather than limping on to question four, because a caller whose
+/// answers keep failing to land will not suddenly be understood.</summary>
 public sealed class FeedbackCallSessionTests
 {
     [Fact]
-    public void A_question_is_given_two_goes_before_the_survey_moves_on()
+    public void A_question_is_asked_once_and_repeated_once()
     {
         var session = new FeedbackCallSession();
 

@@ -55,6 +55,38 @@ public sealed class FeedbackCallTests
         call.CompletedAt.ShouldNotBeNull();
     }
 
+    /// <summary>⚠ The same trap as the one above, on the outcome that has to survive teardown.
+    ///
+    /// The hand-over is decided mid-call, and the call then ends — so Finish runs afterwards,
+    /// every time. If it overwrote the status the way it overwrites everything else, "a person
+    /// will call you back" would be a promise made to the caller and to nobody in the database,
+    /// and the row would sit on the retry list looking like a dropped line.</summary>
+    [Fact]
+    public void Finishing_does_not_lose_a_hand_over_to_a_person()
+    {
+        var call = Queued();
+        call.Begin(Now);
+        call.HandOverToHuman(Now);
+
+        call.Finish(22, 3, 3, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.01m, Now);
+
+        call.CallStatus.ShouldBe(FeedbackCallStatus.NeedsHuman);
+    }
+
+    /// <summary>The other way round: a survey that got every answer is finished, whatever went
+    /// wrong during the goodbye.</summary>
+    [Fact]
+    public void A_completed_survey_is_never_handed_over()
+    {
+        var call = Queued();
+        call.Begin(Now);
+        call.Complete(Now);
+
+        call.HandOverToHuman(Now);
+
+        call.CallStatus.ShouldBe(FeedbackCallStatus.Completed);
+    }
+
     [Fact]
     public void A_call_needs_somebody_to_be_about_and_a_number_to_reach_them_on()
     {

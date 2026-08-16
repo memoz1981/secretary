@@ -419,7 +419,7 @@ export interface BusinessHoursDay {
 // ---- Feedback module ----
 
 export type FeedbackQuestionType = "Open" | "Choice" | "YesNo" | "Scale";
-export type FeedbackCallStatus = "Created" | "InProgress" | "Completed" | "Abandoned";
+export type FeedbackCallStatus = "Created" | "InProgress" | "Completed" | "Abandoned" | "NeedsHuman";
 
 /** A scale runs to one of these, and no other number. "1 to 7" is a scale nobody can hold in
  *  their head while listening. */

@@ -14,7 +14,10 @@ import type { FeedbackCallStatus } from "@/shared/api/types";
 
 function statusVariant(status: FeedbackCallStatus): "success" | "warning" | "critical" | "neutral" {
   if (status === "Completed") return "success";
-  if (status === "Abandoned") return "critical";
+  // Both need somebody to act, and both are red for that reason — but they are not the same
+  // action. Abandoned gets dialled again; NeedsHuman gets a person, because the same agent
+  // ringing back would fail the same way.
+  if (status === "Abandoned" || status === "NeedsHuman") return "critical";
   if (status === "InProgress") return "warning";
   return "neutral";
 }

@@ -35,9 +35,9 @@ public enum FeedbackQuestionType
 
 /// <summary>Where a feedback call got to.
 ///
-/// The distinction that matters is Completed versus Abandoned: a survey answered to the last
-/// question is worth something and one abandoned at question two is worth knowing about, which
-/// is why the agent's own reliability is half of the dashboard.</summary>
+/// Only Completed contributes answers to the dashboard. Everything else is a to-do — somebody to
+/// ring again, or somebody a person needs to ring — and the difference between those two is the
+/// whole of the follow-up list.</summary>
 public enum FeedbackCallStatus
 {
     /// <summary>Queued by the form, not yet dialled.</summary>
@@ -49,7 +49,13 @@ public enum FeedbackCallStatus
     /// <summary>Every question was put to them — including any they declined to answer.</summary>
     Completed = 2,
 
-    /// <summary>The call ended before the last question. Where it stopped is the most useful
-    /// thing on the dashboard, so the answers given up to that point are kept.</summary>
+    /// <summary>The call ended before the last question. Nobody knows why, so it is retryable.</summary>
     Abandoned = 3,
+
+    /// <summary>The survey broke down: the caller answered, and twice running the answer could not
+    /// be understood.
+    ///
+    /// Never retried automatically. Ringing again with the same agent would fail the same way, and
+    /// a second identical call is how a survey becomes a nuisance. A person rings them instead.</summary>
+    NeedsHuman = 4,
 }

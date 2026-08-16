@@ -151,11 +151,18 @@ public sealed record FeedbackDashboardResponse(
 
 // ---- The agent's own view of a call in progress ----
 
+/// <summary>What the agent is told about the question it is about to ask.
+///
+/// <c>ScaleMax</c> and <c>AllowOther</c> are here because they change what the agent says, not
+/// only what the service stores: a scale is announced as a range rather than as a list, and a
+/// question that allows "Digər" has no such thing as an unmatchable answer.</summary>
 public sealed record FeedbackQuestionForAgent(
     int QuestionId,
     int Position,
     string Text,
     FeedbackQuestionType QuestionType,
+    int? ScaleMax,
+    bool AllowOther,
     IReadOnlyList<SurveyOptionResponse> Options);
 
 public sealed record FeedbackCallSubject(int CallId, string PersonName, string SurveyName, int QuestionCount);
