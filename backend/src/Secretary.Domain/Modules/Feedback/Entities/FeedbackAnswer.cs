@@ -21,7 +21,9 @@ public sealed class FeedbackAnswer : BaseEntity
     /// <summary>Set for a Choice question. Null for an open answer or a decline.</summary>
     public int? SurveyQuestionOptionId { get; private set; }
 
-    /// <summary>The caller's own words, for an Open question. Null otherwise.</summary>
+    /// <summary>The caller's own words. Set for an Open question, and also for "Digər" — an
+    /// option chosen because the list was wrong is worth nothing without what they actually
+    /// said. Null otherwise.</summary>
     public string? Text { get; private set; }
 
     /// <summary>They were asked and would not say. Distinct from never having been asked.</summary>
@@ -37,6 +39,18 @@ public sealed class FeedbackAnswer : BaseEntity
     {
         var answer = New(callId, questionId, now);
         answer.SurveyQuestionOptionId = optionId;
+        return answer;
+    }
+
+    /// <summary>Picked "Digər", and said what it was.
+    ///
+    /// Both halves are kept: the option so the count is right, the words so the count means
+    /// something. Recording only the option would turn every unanticipated answer into an
+    /// undifferentiated pile.</summary>
+    public static FeedbackAnswer ChoseOther(int callId, int questionId, int optionId, string text, Instant now)
+    {
+        var answer = Chose(callId, questionId, optionId, now);
+        answer.Text = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
         return answer;
     }
 

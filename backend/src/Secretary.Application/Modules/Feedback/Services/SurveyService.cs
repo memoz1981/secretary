@@ -94,28 +94,33 @@ public sealed class SurveyService
         var existing = await _uow.SurveyQuestions.GetForSurveyAsync(surveyId, cancellationToken);
         Validate(request);
 
-        if (request.IsHeadline)
-        {
-            await ClearOtherHeadlinesAsync(existing, exceptQuestionId: null, now);
-        }
-
-        var question = SurveyQuestion.Create(
-            surveyId, existing.Count, request.Text, request.QuestionType, request.IsHeadline, now);
-
+        var question = Build(surveyId, existing.Count, request, now);
         await _uow.SurveyQuestions.AddAsync(question, cancellationToken);
 
-        // Saved before the options so the identity exists — they key on it, the same reason
-        // customer registration saves in two steps.
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        foreach (var option in request.Options)
-        {
-            question.AddOption(option.Text, option.Value, now);
-        }
-
+        // One save now, where it used to be two. The options are built by the question itself and
+        // reach the database through the navigation, so there is no identity to wait for.
         await _uow.SaveChangesAsync(cancellationToken);
         return ToResponse(question);
     }
+
+    /// <summary>Type in, question out. The one place the wire format meets the four shapes, and
+    /// the reason nothing downstream has to ask "is this really a scale".</summary>
+    private static SurveyQuestion Build(int surveyId, int position, SaveQuestionRequest request, Instant now)
+        => request.QuestionType switch
+        {
+            FeedbackQuestionType.YesNo => SurveyQuestion.YesNoQuestion(
+                surveyId, position, request.Text, request.YesIsPositive, request.CountsTowardScore, now),
+
+            FeedbackQuestionType.Scale => SurveyQuestion.ScaleQuestion(
+                surveyId, position, request.Text, request.ScaleMax ?? 0, request.CountsTowardScore, now),
+
+            FeedbackQuestionType.Choice => SurveyQuestion.ChoiceQuestion(
+                surveyId, position, request.Text, request.Labels ?? [], request.AllowOther, now),
+
+            FeedbackQuestionType.Open => SurveyQuestion.OpenQuestion(surveyId, position, request.Text, now),
+
+            _ => throw new ArgumentException($"Unknown question type '{request.QuestionType}'."),
+        };
 
     /// <summary>Replaces the question's text and its whole option list.
     ///
@@ -133,30 +138,27 @@ public sealed class SurveyService
 
         var now = _clock.GetCurrentInstant();
         var answered = await _uow.SurveyQuestions.HasAnswersAsync(questionId, cancellationToken);
-        var optionsChanged = OptionsDiffer(question, request);
+        var shapeChanged = ShapeDiffers(question, request);
 
-        if (answered && optionsChanged)
+        if (answered && shapeChanged)
         {
             throw new InvalidStateTransitionException(
                 nameof(SurveyQuestion), questionId, "already answered by callers",
                 "changed — reword it, or add a new question and remove this one");
         }
 
-        if (request.IsHeadline)
+        // ⚠ Only reshape when the shape actually moved. Reshape rebuilds the option rows, so
+        // calling it for a typo fix would hand every option a new id and orphan the answers
+        // pointing at the old ones — a silent version of the deletion this method refuses.
+        if (shapeChanged)
         {
-            var siblings = await _uow.SurveyQuestions.GetForSurveyAsync(question.SurveyId, cancellationToken);
-            await ClearOtherHeadlinesAsync(siblings, questionId, now);
+            question.Reshape(
+                request.QuestionType, request.Text, request.CountsTowardScore,
+                request.ScaleMax, request.YesIsPositive, request.AllowOther, request.Labels ?? [], now);
         }
-
-        question.Update(request.Text, question.Position, request.IsHeadline, now);
-
-        if (optionsChanged)
+        else
         {
-            question.ClearOptions(now);
-            foreach (var option in request.Options)
-            {
-                question.AddOption(option.Text, option.Value, now);
-            }
+            question.Retitle(request.Text, request.CountsTowardScore, now);
         }
 
         _uow.SurveyQuestions.Update(question);
@@ -197,7 +199,7 @@ public sealed class SurveyService
                 throw new NotFoundException(nameof(SurveyQuestion), id);
             }
 
-            question.Update(question.Text, position++, question.IsHeadline, now);
+            question.MoveTo(position++, now);
             _uow.SurveyQuestions.Update(question);
         }
 
@@ -213,23 +215,11 @@ public sealed class SurveyService
         var position = 0;
         foreach (var question in remaining)
         {
-            question.Update(question.Text, position++, question.IsHeadline, now);
+            question.MoveTo(position++, now);
             _uow.SurveyQuestions.Update(question);
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task ClearOtherHeadlinesAsync(
-        IReadOnlyList<SurveyQuestion> questions, int? exceptQuestionId, Instant now)
-    {
-        foreach (var other in questions.Where(q => q.IsHeadline && q.Id != exceptQuestionId))
-        {
-            other.Update(other.Text, other.Position, isHeadline: false, now);
-            _uow.SurveyQuestions.Update(other);
-        }
-
-        await Task.CompletedTask;
     }
 
     private async Task EnsureQuotaAllowsAnotherAsync(CancellationToken cancellationToken)
@@ -244,39 +234,55 @@ public sealed class SurveyService
         }
     }
 
+    /// <summary>What the entity cannot check for itself, said in words the owner can act on.
+    ///
+    /// The entity refuses a bad scale and a one-option choice already; these are the two mistakes
+    /// the form can make that would otherwise be accepted and quietly mean nothing.</summary>
     private static void Validate(SaveQuestionRequest request)
     {
-        if (request.QuestionType == FeedbackQuestionType.Choice && request.Options.Count < 2)
-        {
-            throw new ArgumentException("A multiple-choice question needs at least two options to choose between.");
-        }
-
-        if (request.QuestionType == FeedbackQuestionType.Open && request.Options.Count > 0)
-        {
-            throw new ArgumentException("An open question is answered in the caller's own words and has no options.");
-        }
-
-        // All numbered or none. A half-scored question would average some answers and silently
-        // drop the rest, which is worse than not averaging at all.
-        var valued = request.Options.Count(o => o.Value is not null);
-        if (valued is not 0 && valued != request.Options.Count)
+        if (request.CountsTowardScore
+            && request.QuestionType is not (FeedbackQuestionType.YesNo or FeedbackQuestionType.Scale))
         {
             throw new ArgumentException(
-                "Give every option a number or none of them — a partly numbered question cannot be averaged honestly.");
+                "Only a Yes/No or a scale question has a score. A list of names has counts, and an open "
+                + "answer has words.");
+        }
+
+        if (request.QuestionType == FeedbackQuestionType.Scale
+            && !SurveyQuestion.AllowedScaleMaximums.Contains(request.ScaleMax ?? 0))
+        {
+            throw new ArgumentException(
+                $"A scale runs to {string.Join(", ", SurveyQuestion.AllowedScaleMaximums)} — nothing else.");
         }
     }
 
-    private static bool OptionsDiffer(SurveyQuestion question, SaveQuestionRequest request)
+    /// <summary>Whether saving this would rebuild the options.
+    ///
+    /// Compares the shape rather than the option rows, because the options are now a consequence
+    /// of the shape: a Scale(5) always has the same five, so the only way to change them is to
+    /// change the 5. Text and the score tick are deliberately absent — neither touches an option,
+    /// so neither should block an edit to a question people have already answered.</summary>
+    private static bool ShapeDiffers(SurveyQuestion question, SaveQuestionRequest request)
     {
-        if (question.Options.Count != request.Options.Count)
+        if (question.QuestionType != request.QuestionType)
         {
             return true;
         }
 
-        return question.Options
-            .OrderBy(o => o.Position)
-            .Zip(request.Options, (existing, wanted) => existing.Text != wanted.Text.Trim() || existing.Value != wanted.Value)
-            .Any(different => different);
+        return request.QuestionType switch
+        {
+            FeedbackQuestionType.YesNo => question.YesIsPositive != request.YesIsPositive,
+            FeedbackQuestionType.Scale => question.ScaleMax != request.ScaleMax,
+            FeedbackQuestionType.Choice => question.AllowOther != request.AllowOther
+                                           || !question.Options.Where(o => !o.IsOther)
+                                               .OrderBy(o => o.Position)
+                                               .Select(o => o.Text)
+                                               .SequenceEqual(
+                                                   (request.Labels ?? [])
+                                                   .Where(l => !string.IsNullOrWhiteSpace(l))
+                                                   .Select(l => l.Trim())),
+            _ => false,
+        };
     }
 
     private static SurveyQuestionResponse ToResponse(SurveyQuestion question)
@@ -285,10 +291,13 @@ public sealed class SurveyService
             question.Position,
             question.Text,
             question.QuestionType,
-            question.IsHeadline,
+            question.CountsTowardScore,
+            question.ScaleMax,
+            question.YesIsPositive,
+            question.AllowOther,
             question.Options
                 .OrderBy(o => o.Position)
-                .Select(o => new SurveyOptionResponse(o.Id, o.Position, o.Text, o.Value))
+                .Select(o => new SurveyOptionResponse(o.Id, o.Position, o.Text, o.ScorePercent, o.IsOther))
                 .ToList());
 
     private int RequireTenant()

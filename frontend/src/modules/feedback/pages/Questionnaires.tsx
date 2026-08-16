@@ -22,12 +22,17 @@ import {
   reorderQuestions,
   updateQuestion,
 } from "@/modules/feedback/api/feedback";
-import type {
-  FeedbackQuestionType,
-  SaveOptionRequest,
-  SurveyQuestionResponse,
-  SurveyResponse,
-} from "@/shared/api/types";
+import { SCALE_MAXIMUMS } from "@/shared/api/types";
+import type { FeedbackQuestionType, SurveyQuestionResponse, SurveyResponse } from "@/shared/api/types";
+import type { TranslationKey } from "@/shared/i18n/translations";
+
+/** One label per type, in one place, so the list and the editor cannot drift apart. */
+const QUESTION_TYPE_LABEL: Record<FeedbackQuestionType, TranslationKey> = {
+  YesNo: "yesNoQuestion",
+  Scale: "scaleQuestion",
+  Choice: "multipleChoice",
+  Open: "openQuestion",
+};
 
 /** The questionnaires and what is in them.
  *
@@ -175,30 +180,27 @@ export function QuestionnairesPage() {
                 render: (q) => (
                   <span>
                     {q.text}
-                    {q.isHeadline && (
+                    {q.countsTowardScore && (
                       <>
                         {" "}
-                        <Pill variant="success">{t("headline")}</Pill>
+                        <Pill variant="success">{t("inTheScore")}</Pill>
                       </>
                     )}
                   </span>
                 ),
               },
+              { header: t("colType"), render: (q) => t(QUESTION_TYPE_LABEL[q.questionType]) },
               {
-                header: t("colType"),
-                render: (q) =>
-                  q.questionType === "Open"
-                    ? t("openQuestion")
-                    : q.isScored
-                      ? t("scoredChoice")
-                      : t("multipleChoice"),
-              },
-              {
+                // The percentages are shown because they are derived and nobody typed them —
+                // seeing 0 / 25 / 50 / 75 / 100 beside a 1-5 is how you know the scale runs the
+                // way round you meant.
                 header: t("colOptions"),
                 render: (q) =>
                   q.options.length === 0
                     ? "—"
-                    : q.options.map((o) => (o.value === null ? o.text : `${o.text} (${o.value})`)).join(", "),
+                    : q.options
+                        .map((o) => (o.scorePercent === null ? o.text : `${o.text} (${o.scorePercent}%)`))
+                        .join(", "),
               },
               ...(canEdit
                 ? [
@@ -307,11 +309,16 @@ function NameQuestionnaire({ onClose, onSaved }: { onClose: () => void; onSaved:
   );
 }
 
-/** One question and its options.
+/** One question.
  *
- * The rule the form has to carry: every option numbered, or none. A partly numbered question
- * would average some answers and drop the rest, which is worse than not averaging — so the
- * server refuses it, and saying so here saves a round trip. */
+ * ⚠ Nothing numeric is typed here except the size of a scale. The version this replaces had a
+ * number box per option, and it produced one live questionnaire scored 20/40/60/80/100 and
+ * another auto-numbered into Bəli=1, Xeyr=2 — so "no" outscored "yes". Yes/No and Scale now build
+ * their own options and their own percentages, and the only thing the owner writes for them is
+ * the question itself.
+ *
+ * Which fields appear follows the type, so a form for a Yes/No cannot be filled in wrongly rather
+ * than being filled in wrongly and rejected. */
 function QuestionEditor({
   surveyId,
   existing,
@@ -326,48 +333,49 @@ function QuestionEditor({
   const { token } = useAuth();
   const { t } = useLanguage();
   const [text, setText] = useState(existing?.text ?? "");
-  const [type, setType] = useState<FeedbackQuestionType>(existing?.questionType ?? "Choice");
-  const [isHeadline, setIsHeadline] = useState(existing?.isHeadline ?? false);
-  const [optionTexts, setOptionTexts] = useState<string[]>(
-    existing?.options.map((o) => o.text) ?? ["", ""],
+  const [type, setType] = useState<FeedbackQuestionType>(existing?.questionType ?? "YesNo");
+  const [countsTowardScore, setCountsTowardScore] = useState(existing?.countsTowardScore ?? true);
+  const [scaleMax, setScaleMax] = useState(existing?.scaleMax ?? 5);
+  const [yesIsPositive, setYesIsPositive] = useState(existing?.yesIsPositive ?? true);
+  const [allowOther, setAllowOther] = useState(existing?.allowOther ?? false);
+  const [labels, setLabels] = useState<string[]>(
+    existing?.options.filter((o) => !o.isOther).map((o) => o.text) ?? ["", ""],
   );
 
-  // Off by default: most questions are "Yaxşı / Pis" and only want counting. Ticked, the options
-  // are numbered 1..n in the order they are listed, which is what a rating scale is — and it
-  // replaced a free value box that invited 20/40/60/80/100 on a question people answer by saying
-  // "dörd".
-  const [numbered, setNumbered] = useState(existing?.isScored ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  function setOptionText(index: number, text: string) {
-    setOptionTexts((current) => current.map((o, i) => (i === index ? text : o)));
-  }
+  const scored = type === "YesNo" || type === "Scale";
 
-  /** What actually gets saved: the values are derived from the tick and the position, never
-   *  typed. Nothing can end up half-numbered, which the server refuses anyway. */
-  function buildOptions(): SaveOptionRequest[] {
-    return optionTexts
-      .map((text, index) => ({ text, value: numbered ? index + 1 : null }))
-      .filter((o) => isRequired(o.text));
+  function setLabel(index: number, value: string) {
+    setLabels((current) => current.map((o, i) => (i === index ? value : o)));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    const filled = type === "Choice" ? buildOptions() : [];
+    const filled = labels.filter(isRequired);
 
     if (!isRequired(text)) next.text = t("questionTextRequired");
     if (type === "Choice" && filled.length < 2) next.options = t("atLeastTwoOptions");
-    if (type === "Open" && isHeadline) next.headline = t("headlineMustBeChoice");
-    if (isHeadline && type === "Choice" && !numbered) next.headline = t("headlineMustBeChoice");
 
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
     setSubmitting(true);
     try {
-      const request = { text, questionType: type, isHeadline, options: filled };
+      const request = {
+        text,
+        questionType: type,
+        // Only the two types with an ordering can contribute — the server refuses the rest, and
+        // sending it anyway would make the tick look like it had been ignored.
+        countsTowardScore: scored && countsTowardScore,
+        scaleMax: type === "Scale" ? scaleMax : null,
+        yesIsPositive,
+        allowOther: type === "Choice" && allowOther,
+        labels: type === "Choice" ? filled : [],
+      };
+
       if (existing) {
         await updateQuestion(token!, existing.id, request);
       } else {
@@ -395,27 +403,58 @@ function QuestionEditor({
           label={t("colType")}
           value={type}
           options={[
+            { value: "YesNo", label: t("yesNoQuestion") },
+            { value: "Scale", label: t("scaleQuestion") },
             { value: "Choice", label: t("multipleChoice") },
             { value: "Open", label: t("openQuestion") },
           ]}
           onChange={(e) => setType(e.target.value as FeedbackQuestionType)}
         />
 
+        {type === "YesNo" && (
+          <>
+            {/* "Gözləmə uzun oldu?" is a question you want answered no. Without this its score
+                runs backwards and a well-run service reads as a failing one. */}
+            <SelectField
+              label={t("goodAnswer")}
+              value={yesIsPositive ? "yes" : "no"}
+              options={[
+                { value: "yes", label: t("yesIsGood") },
+                { value: "no", label: t("noIsGood") },
+              ]}
+              onChange={(e) => setYesIsPositive(e.target.value === "yes")}
+            />
+            <div className="note">{t("yesNoExplain")}</div>
+          </>
+        )}
+
+        {type === "Scale" && (
+          <>
+            <SelectField
+              label={t("scaleTop")}
+              value={String(scaleMax)}
+              options={SCALE_MAXIMUMS.map((n) => ({ value: String(n), label: `1 – ${n}` }))}
+              onChange={(e) => setScaleMax(Number(e.target.value))}
+            />
+            <div className="note">{t("scaleExplain")}</div>
+          </>
+        )}
+
         {type === "Choice" && (
           <>
             <div className="section-label">{t("colOptions")}</div>
-            {optionTexts.map((option, index) => (
+            {labels.map((option, index) => (
               <div key={index} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
                 <TextField
-                  label={numbered ? `${index + 1}` : "•"}
+                  label="•"
                   value={option}
-                  onChange={(e) => setOptionText(index, e.target.value)}
+                  onChange={(e) => setLabel(index, e.target.value)}
                   className="grow"
                 />
                 <button
                   type="button"
                   className="link danger"
-                  onClick={() => setOptionTexts((c) => c.filter((_, i) => i !== index))}
+                  onClick={() => setLabels((c) => c.filter((_, i) => i !== index))}
                 >
                   ✕
                 </button>
@@ -423,22 +462,30 @@ function QuestionEditor({
             ))}
             {errors.options && <div className="field-error">{errors.options}</div>}
             <div style={{ marginTop: "var(--space-2)" }}>
-              <button type="button" className="link" onClick={() => setOptionTexts((c) => [...c, ""])}>
+              <button type="button" className="link" onClick={() => setLabels((c) => [...c, ""])}>
                 + {t("addOption")}
               </button>
             </div>
 
             <label className="checkbox-row" style={{ marginTop: "var(--space-4)" }}>
-              <input type="checkbox" checked={numbered} onChange={(e) => setNumbered(e.target.checked)} />
-              <span>{t("numberOptions")}</span>
+              <input type="checkbox" checked={allowOther} onChange={(e) => setAllowOther(e.target.checked)} />
+              <span>{t("allowOther")}</span>
             </label>
-            <div className="note">{t("numberedOptionsExplain")}</div>
+            <div className="note">{t("allowOtherExplain")}</div>
+          </>
+        )}
 
+        {scored && (
+          <>
             <label className="checkbox-row" style={{ marginTop: "var(--space-4)" }}>
-              <input type="checkbox" checked={isHeadline} onChange={(e) => setIsHeadline(e.target.checked)} />
-              <span>{t("useAsHeadline")}</span>
+              <input
+                type="checkbox"
+                checked={countsTowardScore}
+                onChange={(e) => setCountsTowardScore(e.target.checked)}
+              />
+              <span>{t("countsTowardScore")}</span>
             </label>
-            {errors.headline && <div className="field-error">{errors.headline}</div>}
+            <div className="note">{t("countsTowardScoreExplain")}</div>
           </>
         )}
 

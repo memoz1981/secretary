@@ -109,7 +109,7 @@ public sealed class FeedbackCallService
         return new FeedbackQuestionForAgent(
             next.Id, next.Position, next.Text, next.QuestionType,
             next.Options.OrderBy(o => o.Position)
-                .Select(o => new SurveyOptionResponse(o.Id, o.Position, o.Text, o.Value))
+                .Select(o => new SurveyOptionResponse(o.Id, o.Position, o.Text, o.ScorePercent, o.IsOther))
                 .ToList());
     }
 
@@ -144,15 +144,15 @@ public sealed class FeedbackCallService
             return exact;
         }
 
-        // A number, said either way round.
+        // A number, said either way round: "dörd" and "4" are the same answer to a 1-5.
         //
-        // ⚠ Matched against the option's TEXT first, not its value. The value is a score the
-        // business chose — a 1-5 question was set up with 20/40/60/80/100 — and it has nothing
-        // to do with what the caller says. Comparing "dörd" to the value found nothing and every
-        // spoken number was refused, on a question whose whole point is being answered with one.
+        // ⚠ Matched against the option's TEXT, never against its score. It used to fall back to
+        // the score, and on a question set up 20/40/60/80/100 that meant "dörd" matched nothing
+        // and every spoken number was refused — on the one question people always answer with a
+        // number. The score is now derived and is a percentage, so it is not something anyone says.
         //
-        // Still only where the option is itself a number, or "iki" would pick the second item of
-        // a list that has nothing to do with counting.
+        // Only where the option is itself a number, or "iki" would pick the second item of a list
+        // that has nothing to do with counting.
         if (SpokenNumber(said) is { } number)
         {
             var byText = question.Options.FirstOrDefault(
@@ -161,14 +161,6 @@ public sealed class FeedbackCallService
             if (byText is not null)
             {
                 return byText;
-            }
-
-            // And by value, for a question whose options are words carrying numbers — "Yaxşı"
-            // worth 5 — where a caller answering "5" means that one.
-            var byValue = question.Options.FirstOrDefault(o => o.Value == number);
-            if (byValue is not null)
-            {
-                return byValue;
             }
         }
 
@@ -272,7 +264,7 @@ public sealed class FeedbackCallService
                     question?.Text ?? string.Empty,
                     question?.QuestionType ?? FeedbackQuestionType.Open,
                     option?.Text,
-                    option?.Value,
+                    option?.ScorePercent,
                     a.Text,
                     a.Declined,
                     a.AnsweredAt);
@@ -336,32 +328,33 @@ public sealed class FeedbackCallService
         var breakdown = question.Options
             .OrderBy(o => o.Position)
             .Select(o => new OptionBreakdown(
-                o.Id, o.Text, o.Value, chosen.Count(a => a.SurveyQuestionOptionId == o.Id)))
+                o.Id, o.Text, o.ScorePercent, chosen.Count(a => a.SurveyQuestionOptionId == o.Id)))
             .ToList();
 
-        // Averaged only when every option carries a number. A mean over "Yaxşı" and "Pis" would
-        // be a number with no meaning, which is worse than no number.
-        decimal? average = null;
+        // Averaged only for the two types that have an ordering. A mean over "Təmir" and "Satış"
+        // would be a number with no meaning, which is worse than no number.
+        decimal? averagePercent = null;
         if (question.IsScored && chosen.Count > 0)
         {
-            var values = question.Options.ToDictionary(o => o.Id, o => o.Value);
+            var scores = question.Options.ToDictionary(o => o.Id, o => o.ScorePercent);
             var scored = chosen
-                .Select(a => values.GetValueOrDefault(a.SurveyQuestionOptionId!.Value))
+                .Select(a => scores.GetValueOrDefault(a.SurveyQuestionOptionId!.Value))
                 .Where(v => v is not null)
-                .Select(v => (decimal)v!.Value)
+                .Select(v => v!.Value)
                 .ToList();
 
             if (scored.Count > 0)
             {
-                average = Math.Round(scored.Average(), 2);
+                averagePercent = Math.Round(scored.Average(), 2);
             }
         }
 
         return new QuestionResult(
-            question.Id, question.Position, question.Text, question.IsHeadline, question.IsScored,
+            question.Id, question.Position, question.Text, question.QuestionType,
+            question.CountsTowardScore, question.IsScored,
             AnsweredCount: chosen.Count,
             DeclinedCount: answers.Count(a => a.Declined),
-            average,
+            averagePercent,
             breakdown);
     }
 

@@ -42,20 +42,24 @@ public sealed class OptionMatchingTests
             new TokenPricebook(Options.Create(new ModelPricingOptions())));
     }
 
-    private void GivenQuestion(params (string Text, int? Value)[] options)
+    private void Given(SurveyQuestion question)
     {
-        var question = SurveyQuestion.Create(1, 0, "Qiymətləndirin", FeedbackQuestionType.Choice, false, Now);
         WithId(question, 10);
 
         var id = 100;
-        foreach (var (text, value) in options)
+        foreach (var option in question.Options)
         {
-            question.AddOption(text, value, Now);
-            WithId(question.Options[^1], id++);
+            WithId(option, id++);
         }
 
         _questions.Setup(q => q.GetWithOptionsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(question);
     }
+
+    private void GivenChoice(params string[] labels)
+        => Given(SurveyQuestion.ChoiceQuestion(1, 0, "Nə üçün gəldiniz?", labels, false, Now));
+
+    private void GivenScale(int scaleMax)
+        => Given(SurveyQuestion.ScaleQuestion(1, 0, "Qiymətləndirin", scaleMax, true, Now));
 
     /// <summary>The fold that bites everywhere text is compared here — ş ə ç ğ ı ö ü. A caller
     /// saying the word correctly must match an option somebody typed in ASCII.</summary>
@@ -65,7 +69,7 @@ public sealed class OptionMatchingTests
     [InlineData("YAXŞI")]
     public async Task An_option_matches_however_the_azerbaijani_is_spelled(string spoken)
     {
-        GivenQuestion(("Yaxşı", null), ("Pis", null));
+        GivenChoice("Yaxşı", "Pis");
 
         var match = await _sut.MatchOptionAsync(10, spoken, default);
 
@@ -73,41 +77,36 @@ public sealed class OptionMatchingTests
         match!.Text.ShouldBe("Yaxşı");
     }
 
-    /// <summary>A 1-5 scale is answered out loud, and a transcript gives either form.</summary>
-    [Theory]
-    [InlineData("4", 4)]
-    [InlineData("dörd", 4)]
-    [InlineData("beş", 5)]
-    [InlineData("bir", 1)]
-    public async Task A_number_matches_whether_it_is_said_as_a_word_or_a_digit(string spoken, int expected)
-    {
-        GivenQuestion(("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5));
-
-        var match = await _sut.MatchOptionAsync(10, spoken, default);
-
-        match.ShouldNotBeNull();
-        match!.Value.ShouldBe(expected);
-    }
-
-    /// <summary>⚠ The one this test file originally missed, and a real call found.
+    /// <summary>⚠ The case a real call found, and the reason scores are derived now.
     ///
-    /// The value is a SCORE the business chose — this question was set up 20/40/60/80/100 — and
-    /// has nothing to do with what the caller says. Matching "dörd" against the value found
-    /// nothing, so every spoken number was refused on the one question people always answer with
-    /// a number. The original test used values 1-5 and passed happily.</summary>
+    /// A 1-5 was set up carrying 20/40/60/80/100, the matcher compared the spoken number to that,
+    /// and "dörd" matched nothing — on the one question people always answer with a number. The
+    /// original test used 1-5 for both the label and the score, where the two happen to agree, so
+    /// it passed on the broken code. Matching is against the TEXT, and the score is now a
+    /// percentage nobody would ever say out loud.</summary>
     [Theory]
+    [InlineData("4", "4")]
     [InlineData("dörd", "4")]
-    [InlineData("3", "3")]
     [InlineData("beş", "5")]
-    public async Task A_spoken_number_matches_the_option_text_whatever_the_score_behind_it_is(
-        string spoken, string expected)
+    [InlineData("bir", "1")]
+    public async Task A_number_matches_whether_it_is_said_as_a_word_or_a_digit(string spoken, string expected)
     {
-        GivenQuestion(("1", 20), ("2", 40), ("3", 60), ("4", 80), ("5", 100));
+        GivenScale(5);
 
         var match = await _sut.MatchOptionAsync(10, spoken, default);
 
         match.ShouldNotBeNull();
         match!.Text.ShouldBe(expected);
+    }
+
+    /// <summary>The score behind "4" on a five-point scale is 75%, and nobody says "yetmiş beş".
+    /// Pinned so a future matcher cannot quietly start reading the score again.</summary>
+    [Fact]
+    public async Task The_percentage_behind_an_option_is_never_what_matches()
+    {
+        GivenScale(5);
+
+        (await _sut.MatchOptionAsync(10, "yetmiş beş", default)).ShouldBeNull();
     }
 
     /// <summary>⚠ Number words only match options that carry numbers. Otherwise "iki" would pick
@@ -116,7 +115,7 @@ public sealed class OptionMatchingTests
     [Fact]
     public async Task A_number_word_does_not_match_an_unnumbered_list()
     {
-        GivenQuestion(("Təmir", null), ("Satış", null), ("Digər", null));
+        GivenChoice("Təmir", "Satış", "Servis");
 
         (await _sut.MatchOptionAsync(10, "iki", default)).ShouldBeNull();
     }
@@ -129,7 +128,7 @@ public sealed class OptionMatchingTests
     [InlineData("   ")]
     public async Task Nothing_recognisable_matches_nothing(string spoken)
     {
-        GivenQuestion(("Yaxşı", null), ("Pis", null));
+        GivenChoice("Yaxşı", "Pis");
 
         (await _sut.MatchOptionAsync(10, spoken, default)).ShouldBeNull();
     }
@@ -138,7 +137,7 @@ public sealed class OptionMatchingTests
     [Fact]
     public async Task An_option_inside_a_sentence_still_matches()
     {
-        GivenQuestion(("Yaxşı", null), ("Pis", null));
+        GivenChoice("Yaxşı", "Pis");
 
         var match = await _sut.MatchOptionAsync(10, "hər şey yaxşı idi", default);
 

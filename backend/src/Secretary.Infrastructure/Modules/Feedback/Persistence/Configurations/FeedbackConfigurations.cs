@@ -48,6 +48,10 @@ public sealed class SurveyQuestionOptionConfiguration : IEntityTypeConfiguration
         builder.ConfigureBaseEntity();
         builder.Property(o => o.Text).HasMaxLength(200).IsRequired();
 
+        // A percentage with two places, because a 1-10 scale lands on 11.11 and rounding it to a
+        // whole number would make ten steps that do not add up to a hundred.
+        builder.Property(o => o.ScorePercent).HasPrecision(5, 2);
+
         builder.HasIndex(o => new { o.SurveyQuestionId, o.Position });
     }
 }

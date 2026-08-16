@@ -7,21 +7,22 @@ namespace Secretary.Application.Dtos;
 
 // ---- Questionnaire editing ----
 
-public sealed record SurveyOptionResponse(int Id, int Position, string Text, int? Value);
+public sealed record SurveyOptionResponse(int Id, int Position, string Text, decimal? ScorePercent, bool IsOther);
 
 public sealed record SurveyQuestionResponse(
     int Id,
     int Position,
     string Text,
     FeedbackQuestionType QuestionType,
-    bool IsHeadline,
+    bool CountsTowardScore,
+    int? ScaleMax,
+    bool YesIsPositive,
+    bool AllowOther,
     IReadOnlyList<SurveyOptionResponse> Options)
 {
-    /// <summary>Whether these answers can be averaged rather than only counted — every option
-    /// carries a number. The dashboard renders a different panel for each case.</summary>
-    public bool IsScored => QuestionType == FeedbackQuestionType.Choice
-                            && Options.Count > 0
-                            && Options.All(o => o.Value is not null);
+    /// <summary>Read off the type, exactly as the entity does. It used to be read off "do all the
+    /// options carry numbers", which was true by accident whenever somebody filled the boxes in.</summary>
+    public bool IsScored => QuestionType is FeedbackQuestionType.YesNo or FeedbackQuestionType.Scale;
 }
 
 public sealed record SurveyResponse(int Id, string Name, int QuestionCount);
@@ -30,13 +31,22 @@ public sealed record SurveyDetailResponse(int Id, string Name, IReadOnlyList<Sur
 
 public sealed record SaveSurveyRequest(string Name);
 
-public sealed record SaveOptionRequest(string Text, int? Value);
-
+/// <summary>What the question editor sends.
+///
+/// ⚠ No scores. The owner types labels for a Choice question and nothing else numeric, anywhere:
+/// Yes/No and Scale generate their own options and their own percentages. The field this replaces
+/// was a free number box per option, and it produced a live questionnaire scoring Bəli=1, Xeyr=2.
+///
+/// Fields that do not apply to the chosen type are ignored rather than rejected, so switching the
+/// type in the form does not have to clear them first.</summary>
 public sealed record SaveQuestionRequest(
     string Text,
     FeedbackQuestionType QuestionType,
-    bool IsHeadline,
-    IReadOnlyList<SaveOptionRequest> Options);
+    bool CountsTowardScore = false,
+    int? ScaleMax = null,
+    bool YesIsPositive = true,
+    bool AllowOther = false,
+    IReadOnlyList<string>? Labels = null);
 
 /// <summary>The whole running order in one call. Reordering is a drag on the page and sending
 /// one request per moved question would leave the list half-reordered if any of them failed.</summary>
@@ -83,7 +93,7 @@ public sealed record FeedbackAnswerResponse(
     string QuestionText,
     FeedbackQuestionType QuestionType,
     string? OptionText,
-    int? OptionValue,
+    decimal? OptionScorePercent,
     string? Text,
     bool Declined,
     Instant AnsweredAt);
@@ -114,18 +124,20 @@ public sealed record FeedbackAgentStats(
 /// a question that loses a third of callers is a question worth rewriting.</summary>
 public sealed record QuestionDropOff(int QuestionId, int Position, string QuestionText, int Reached, int Answered);
 
-public sealed record OptionBreakdown(int OptionId, string Text, int? Value, int Count);
+public sealed record OptionBreakdown(int OptionId, string Text, decimal? ScorePercent, int Count);
 
-/// <summary>One panel. Average is null unless every option carries a number — see IsScored.</summary>
+/// <summary>One panel. <c>AveragePercent</c> is null for the types with no ordering — Choice and
+/// Open — because a mean over names is a number about nothing.</summary>
 public sealed record QuestionResult(
     int QuestionId,
     int Position,
     string QuestionText,
-    bool IsHeadline,
+    FeedbackQuestionType QuestionType,
+    bool CountsTowardScore,
     bool IsScored,
     int AnsweredCount,
     int DeclinedCount,
-    decimal? Average,
+    decimal? AveragePercent,
     IReadOnlyList<OptionBreakdown> Options);
 
 /// <summary>⚠ Open questions are deliberately absent from the charts. There is nothing honest to

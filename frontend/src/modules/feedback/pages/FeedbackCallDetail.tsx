@@ -122,7 +122,12 @@ export function FeedbackCallDetailPage() {
                   ) : a.optionText !== null ? (
                     <span>
                       {a.optionText}
-                      {a.optionValue !== null && <span className="mono"> ({a.optionValue})</span>}
+                      {a.optionScorePercent !== null && (
+                        <span className="mono"> ({a.optionScorePercent}%)</span>
+                      )}
+                      {/* "Digər" carries both: the option so the count is right, the words so
+                          the count means something. */}
+                      {a.text !== null && <span className="verbatim"> — “{a.text}”</span>}
                     </span>
                   ) : (
                     <span className="verbatim">“{a.text}”</span>

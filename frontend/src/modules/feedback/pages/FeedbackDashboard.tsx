@@ -54,7 +54,16 @@ export function FeedbackDashboardPage() {
   );
 
   const data = state.status === "success" ? state.data : null;
-  const headline = data?.results.find((r) => r.isHeadline && r.isScored) ?? null;
+
+  // Every question the owner ticked, averaged into one percentage. Replaced a single "headline"
+  // question, because "Məmnun qaldınız?" is satisfaction and "Servis kitabçası verildi?" is a
+  // fact — one number built from both moves for two unrelated reasons.
+  const counting = (data?.results ?? []).filter((r) => r.countsTowardScore && r.averagePercent !== null);
+  const score =
+    counting.length === 0
+      ? null
+      : counting.reduce((sum, r) => sum + (r.averagePercent ?? 0), 0) / counting.length;
+  const scoreAnswers = counting.reduce((sum, r) => sum + r.answeredCount, 0);
 
   return (
     <AppShell {...shell}>
@@ -84,14 +93,14 @@ export function FeedbackDashboardPage() {
 
       {data && (
         <>
-          {/* The one number a manager looks at, when the Owner has said which it is. */}
-          {headline && (
+          {/* The one number, and never without its denominator: 92% from four people is not 92%. */}
+          {score !== null && (
             <Card>
               <div className="headline-metric">
-                <div className="headline-value mono">{headline.average?.toFixed(2) ?? "—"}</div>
-                <div className="headline-label">{headline.questionText}</div>
+                <div className="headline-value mono">{Math.round(score)}%</div>
+                <div className="headline-label">{t("satisfactionScore")}</div>
                 <div className="headline-sub">
-                  {t("basedOnAnswers").replace("{n}", String(headline.answeredCount))}
+                  {t("basedOnAnswers").replace("{n}", String(scoreAnswers))}
                 </div>
               </div>
             </Card>
@@ -149,9 +158,9 @@ export function FeedbackDashboardPage() {
                       {result.position + 1}. {result.questionText}
                     </div>
                     <div className="result-meta mono">
-                      {result.isScored && result.average !== null && (
+                      {result.isScored && result.averagePercent !== null && (
                         <span>
-                          {t("average")} {result.average.toFixed(2)} ·{" "}
+                          {t("average")} {Math.round(result.averagePercent)}% ·{" "}
                         </span>
                       )}
                       {t("answeredN").replace("{n}", String(result.answeredCount))}
@@ -162,7 +171,7 @@ export function FeedbackDashboardPage() {
                     {result.options.map((o) => (
                       <BarRow
                         key={o.optionId}
-                        label={`${o.text}${o.value === null ? "" : ` (${o.value})`} — ${o.count}`}
+                        label={`${o.text}${o.scorePercent === null ? "" : ` (${o.scorePercent}%)`} — ${o.count}`}
                         pct={total === 0 ? 0 : (o.count / total) * 100}
                       />
                     ))}

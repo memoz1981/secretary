@@ -2,19 +2,35 @@ namespace Secretary.Domain.Enums;
 
 /// <summary>What kind of answer a question expects.
 ///
-/// Two kinds, not three. A rating scale looks like a third — "1 to 5" — but it is a choice whose
-/// options happen to carry numbers, and modelling it separately would mean two code paths that
-/// ask the same question and store the same answer. The number lives on the option instead, so
-/// "1–5" and "Yaxşı / Pis" are one type and only one of them can be averaged.</summary>
+/// ⚠ This started as two types — Open and Choice — with a rating scale modelled as a Choice whose
+/// options happened to carry numbers. It was one type too few, and the collapse hid three
+/// different things inside one editable number:
+///
+/// - what the caller says ("4"),
+/// - what the dashboard averages,
+/// - and, once options were auto-numbered, their position in the list.
+///
+/// A real questionnaire came out of it scoring Bəli=1 and Xeyr=2, so "no" beat "yes". The types
+/// are separate now and nothing numeric is typed by the owner: each type derives its own score.</summary>
 public enum FeedbackQuestionType
 {
-    /// <summary>Answered in the caller's own words, recorded from the transcript. Cannot be
-    /// charted — the dashboard shows these verbatim.</summary>
+    /// <summary>Answered in the caller's own words, recorded from the transcript. Never charted —
+    /// the words are read on the call page.</summary>
     Open = 0,
 
-    /// <summary>Answered by picking one of the options. Counted always, averaged when the
-    /// options carry values.</summary>
+    /// <summary>A list of named options the agent reads out. Counted, never scored: "Təmir" and
+    /// "Satış" have no order between them, so an average over them would be a number about
+    /// nothing. May allow an "Other" option that also captures what the caller said.</summary>
     Choice = 1,
+
+    /// <summary>Bəli or Xeyr. The options are not read out — the question already implies them —
+    /// and the owner says which answer is the good one, because "Gözləmə uzun oldu?" is a
+    /// question whose good answer is no.</summary>
+    YesNo = 2,
+
+    /// <summary>1 to N, where N is 3, 5 or 10. The options are not read out; "birdən beşə qədər"
+    /// is the question. 1 is the worst and scores 0%, N is the best and scores 100%.</summary>
+    Scale = 3,
 }
 
 /// <summary>Where a feedback call got to.

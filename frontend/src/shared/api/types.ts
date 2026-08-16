@@ -418,16 +418,22 @@ export interface BusinessHoursDay {
 
 // ---- Feedback module ----
 
-export type FeedbackQuestionType = "Open" | "Choice";
+export type FeedbackQuestionType = "Open" | "Choice" | "YesNo" | "Scale";
 export type FeedbackCallStatus = "Created" | "InProgress" | "Completed" | "Abandoned";
+
+/** A scale runs to one of these, and no other number. "1 to 7" is a scale nobody can hold in
+ *  their head while listening. */
+export const SCALE_MAXIMUMS = [3, 5, 10] as const;
 
 export interface SurveyOptionResponse {
   id: number;
   position: number;
   text: string;
-  /** The number behind the words, when there is one. Null means countable but not averageable —
-   *  which is the only difference between "Yaxşı / Pis" and a 1-5 scale. */
-  value: number | null;
+  /** 0-100, derived by the question. Null for a Choice option, where there is no ordering to
+   *  average and so nothing honest to score. Never typed by anybody. */
+  scorePercent: number | null;
+  /** The "Digər" option, which also records what the caller actually said. */
+  isOther: boolean;
 }
 
 export interface SurveyQuestionResponse {
@@ -435,10 +441,17 @@ export interface SurveyQuestionResponse {
   position: number;
   text: string;
   questionType: FeedbackQuestionType;
-  /** The one question the dashboard leads with. At most one per questionnaire. */
-  isHeadline: boolean;
+  /** Whether this question's score feeds the questionnaire's one number. Any number of questions
+   *  may; it replaced a single "headline" tick. */
+  countsTowardScore: boolean;
+  /** Scale only. */
+  scaleMax: number | null;
+  /** Yes/No only. False when "Xeyr" is the good answer. */
+  yesIsPositive: boolean;
+  /** Choice only. */
+  allowOther: boolean;
   options: SurveyOptionResponse[];
-  /** Every option carries a number, so these answers can be averaged rather than only counted. */
+  /** Yes/No or Scale — the two types with an ordering, and so the two that can be averaged. */
   isScored: boolean;
 }
 
@@ -458,16 +471,19 @@ export interface SaveSurveyRequest {
   name: string;
 }
 
-export interface SaveOptionRequest {
-  text: string;
-  value: number | null;
-}
-
+/** What the question editor sends. Nothing numeric except the size of a scale — Yes/No and Scale
+ *  build their own options and their own percentages, and Choice has no scores at all.
+ *
+ *  Fields that do not apply to the chosen type are ignored by the server rather than rejected, so
+ *  switching type in the form does not have to clear them first. */
 export interface SaveQuestionRequest {
   text: string;
   questionType: FeedbackQuestionType;
-  isHeadline: boolean;
-  options: SaveOptionRequest[];
+  countsTowardScore: boolean;
+  scaleMax: number | null;
+  yesIsPositive: boolean;
+  allowOther: boolean;
+  labels: string[];
 }
 
 export interface FeedbackSettingsResponse {
@@ -509,7 +525,7 @@ export interface FeedbackAnswerResponse {
   questionText: string;
   questionType: FeedbackQuestionType;
   optionText: string | null;
-  optionValue: number | null;
+  optionScorePercent: number | null;
   text: string | null;
   /** Asked, and would not say. Distinct from never having been asked. */
   declined: boolean;
@@ -543,7 +559,7 @@ export interface QuestionDropOff {
 export interface OptionBreakdown {
   optionId: number;
   text: string;
-  value: number | null;
+  scorePercent: number | null;
   count: number;
 }
 
@@ -551,11 +567,13 @@ export interface QuestionResult {
   questionId: number;
   position: number;
   questionText: string;
-  isHeadline: boolean;
+  questionType: FeedbackQuestionType;
+  countsTowardScore: boolean;
   isScored: boolean;
   answeredCount: number;
   declinedCount: number;
-  average: number | null;
+  /** A mean of the option percentages. Null for Choice and Open, which have no ordering. */
+  averagePercent: number | null;
   options: OptionBreakdown[];
 }
 
