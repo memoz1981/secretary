@@ -10,6 +10,7 @@ import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { getSurveys, searchFeedbackCalls } from "@/modules/feedback/api/feedback";
+import { maskAzPhone } from "@/modules/feedback/api/phone";
 import type { FeedbackCallStatus } from "@/shared/api/types";
 
 function statusVariant(status: FeedbackCallStatus): "success" | "warning" | "critical" | "neutral" {
@@ -66,7 +67,9 @@ export function FeedbackCallsPage() {
         columns={[
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.createdAt, language), className: "mono" },
           { header: t("customerName"), render: (c) => c.personName },
-          { header: t("colPhone"), render: (c) => c.phoneNumber, className: "mono" },
+          // Masked, not shown. The list is read over somebody's shoulder more often than the
+          // number on it is needed.
+          { header: t("colPhone"), render: (c) => maskAzPhone(c.phoneNumber), className: "mono muted" },
           { header: t("questionnaire"), render: (c) => c.surveyName },
           {
             header: t("colStatus"),

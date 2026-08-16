@@ -10,6 +10,7 @@ import { formatDayMonthTime } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getFeedbackCall } from "@/modules/feedback/api/feedback";
+import { maskAzPhone } from "@/modules/feedback/api/phone";
 
 /** One call, in full: who, when, what it cost, and every answer with the time it was given.
  *
@@ -64,7 +65,7 @@ export function FeedbackCallDetailPage() {
         <div className="detail-grid">
           <div>
             <div className="label">{t("colPhone")}</div>
-            <div className="value mono">{call.phoneNumber}</div>
+            <div className="value mono muted">{maskAzPhone(call.phoneNumber)}</div>
           </div>
           <div>
             <div className="label">{t("colStatus")}</div>

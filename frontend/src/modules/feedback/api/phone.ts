@@ -54,3 +54,15 @@ export function isValidAzPhone(input: string): boolean {
 export function toApiPhone(input: string): string {
   return `+994${subscriberDigits(input)}`;
 }
+
+/** What a survey list shows instead of somebody's number.
+ *
+ * ⚠ Nothing of the real number survives — not the operator code, not the last two digits. A
+ * partial mask is a smaller version of the same problem, because two of nine digits plus a name
+ * is often enough to find somebody.
+ *
+ * The full number is still stored and still what the scheduler will dial. Masking is a display
+ * decision, not a storage one, so turning it off later is a change to this function alone. */
+export function maskAzPhone(_stored: string): string {
+  return "+994(00)000-00-00";
+}
