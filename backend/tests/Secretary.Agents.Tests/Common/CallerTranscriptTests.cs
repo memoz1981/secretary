@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Secretary.Agents.Tests;
 
-/// <summary>The caller's words, with the clock time each was said at.
+/// <summary>Both sides of the conversation, with the clock time each line was said at.
 ///
 /// ⚠ This column existed on three tables for months and was written null on every call, because
 /// the value was hardcoded at the single place a CallLogEntry is built. Nothing failed — an
@@ -22,20 +22,20 @@ public sealed class CallerTranscriptTests
             .ToInstant();
 
     [Fact]
-    public void A_line_says_the_time_it_was_said_at()
-        => LiveVoiceCallOrchestrator.CallerLine(Baku("2026-08-16 13:50:04"), "Bəli")
-            .ShouldBe("[13:50:04] Bəli");
+    public void A_line_says_who_spoke_and_when()
+        => LiveVoiceCallOrchestrator.TranscriptLine(Baku("2026-08-16 13:50:04"), "Müştəri", "Bəli")
+            .ShouldBe("[13:50:04] Müştəri: Bəli");
 
     /// <summary>⚠ Azerbaijan local time, not UTC. The instant below is 09:50 UTC; a transcript
     /// showing that would put every call four hours before it happened, and quietly disagree with
     /// the call's own timestamp printed at the top of the same page.</summary>
     [Fact]
     public void The_time_is_local_and_not_utc()
-        => LiveVoiceCallOrchestrator.CallerLine(Instant.FromUtc(2026, 8, 16, 9, 50, 4), "Bəli")
-            .ShouldBe("[13:50:04] Bəli");
+        => LiveVoiceCallOrchestrator.TranscriptLine(Instant.FromUtc(2026, 8, 16, 9, 50, 4), "Lamiya", "Salam")
+            .ShouldBe("[13:50:04] Lamiya: Salam");
 
     [Fact]
     public void The_words_are_trimmed_but_otherwise_untouched()
-        => LiveVoiceCallOrchestrator.CallerLine(Baku("2026-08-16 09:00:00"), "  Gözləmə çox uzun idi  ")
-            .ShouldBe("[09:00:00] Gözləmə çox uzun idi");
+        => LiveVoiceCallOrchestrator.TranscriptLine(Baku("2026-08-16 09:00:00"), "Müştəri", "  Gözləmə çox uzun idi  ")
+            .ShouldBe("[09:00:00] Müştəri: Gözləmə çox uzun idi");
 }

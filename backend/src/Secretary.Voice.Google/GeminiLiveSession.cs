@@ -118,6 +118,18 @@ public sealed class GeminiLiveSession : IRealtimeSession
                 ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
                 : null,
 
+            // ⚠ The agent's own words, and it took four rounds of debugging this module to admit
+            // they were needed. Every call was diagnosed from one side of the conversation: the
+            // caller's answers and the tool calls, with a ten-second turn of agent speech in the
+            // middle that nobody could read. "It repeated Digər twice" and "it interrupted me"
+            // were both reports about audio no log contained.
+            //
+            // Tied to the same switch as the caller's, because a module that wants a reviewable
+            // call wants both halves of it — half a transcript is how you end up guessing.
+            OutputAudioTranscription = transcribeCaller || _options.TranscribeCaller
+                ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
+                : null,
+
             // Both ends tuned, the start on measured evidence: a 200 ms "xeyr" took Gemini 7.3
             // seconds to report, against ~1.5 s for a two-second sentence in the same call. The
             // caller answered 36 ms after the agent stopped — the delay was entirely Gemini
@@ -294,6 +306,11 @@ public sealed class GeminiLiveSession : IRealtimeSession
             if (content.InputTranscription?.Text is { Length: > 0 } heard)
             {
                 yield return new RealtimeEvent.CallerTranscript(heard.Trim());
+            }
+
+            if (content.OutputTranscription?.Text is { Length: > 0 } said)
+            {
+                yield return new RealtimeEvent.AgentTranscript(said.Trim());
             }
 
             if (content.Interrupted == true)
