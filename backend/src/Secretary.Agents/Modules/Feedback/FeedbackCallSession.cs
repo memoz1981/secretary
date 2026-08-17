@@ -14,6 +14,22 @@ public sealed class FeedbackCallSession
 
     public void For(int callId) => CallId = callId;
 
+    /// <summary>The question `GetNextQuestion` last handed over, and therefore the only one the
+    /// caller can possibly have been asked.
+    ///
+    /// ⚠ On a real call the agent never called `GetNextQuestion` at all. It invented a rating
+    /// question out of nothing, the caller answered "4", and `RecordAnswer` filed that against
+    /// question one — "Məmnun qaldınız?", whose options are Bəli and Xeyr. It did not match, the
+    /// caller repeated themselves, it did not match again, and the call ended on a question
+    /// nobody had ever been asked.
+    ///
+    /// The tool used to work out the current question for itself, which quietly made "record an
+    /// answer to a question you never asked" a legal move. Now it is not one. Same lesson as the
+    /// order line's NO_INPUT: a tool called out of order must say so rather than do its best.</summary>
+    public int? ServedQuestionId { get; private set; }
+
+    public void Served(int questionId) => ServedQuestionId = questionId;
+
     /// <summary>How many times a question has been answered with something unmatchable.
     ///
     /// ⚠ Counted here because a survey that cannot get past a question is worse than a survey

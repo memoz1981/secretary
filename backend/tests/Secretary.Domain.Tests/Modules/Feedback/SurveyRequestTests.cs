@@ -20,6 +20,10 @@ public sealed class SurveyRequestTests
 
     private static SurveyRequest Queued() => SurveyRequest.Queue(1, 2, "Mehdi", "+994502505832", Now);
 
+    /// <summary>A business open around the clock, so these tests are about the retry rule and not
+    /// about opening hours. CallingHoursTests covers the clamp.</summary>
+    private static readonly Func<Instant, Instant?> AlwaysOpen = due => due;
+
     [Fact]
     public void A_queued_request_is_due_immediately_and_has_not_been_tried()
     {
@@ -50,7 +54,7 @@ public sealed class SurveyRequestTests
         var request = Queued();
         request.BeginAttempt(Now);
 
-        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 2, retryDelayMinutes: 60, Now);
+        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 2, retryDelayMinutes: 60, AlwaysOpen, Now);
 
         request.NextAttemptDueAt.ShouldBe(Now.Plus(Duration.FromMinutes(60)));
         request.NeedsFollowUp.ShouldBeFalse();
@@ -64,7 +68,7 @@ public sealed class SurveyRequestTests
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             request.BeginAttempt(Now);
-            request.Settle(SurveyRequestOutcome.NotReached, retryCount: 2, retryDelayMinutes: 60, Now);
+            request.Settle(SurveyRequestOutcome.NotReached, retryCount: 2, retryDelayMinutes: 60, AlwaysOpen, Now);
         }
 
         request.AttemptCount.ShouldBe(3);
@@ -88,7 +92,7 @@ public sealed class SurveyRequestTests
         var request = Queued();
         request.BeginAttempt(Now);
 
-        request.Settle(outcome, retryCount: 5, retryDelayMinutes: 60, Now);
+        request.Settle(outcome, retryCount: 5, retryDelayMinutes: 60, AlwaysOpen, Now);
 
         request.NextAttemptDueAt.ShouldBeNull();
     }
@@ -104,7 +108,7 @@ public sealed class SurveyRequestTests
     {
         var request = Queued();
         request.BeginAttempt(Now);
-        request.Settle(outcome, retryCount: 0, retryDelayMinutes: 60, Now);
+        request.Settle(outcome, retryCount: 0, retryDelayMinutes: 60, AlwaysOpen, Now);
 
         request.NeedsFollowUp.ShouldBe(expected);
     }
@@ -117,7 +121,7 @@ public sealed class SurveyRequestTests
         var request = Queued();
         request.BeginAttempt(Now);
 
-        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 0, retryDelayMinutes: 60, Now);
+        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 0, retryDelayMinutes: 60, AlwaysOpen, Now);
 
         request.NextAttemptDueAt.ShouldBeNull();
     }
@@ -127,7 +131,7 @@ public sealed class SurveyRequestTests
     {
         var request = Queued();
         request.BeginAttempt(Now);
-        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 3, retryDelayMinutes: 60, Now);
+        request.Settle(SurveyRequestOutcome.NotReached, retryCount: 3, retryDelayMinutes: 60, AlwaysOpen, Now);
 
         request.CloseWithoutAnswer(Now);
 

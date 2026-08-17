@@ -41,3 +41,21 @@ export function formatDayMonthTime(value: string | Date, language: Language): st
   const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
   return `${formatDayMonth(date, language)}, ${time}`;
 }
+
+/** "14:35:02" — the clock time alone, for rows that all share a date already printed above them.
+ *
+ * Seconds included on purpose: the answers to one survey call land within the same minute, and a
+ * column where every row reads 14:35 tells you nothing about the order they came in. */
+export function formatTimeOfDay(value: string | Date): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}

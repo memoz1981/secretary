@@ -113,20 +113,18 @@ public sealed class LiveVoiceCallOrchestrator
     {
         if (!string.IsNullOrWhiteSpace(text))
         {
-            _callerLines.Add(CallerLine(_clock.GetCurrentInstant() - _startedAt, text));
+            _callerLines.Add(CallerLine(_clock.GetCurrentInstant(), text));
         }
     }
 
-    /// <summary>One line: how far into the call, then what they said.
+    /// <summary>One line: the clock time it was said at, then what they said.
     ///
-    /// Minutes come from the total rather than from a minutes component, so a call past the hour
-    /// reads 61:40 instead of wrapping round to 01:40 and putting the end of the call before the
-    /// middle of it.</summary>
-    internal static string CallerLine(Duration elapsed, string text)
-    {
-        var seconds = Math.Max(0, (int)elapsed.TotalSeconds);
-        return $"[{seconds / 60:00}:{seconds % 60:00}] {text.Trim()}";
-    }
+    /// ⚠ Wall clock, not seconds into the call. It read "[00:14]" before, which looks exactly
+    /// like a time of day and is not one — and with nothing else on the page saying when the call
+    /// happened, a transcript was a list of unplaceable fragments. Azerbaijan local time, like
+    /// every other time this product shows anybody.</summary>
+    internal static string CallerLine(Instant at, string text)
+        => $"[{at.InZone(AzerbaijanTime.Zone).LocalDateTime:HH:mm:ss}] {text.Trim()}";
 
     private string? CallerTranscript() => _callerLines.Count == 0 ? null : string.Join("\n", _callerLines);
 

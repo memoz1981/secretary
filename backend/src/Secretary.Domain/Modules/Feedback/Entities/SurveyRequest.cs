@@ -91,12 +91,20 @@ public sealed class SurveyRequest : BaseEntity
     /// Only NotReached is retried. Refused is an answer — the worst one, but an answer, and
     /// ringing back somebody who said no is the behaviour that gets a number blocked. NeedsHuman
     /// would fail identically on a second attempt with the same agent. Complete is done.</summary>
-    public void Settle(SurveyRequestOutcome outcome, int retryCount, int retryDelayMinutes, Instant now)
+    /// <param name="withinCallingHours">Moves a due time to the next moment the business is open,
+    /// and returns null when there is no such moment. Supplied by the caller because opening
+    /// hours are a tenant record and this is an entity — but it is not optional: "in an hour"
+    /// from a six o'clock failure is seven o'clock, and a day's delay lands at whatever time the
+    /// first attempt happened to be made. The first survey call somebody gets at three in the
+    /// morning is the last call from us they will ever answer.</param>
+    public void Settle(
+        SurveyRequestOutcome outcome, int retryCount, int retryDelayMinutes,
+        Func<Instant, Instant?> withinCallingHours, Instant now)
     {
         Outcome = outcome;
 
         NextAttemptDueAt = outcome == SurveyRequestOutcome.NotReached && AttemptCount <= retryCount
-            ? now.Plus(Duration.FromMinutes(retryDelayMinutes))
+            ? withinCallingHours(now.Plus(Duration.FromMinutes(retryDelayMinutes)))
             : null;
 
         Touch(now);

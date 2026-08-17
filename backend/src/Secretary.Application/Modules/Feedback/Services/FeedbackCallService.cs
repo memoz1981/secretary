@@ -284,10 +284,16 @@ public sealed class FeedbackCallService
     {
         var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
 
+        // Fetched even when there is nothing to schedule — one query on a call that has just
+        // ended, against a retry that would otherwise be placed at whatever hour the failure
+        // happened to occur.
+        var week = await _uow.BusinessHours.GetWeekAsync(cancellationToken);
+
         surveyRequest.Settle(
             call.Outcome,
             survey?.RetryCount ?? 0,
             survey?.RetryDelayMinutes ?? Survey.DefaultRetryDelayMinutes,
+            due => CallingHours.NextOpening(due, week, DateTimeZoneProviders.Tzdb["Asia/Baku"]),
             _clock.GetCurrentInstant());
 
         _uow.SurveyRequests.Update(surveyRequest);

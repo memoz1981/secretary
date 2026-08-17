@@ -1,11 +1,12 @@
 using Secretary.Agents.Realtime;
 using NodaTime;
+using NodaTime.Text;
 using Shouldly;
 using Xunit;
 
 namespace Secretary.Agents.Tests;
 
-/// <summary>The caller's words, timestamped from the start of the call.
+/// <summary>The caller's words, with the clock time each was said at.
 ///
 /// ⚠ This column existed on three tables for months and was written null on every call, because
 /// the value was hardcoded at the single place a CallLogEntry is built. Nothing failed — an
@@ -14,30 +15,27 @@ namespace Secretary.Agents.Tests;
 /// never there.</summary>
 public sealed class CallerTranscriptTests
 {
-    [Theory]
-    [InlineData(0, "[00:00]")]
-    [InlineData(9, "[00:09]")]
-    [InlineData(75, "[01:15]")]
-    public void A_line_says_how_far_into_the_call_it_was_said(int seconds, string expected)
-        => LiveVoiceCallOrchestrator.CallerLine(Duration.FromSeconds(seconds), "Bəli")
-            .ShouldBe($"{expected} Bəli");
+    private static Instant Baku(string local)
+        => LocalDateTimePattern.CreateWithInvariantCulture("yyyy-MM-dd HH:mm:ss")
+            .Parse(local).Value
+            .InZoneStrictly(AzerbaijanTime.Zone)
+            .ToInstant();
 
-    /// <summary>Minutes come from the total, not from a minutes component. A component would wrap
-    /// at the hour and put the end of a long call before the middle of it.</summary>
     [Fact]
-    public void A_call_past_the_hour_keeps_counting_up()
-        => LiveVoiceCallOrchestrator.CallerLine(Duration.FromSeconds(3700), "Bəli")
-            .ShouldStartWith("[61:40]");
+    public void A_line_says_the_time_it_was_said_at()
+        => LiveVoiceCallOrchestrator.CallerLine(Baku("2026-08-16 13:50:04"), "Bəli")
+            .ShouldBe("[13:50:04] Bəli");
 
-    /// <summary>Clock skew between the start instant and a transcript should not produce a
-    /// negative timestamp that sorts above everything.</summary>
+    /// <summary>⚠ Azerbaijan local time, not UTC. The instant below is 09:50 UTC; a transcript
+    /// showing that would put every call four hours before it happened, and quietly disagree with
+    /// the call's own timestamp printed at the top of the same page.</summary>
     [Fact]
-    public void A_line_from_before_the_start_is_clamped_rather_than_negative()
-        => LiveVoiceCallOrchestrator.CallerLine(Duration.FromSeconds(-5), "Bəli")
-            .ShouldStartWith("[00:00]");
+    public void The_time_is_local_and_not_utc()
+        => LiveVoiceCallOrchestrator.CallerLine(Instant.FromUtc(2026, 8, 16, 9, 50, 4), "Bəli")
+            .ShouldBe("[13:50:04] Bəli");
 
     [Fact]
     public void The_words_are_trimmed_but_otherwise_untouched()
-        => LiveVoiceCallOrchestrator.CallerLine(Duration.Zero, "  Gözləmə çox uzun idi  ")
-            .ShouldBe("[00:00] Gözləmə çox uzun idi");
+        => LiveVoiceCallOrchestrator.CallerLine(Baku("2026-08-16 09:00:00"), "  Gözləmə çox uzun idi  ")
+            .ShouldBe("[09:00:00] Gözləmə çox uzun idi");
 }

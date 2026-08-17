@@ -66,3 +66,13 @@ export function toApiPhone(input: string): string {
 export function maskAzPhone(_stored: string): string {
   return "+994(00)000-00-00";
 }
+
+/** The stored number, formatted the way this product writes them.
+ *
+ * ⚠ Used on the follow-up list alone, and behind a click. That page exists so a person can ring
+ * somebody the agent could not reach, and a list of masked numbers cannot be acted on — the mask
+ * would make the page decorative. Everywhere else the number stays hidden, because everywhere
+ * else it is only being read. */
+export function revealAzPhone(stored: string): string {
+  return formatAzPhone(stored) || stored;
+}

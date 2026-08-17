@@ -41,6 +41,10 @@ public sealed class FeedbackTools
             return "SURVEY_DONE.";
         }
 
+        // Remembered, so RecordAnswer can refuse an answer to a question that was never handed
+        // over. See FeedbackCallSession.ServedQuestionId.
+        _session.Served(question.QuestionId);
+
         // ⚠ Only a Choice carries its options here, and that is deliberate. A yes/no question
         // already contains its answers, and reading "1, 2, 3, 4, 5" after "birdən beşə qədər" is
         // the readback a caller sat through five times before hanging up. What is not in the
@@ -65,6 +69,18 @@ public sealed class FeedbackTools
         if (question is null)
         {
             return "SURVEY_DONE.";
+        }
+
+        // ⚠ An answer to a question nobody was asked. On a real call the agent skipped
+        // GetNextQuestion entirely, made a rating question up, and the caller's "4" was filed
+        // against "Məmnun qaldınız?" — Bəli or Xeyr — where it could not match. Two failures
+        // later the call ended, on a question the caller had never heard.
+        //
+        // Deliberately not counted as a failure: the caller did nothing wrong, and ending the
+        // call over the agent's own bookkeeping would be the same bug wearing a different hat.
+        if (_session.ServedQuestionId != question.QuestionId)
+        {
+            return "NO_QUESTION_ASKED.";
         }
 
         if (string.IsNullOrWhiteSpace(spokenAnswer))
@@ -124,6 +140,11 @@ public sealed class FeedbackTools
         if (question is null)
         {
             return "SURVEY_DONE.";
+        }
+
+        if (_session.ServedQuestionId != question.QuestionId)
+        {
+            return "NO_QUESTION_ASKED.";
         }
 
         // A declined answer is a row, not an absence. A missing row also means the call ended

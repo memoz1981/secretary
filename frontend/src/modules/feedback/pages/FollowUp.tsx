@@ -10,7 +10,7 @@ import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
 import { closeRequest, getSurveys, getSurveyRequests, retryRequest } from "@/modules/feedback/api/feedback";
-import { maskAzPhone } from "@/modules/feedback/api/phone";
+import { revealAzPhone } from "@/modules/feedback/api/phone";
 import type { SurveyRequestOutcome, SurveyRequestResponse } from "@/shared/api/types";
 
 function outcomeVariant(outcome: SurveyRequestOutcome): "success" | "warning" | "critical" | "neutral" {
@@ -40,6 +40,7 @@ export function FeedbackFollowUpPage() {
   const [surveyId, setSurveyId] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [shown, setShown] = useState<ReadonlySet<number>>(new Set());
 
   const surveys = useApiData(() => getSurveys(token!), [token]);
   const state = useApiData(
@@ -104,7 +105,21 @@ export function FeedbackFollowUpPage() {
           emptyMessage={t("nobodyWaiting")}
           columns={[
             { header: t("customerName"), render: (r) => r.personName },
-            { header: t("colPhone"), render: (r) => maskAzPhone(r.phoneNumber), className: "mono muted" },
+            {
+              // ⚠ Masked, but revealable here and only here. This page's whole job is getting a
+              // person to ring somebody, and a column of +994(00)000-00-00 makes it decorative.
+              // A click is enough to keep the number out of an over-the-shoulder glance while
+              // leaving it one click away for the person who actually needs it.
+              header: t("colPhone"),
+              render: (r) =>
+                shown.has(r.id) ? (
+                  <span className="mono">{revealAzPhone(r.phoneNumber)}</span>
+                ) : (
+                  <button className="link" onClick={() => setShown((s) => new Set(s).add(r.id))}>
+                    {t("showNumber")}
+                  </button>
+                ),
+            },
             { header: t("questionnaire"), render: (r) => r.surveyName },
             {
               header: t("colStatus"),

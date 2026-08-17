@@ -6,7 +6,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { formatDayMonthTime } from "@/shared/lib/dates";
+import { formatDayMonthTime, formatTimeOfDay } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getFeedbackCall } from "@/modules/feedback/api/feedback";
@@ -63,6 +63,18 @@ export function FeedbackCallDetailPage() {
 
       <Card>
         <div className="detail-grid">
+          {/* The date and time of the CALL, once, at the top. Every answer used to carry its own
+              full date — the same date, repeated down the page, for a conversation that lasted
+              forty seconds. The answers now show only the clock time, which is the part that
+              differs between them. */}
+          <div>
+            <div className="label">{t("colDateTime")}</div>
+            <div className="value mono">{formatDayMonthTime(call.createdAt, language)}</div>
+          </div>
+          <div>
+            <div className="label">{t("attempt")}</div>
+            <div className="value mono">{call.attemptNumber}</div>
+          </div>
           <div>
             <div className="label">{t("colPhone")}</div>
             <div className="value mono muted">{maskAzPhone(call.phoneNumber)}</div>
@@ -134,7 +146,7 @@ export function FeedbackCallDetailPage() {
                     <span className="verbatim">“{a.text}”</span>
                   )}
                 </div>
-                <div className="answer-time mono">{formatDayMonthTime(a.answeredAt, language)}</div>
+                <div className="answer-time mono">{formatTimeOfDay(a.answeredAt)}</div>
               </li>
             ))}
           </ol>
@@ -144,6 +156,11 @@ export function FeedbackCallDetailPage() {
       {transcript && (
         <Card>
           <h2>{t("transcript")}</h2>
+          {/* The date once, above; each line carries its own clock time. The lines used to be
+              seconds-into-the-call — "[00:14]", which reads as a time of day and is not one. */}
+          <div className="score-caption" style={{ marginTop: 0, marginBottom: "var(--space-3)" }}>
+            {formatDayMonthTime(call.createdAt, language)}
+          </div>
           <pre className="transcript">{transcript}</pre>
         </Card>
       )}
