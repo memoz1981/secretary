@@ -43,7 +43,7 @@ public sealed class FeedbackTools
 
         // Remembered, so RecordAnswer can refuse an answer to a question that was never handed
         // over. See FeedbackCallSession.ServedQuestionId.
-        _session.Served(question.QuestionId);
+        _session.Served(question.QuestionId, question.QuestionType == FeedbackQuestionType.Open);
 
         // ⚠ Only a Choice carries its options here, and that is deliberate. A yes/no question
         // already contains its answers, and reading "1, 2, 3, 4, 5" after "birdən beşə qədər" is
@@ -54,8 +54,13 @@ public sealed class FeedbackTools
             FeedbackQuestionType.Open => $"OPEN_QUESTION. {question.Text}",
             FeedbackQuestionType.YesNo => $"YES_NO_QUESTION. {question.Text}",
             FeedbackQuestionType.Scale => $"SCALE_QUESTION. {question.Text} (1-{question.ScaleMax})",
+            // ⚠ "Digər" is left out of the list on purpose. Reading it aloud invites the caller
+            // to answer with the word instead of with the thing: one said "digərini, digər
+            // sözün" and the survey recorded "Digər" with nothing behind it, having already
+            // discarded the real answer they gave a moment earlier. It is a catch-all, not a
+            // choice — anything off the list becomes it, with their own words attached.
             _ => $"CHOICE_QUESTION. {question.Text} Variantlar: "
-                 + string.Join("; ", question.Options.Select(o => o.Text)),
+                 + string.Join("; ", question.Options.Where(o => !o.IsOther).Select(o => o.Text)),
         };
     }
 
@@ -71,6 +76,11 @@ public sealed class FeedbackTools
             return "SURVEY_DONE.";
         }
 
+        if (string.IsNullOrWhiteSpace(spokenAnswer))
+        {
+            return "NOTHING_HEARD.";
+        }
+
         // ⚠ An answer to a question nobody was asked. On a real call the agent skipped
         // GetNextQuestion entirely, made a rating question up, and the caller's "4" was filed
         // against "Məmnun qaldınız?" — Bəli or Xeyr — where it could not match. Two failures
@@ -80,12 +90,14 @@ public sealed class FeedbackTools
         // call over the agent's own bookkeeping would be the same bug wearing a different hat.
         if (_session.ServedQuestionId != question.QuestionId)
         {
-            return "NO_QUESTION_ASKED.";
-        }
-
-        if (string.IsNullOrWhiteSpace(spokenAnswer))
-        {
-            return "NOTHING_HEARD.";
+            // Unless they are still talking. An open answer arrives in pieces — the caller
+            // pauses, the provider ends the turn, the agent records what it has, and the rest of
+            // the sentence turns up next. That is not a stray answer, it is the same one
+            // continuing, and it used to be thrown away as "never asked".
+            return _session is { ServedIsOpen: true, ServedQuestionId: { } servedId }
+                   && await _calls.ExtendOpenAnswerAsync(callId, servedId, spokenAnswer, default)
+                ? "RECORDED."
+                : "NO_QUESTION_ASKED.";
         }
 
         // Recorded verbatim. This is the only place a survey keeps the caller's own words, and
@@ -100,6 +112,21 @@ public sealed class FeedbackTools
         var option = await _calls.MatchOptionAsync(question.QuestionId, spokenAnswer, default);
         if (option is not null)
         {
+            // ⚠ They named the catch-all rather than saying what it was. "Digər" on its own is a
+            // tally with nothing behind it — the whole reason for offering it is that the list
+            // was incomplete, so the answer is the part that is missing. Ask, once; if they say
+            // it again, take it bare rather than argue, because a thin answer beats no answer.
+            if (option.IsOther && !_session.TooManyFailuresFor(question.QuestionId))
+            {
+                return "OTHER_NEEDS_WORDS.";
+            }
+
+            if (option.IsOther)
+            {
+                await _calls.RecordOtherAsync(callId, question.QuestionId, option.Id, spokenAnswer, default);
+                return "RECORDED.";
+            }
+
             await _calls.RecordChoiceAsync(callId, question.QuestionId, option.Id, default);
             return $"RECORDED. {option.Text}";
         }

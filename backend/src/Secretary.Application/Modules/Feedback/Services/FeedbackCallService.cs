@@ -254,6 +254,50 @@ public sealed class FeedbackCallService
         => await RecordAsync(
             FeedbackAnswer.Refused(callId, questionId, _clock.GetCurrentInstant()), cancellationToken);
 
+    /// <summary>More of an open answer that was recorded before the caller had finished saying it.
+    ///
+    /// ⚠ A pause is not the end of a sentence. The provider's voice detection ends the turn at
+    /// one, the agent records what it has, and the rest arrives afterwards — on a real call
+    /// "…servis çox yaxşıdır" was stored and "…başqa" was thrown away as an answer to nothing.
+    ///
+    /// Replaces rather than appends when the new text already contains the old, which is the
+    /// common shape: the transcriber re-sends the whole utterance with more on the end, and
+    /// appending would store the first half twice. Returns false when there is nothing to extend,
+    /// so the caller can fall back to refusing.</summary>
+    public async Task<bool> ExtendOpenAnswerAsync(
+        int callId, int questionId, string text, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var answer = (await _uow.FeedbackAnswers.GetForCallAsync(callId, cancellationToken))
+            .FirstOrDefault(a => a.SurveyQuestionId == questionId && a.Text is not null && !a.Declined);
+
+        if (answer is null)
+        {
+            return false;
+        }
+
+        var addition = text.Trim();
+        var existing = answer.Text!;
+        if (existing.Contains(addition, StringComparison.OrdinalIgnoreCase))
+        {
+            // Nothing new — the transcriber repeated itself. Not a failure; there is simply
+            // nothing to store, and saying so would have the agent apologise for a non-event.
+            return true;
+        }
+
+        answer.Extend(
+            addition.Contains(existing, StringComparison.OrdinalIgnoreCase) ? addition : $"{existing} {addition}",
+            _clock.GetCurrentInstant());
+
+        _uow.FeedbackAnswers.Update(answer);
+        await _uow.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     /// <summary>Their own answer, on a question that invited one. Both halves are kept — the
     /// option so the count is right, the words so the count means something.</summary>
     public async Task RecordOtherAsync(

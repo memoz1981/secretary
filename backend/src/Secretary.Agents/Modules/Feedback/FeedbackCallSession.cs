@@ -28,7 +28,20 @@ public sealed class FeedbackCallSession
     /// order line's NO_INPUT: a tool called out of order must say so rather than do its best.</summary>
     public int? ServedQuestionId { get; private set; }
 
-    public void Served(int questionId) => ServedQuestionId = questionId;
+    /// <summary>Whether the question just served was an open one.
+    ///
+    /// ⚠ Kept because an open answer arrives in pieces. A caller saying "ümumi rəylərim belədir
+    /// ki, yəni servis çox yaxşıdır… başqa" pauses in the middle, the provider's voice detection
+    /// ends the turn there, and the agent records what it has. The rest of the sentence then
+    /// looks like an answer to a question nobody asked, and was thrown away. It is the same
+    /// answer continuing, and only an open question can continue.</summary>
+    public bool ServedIsOpen { get; private set; }
+
+    public void Served(int questionId, bool isOpen)
+    {
+        ServedQuestionId = questionId;
+        ServedIsOpen = isOpen;
+    }
 
     /// <summary>How many times a question has been answered with something unmatchable.
     ///

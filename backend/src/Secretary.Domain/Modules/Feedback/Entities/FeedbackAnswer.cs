@@ -67,6 +67,22 @@ public sealed class FeedbackAnswer : BaseEntity
         return answer;
     }
 
+    /// <summary>The caller had not finished. Replaces the words with the fuller version.
+    ///
+    /// ⚠ Only ever more of the same answer, never a second one — the service decides that, and
+    /// the entity refuses to empty an answer it already has, because a truncated sentence is
+    /// still better than nothing.</summary>
+    public void Extend(string text, Instant now)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new ArgumentException("There is nothing to add to this answer.", nameof(text));
+        }
+
+        Text = text.Trim();
+        Touch(now);
+    }
+
     /// <summary>Asked, and would not say.</summary>
     public static FeedbackAnswer Refused(int callId, int questionId, Instant now)
     {
