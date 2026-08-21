@@ -42,6 +42,13 @@ public interface ISurveyRequestRepository : IRepository<SurveyRequest>
 
 public interface IFeedbackCallRepository : IRepository<FeedbackCall>
 {
+    /// <summary>Every call for one tenant, for the platform admin's view of them.
+    ///
+    /// ⚠ Ignores the tenant query filter and takes the id explicitly. The platform admin has no
+    /// TenantId of their own, so the ambient filter — the thing that keeps tenants apart
+    /// everywhere else — matches nothing at all for the one caller allowed to look across them.</summary>
+    Task<IReadOnlyList<FeedbackCall>> GetForTenantAsync(int tenantId, CancellationToken cancellationToken);
+
     /// <summary>Newest first, optionally bounded and optionally one questionnaire — the two
     /// filters the calls page and the dashboard both need. The questionnaire is reached through
     /// the request, which is the only place it is recorded.</summary>

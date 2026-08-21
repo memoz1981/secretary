@@ -11,6 +11,7 @@ namespace Secretary.Agents;
 public sealed class AppointmentAgentModule : IAgentModule
 {
     private readonly ClientTools _clientTools;
+    private readonly Appointment.AppointmentCallSession _session;
     private readonly ServiceCatalogTools _serviceCatalogTools;
     private readonly AppointmentTools _appointmentTools;
     private readonly EscalationTools _escalationTools;
@@ -18,10 +19,12 @@ public sealed class AppointmentAgentModule : IAgentModule
     private readonly CallService _calls;
 
     public AppointmentAgentModule(
-        ClientTools clientTools, ServiceCatalogTools serviceCatalogTools, AppointmentTools appointmentTools,
+        ClientTools clientTools, Appointment.AppointmentCallSession session,
+        ServiceCatalogTools serviceCatalogTools, AppointmentTools appointmentTools,
         EscalationTools escalationTools, CallControlTools callControlTools, CallService calls)
     {
         _clientTools = clientTools;
+        _session = session;
         _serviceCatalogTools = serviceCatalogTools;
         _appointmentTools = appointmentTools;
         _escalationTools = escalationTools;
@@ -41,7 +44,8 @@ public sealed class AppointmentAgentModule : IAgentModule
     public async Task LogCallAsync(CallLogEntry entry, CancellationToken cancellationToken)
         => await _calls.LogAsync(
             new LogCallRequest(
-                entry.CallerPhoneNumber, RelatedAppointmentId: null, entry.Classification, entry.Outcome,
+                _session.ClientId, entry.CallerPhoneNumber, RelatedAppointmentId: null,
+                entry.Classification, entry.Outcome,
                 entry.DurationSeconds, entry.TurnCount, entry.CallerTurnCount, WaitTimeSeconds: null,
                 entry.RecordingUrl, entry.Transcript, entry.StartedAt, entry.Pipeline, entry.ModelUsages),
             cancellationToken);

@@ -79,7 +79,7 @@ public sealed record SurveyRequestResponse(
     Instant? LastAttemptAt,
     Instant? NextAttemptDueAt,
     bool NeedsFollowUp,
-    decimal TotalCostUsd);
+    decimal? TotalCostUsd);
 
 public sealed record SaveRetryPolicyRequest(int RetryCount, int RetryDelayMinutes);
 
@@ -97,17 +97,21 @@ public sealed record FeedbackCallResponse(
     int DurationSeconds,
     int TurnCount,
     int CallerTurnCount,
-    string AgentModel,
+    /// <summary>Null when this caller may not be shown call costs. Which model answered is
+    /// the same commercial fact as what it cost — the rates are published — so the two are
+    /// withheld together. See CallCostVisibility.</summary>
+    string? AgentModel,
     CallPipeline Pipeline,
     TokenUsage TokenUsage,
-    decimal CostUsd,
+    decimal? CostUsd,
     int AnsweredCount,
     int QuestionCount)
 {
     public bool IsCompleted => Status == FeedbackCallStatus.Completed;
 
     /// <summary>Null for a call that never started — a rate over nothing is not zero.</summary>
-    public decimal? CostPerMinuteUsd => DurationSeconds <= 0 ? null : CostUsd * 60m / DurationSeconds;
+    public decimal? CostPerMinuteUsd =>
+        CostUsd is not { } cost || DurationSeconds <= 0 ? null : cost * 60m / DurationSeconds;
 }
 
 public sealed record FeedbackAnswerResponse(
@@ -141,7 +145,7 @@ public sealed record FeedbackCoverage(
     int NeedsHuman,
     int Attempts,
     int AverageDurationSeconds,
-    decimal TotalCostUsd)
+    decimal? TotalCostUsd)
 {
     /// <summary>People who picked up and engaged. The honest denominator for anything about how
     /// well the agent does its job.</summary>

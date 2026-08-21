@@ -19,8 +19,14 @@ public sealed class CallService
     private readonly ICurrentTenantProvider _currentTenant;
     private readonly TokenPricebook _pricebook;
 
-    public CallService(IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook)
+    /// <summary>Whether this caller may see what a call cost. See CallCostVisibility.</summary>
+    private readonly CallCostVisibility _costs;
+
+    public CallService(
+        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook,
+        CallCostVisibility costs)
     {
+        _costs = costs;
         _uow = uow;
         _clock = clock;
         _currentTenant = currentTenant;
@@ -32,7 +38,13 @@ public sealed class CallService
         var tenantId = _currentTenant.TenantId
             ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
-        var client = await _uow.Clients.GetByPhoneNumberAsync(request.CallerPhoneNumber, cancellationToken);
+        // Who the agent identified, if it says so; the number it rang from otherwise. The
+        // lookup alone never matched a browser call, whose number is the literal string
+        // "local-device-call", so the log named nobody even when the agent had just booked an
+        // appointment for somebody by name.
+        var client = request.ClientId is { } identified
+            ? await _uow.Clients.GetByIdAsync(identified, cancellationToken)
+            : await _uow.Clients.GetByPhoneNumberAsync(request.CallerPhoneNumber, cancellationToken);
 
         // The one moment this call is ever priced. Everything downstream — Call Log, Call
         // Detail, the KPI dashboard's spend figures — reads the stored number, so correcting a
@@ -55,7 +67,7 @@ public sealed class CallService
 
         await _uow.Calls.AddAsync(call, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
-        return ToResponse(call, client);
+        return ToResponse(call, client, await _costs.ShowAsync(call.CostUsd, cancellationToken));
     }
 
     public async Task<IReadOnlyList<CallResponse>> SearchAsync(CallSearchRequest request, CancellationToken cancellationToken)
@@ -70,7 +82,7 @@ public sealed class CallService
             var client = call.ClientId is int clientId
                 ? await _uow.Clients.GetByIdAsync(clientId, cancellationToken)
                 : null;
-            responses.Add(ToResponse(call, client));
+            responses.Add(ToResponse(call, client, await _costs.ShowAsync(call.CostUsd, cancellationToken)));
         }
 
         return responses;
@@ -85,7 +97,9 @@ public sealed class CallService
             ? await _uow.Clients.GetByIdAsync(clientId, cancellationToken)
             : null;
 
-        return new CallDetailResponse(ToResponse(call, client), call.Transcript);
+        return new CallDetailResponse(
+            ToResponse(call, client, await _costs.ShowAsync(call.CostUsd, cancellationToken)),
+            call.Transcript);
     }
 
     /// <summary>Every model that served the call, for the record's AgentModel column — a chained
@@ -107,10 +121,11 @@ public sealed class CallService
             : described[..agentModelColumnLength];
     }
 
-    private static CallResponse ToResponse(Call call, Client? client)
+    private static CallResponse ToResponse(Call call, Client? client, decimal? costUsd)
         => new(
             call.Id, call.ClientId, call.CallerPhoneNumber, client?.Name, call.RelatedAppointmentId,
             call.Classification, call.Outcome, call.DurationSeconds, call.TurnCount, call.CallerTurnCount,
-            call.WaitTimeSeconds, call.RecordingUrl, call.StartedAt, call.AgentModel, call.Pipeline,
-            call.TokenUsage, call.CostUsd);
+            call.WaitTimeSeconds, call.RecordingUrl, call.StartedAt,
+            costUsd is null ? null : call.AgentModel, call.Pipeline,
+            call.TokenUsage, costUsd);
 }

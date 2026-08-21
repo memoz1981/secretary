@@ -73,6 +73,23 @@ export function TenantListPage() {
             ),
           },
           { header: t("colCreated"), render: (tenant) => new Date(tenant.createdAt).toLocaleDateString(), className: "mono" },
+          {
+            // A second destination from the same row: the row itself opens the settings, this
+            // opens what the account is actually doing.
+            header: "",
+            render: (tenant) => (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/admin/tenants/${tenant.id}/dashboard`);
+                }}
+              >
+                {t("tenantDashboard")}
+              </Button>
+            ),
+          },
         ]}
       />
       <div className="note">{t("rowClickToTenantDetail")}</div>

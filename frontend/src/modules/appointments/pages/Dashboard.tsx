@@ -81,7 +81,12 @@ export function DashboardPage() {
           </div>
           {/* What the agent cost to run over this range. Sits directly under the volume tiles
               because the two only mean anything together: 400 calls is good news or bad
-              depending entirely on the line below it. */}
+              depending entirely on the line below it.
+
+              Both money cards are absent for a tenant who may not see costs — see
+              CallCostVisibility. Not greyed out and not zeroed: a card of dashes invites the
+              question, and the answer is not one we want to be having on a customer's screen. */}
+          {state.data.totalCostUsd !== null && (
           <Card style={{ marginTop: "var(--space-4)" }}>
             <h2>{t("agentSpend")}</h2>
             <div className="stat-grid" style={{ marginTop: "var(--space-3)" }}>
@@ -107,9 +112,11 @@ export function DashboardPage() {
               />
             </div>
           </Card>
+          )}
           {/* Per mode, because a blended average across architectures that differ tenfold in
               cost describes none of them. All four are listed whether or not they were dialled
               in this range — the gaps are part of the comparison. */}
+          {state.data.spendByPipeline.length > 0 && CALL_PIPELINES.length > 1 && (
           <Card style={{ marginTop: "var(--space-4)" }}>
             <h2>{t("spendByPipeline")}</h2>
             <div className="table-scroll">
@@ -141,6 +148,7 @@ export function DashboardPage() {
               </table>
             </div>
           </Card>
+          )}
           <div className="row" style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
             <Card style={{ flex: 1 }}>
               <h2>{t("escalationOutcomes")}</h2>

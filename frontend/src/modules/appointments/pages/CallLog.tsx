@@ -1,3 +1,4 @@
+import type { CallResponse } from "@/shared/api/types";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
@@ -7,6 +8,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
+import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { searchCalls } from "@/modules/appointments/api/calls";
 import { CALL_PIPELINES, type CallClassification, type CallOutcome, type CallPipeline } from "@/shared/api/types";
 import { PIPELINE_INFO, pipelineLabel } from "@/shared/lib/pipelines";
@@ -60,6 +62,11 @@ export function CallLogPage() {
   // Hidden rather than shown as a row of dashes.
   const rows = state.status === "success" ? state.data.filter((c) => c.pipeline !== "Unknown") : [];
 
+  // Whether this caller may be shown call costs, read off the data rather than off the session:
+  // the server already decided, and a second copy of that decision on the client is a second
+  // thing that can disagree with it. See CallCostVisibility.
+  const showsCosts = rows.some((c) => c.costUsd !== null);
+
   return (
     <AppShell {...shell}>
       <h1 className="page-title" style={{ marginBottom: "var(--space-4)" }}>
@@ -82,15 +89,18 @@ export function CallLogPage() {
             </option>
           ))}
         </select>
-        {/* The filter that makes the four comparable: one architecture at a time, same range. */}
-        <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
-          <option value="">{t("allPipelines")}</option>
-          {CALL_PIPELINES.map((p) => (
-            <option key={p} value={p}>
-              {PIPELINE_INFO[p].short}
-            </option>
-          ))}
-        </select>
+        {/* The filter that made the architectures comparable, one at a time. Absent while there
+            is only one to pick — see CALL_PIPELINES. */}
+        {CALL_PIPELINES.length > 1 && (
+          <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
+            <option value="">{t("allPipelines")}</option>
+            {CALL_PIPELINES.map((p) => (
+              <option key={p} value={p}>
+                {PIPELINE_INFO[p].short}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadCalls")}</div>}
       <DataTable
@@ -101,10 +111,17 @@ export function CallLogPage() {
         emptyMessage={classification || outcome || pipeline ? t("noCallsMatchFilters") : t("noCallsYet")}
         columns={[
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.startedAt, language), className: "mono" },
-          // Immediately after the timestamp: with four pipelines in one log, every other column
-          // on the row is meaningless until you know which one produced it.
-          { header: t("colPipeline"), render: (c) => pipelineLabel(c.pipeline) },
-          { header: t("colClient"), render: (c) => c.clientName ?? c.callerPhoneNumber },
+          // Immediately after the timestamp, when it is shown at all: with several pipelines in
+          // one log, every other column on the row is meaningless until you know which one
+          // produced it.
+          //
+          // ⚠ Withheld with the costs. Which architecture answered names the provider, the
+          // provider publishes its rates, and a tenant who has one of those can work out the
+          // other — which is the number the flag exists to withhold.
+          ...(showsCosts
+            ? [{ header: t("colPipeline"), render: (c: CallResponse) => pipelineLabel(c.pipeline) }]
+            : []),
+          { header: t("colClient"), render: (c) => callerLabel(c.clientName, c.callerPhoneNumber, t("unknownCaller")) },
           { header: t("colClassification"), render: (c) => translateEnum(callClassificationLabels, c.classification, language) },
           {
             header: t("colOutcome"),
@@ -125,8 +142,18 @@ export function CallLogPage() {
             render: (c) => `${c.callerTurnCount}/${c.turnCount}`,
             className: "mono",
           },
-          { header: t("colCost"), render: (c) => formatUsd(c.costUsd), className: "mono" },
-          { header: t("colCostPerMinute"), render: (c) => formatUsd(c.costPerMinuteUsd), className: "mono" },
+          // Dropped entirely rather than filled with dashes when this tenant may not see
+          // costs — a column of "—" reads as data we failed to load. See CallCostVisibility.
+          ...(showsCosts
+            ? [
+                { header: t("colCost"), render: (c: CallResponse) => formatUsd(c.costUsd), className: "mono" },
+                {
+                  header: t("colCostPerMinute"),
+                  render: (c: CallResponse) => formatUsd(c.costPerMinuteUsd),
+                  className: "mono",
+                },
+              ]
+            : []),
         ]}
       />
       <div className="note">{t("rowClickToCallDetail")}</div>

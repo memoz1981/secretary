@@ -20,6 +20,10 @@ export function CreateTenantPage() {
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("Asia/Baku");
   const [phoneLine, setPhoneLine] = useState("");
+
+  // Off unless somebody deliberately turns it on. See the tenant entity: this is the
+  // platform's switch, and the expectation is demonstration tenants only.
+  const [showCallCosts, setShowCallCosts] = useState(false);
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPassword, setOwnerPassword] = useState("");
@@ -46,6 +50,7 @@ export function CreateTenantPage() {
         name,
         timezone,
         phoneLine: phoneLine || null,
+        showCallCosts,
         ownerName,
         ownerEmail,
         ownerPassword,
@@ -96,6 +101,16 @@ export function CreateTenantPage() {
             value={phoneLine}
             onChange={(e) => setPhoneLine(e.target.value)}
           />
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={showCallCosts}
+              onChange={(e) => setShowCallCosts(e.target.checked)}
+            />
+            <span>{t("showCallCosts")}</span>
+          </label>
+          <div className="note">{t("showCallCostsExplain")}</div>
+
           <div className="section-label">{t("firstOwnerAccount")}</div>
           <TextField
             label={t("ownerName")}

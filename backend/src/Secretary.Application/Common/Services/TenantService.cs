@@ -46,7 +46,8 @@ public sealed class TenantService
         }
 
         var now = _clock.GetCurrentInstant();
-        var tenant = Tenant.Create(request.Name, request.Timezone, request.PhoneLine, now);
+        var tenant = Tenant.Create(
+            request.Name, request.Timezone, request.PhoneLine, request.ShowCallCosts, now);
         await _uow.Tenants.AddAsync(tenant, cancellationToken);
 
         // The tenant's identity Id only exists after the first save — the owner/agent
@@ -146,7 +147,9 @@ public sealed class TenantService
         var tenant = await _uow.Tenants.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(Tenant), id);
 
-        tenant.UpdateDetails(request.Name, request.Timezone, request.PhoneLine, _clock.GetCurrentInstant());
+        tenant.UpdateDetails(
+            request.Name, request.Timezone, request.PhoneLine, request.ShowCallCosts,
+            _clock.GetCurrentInstant());
         await _uow.SaveChangesAsync(cancellationToken);
         return ToResponse(tenant, await _uow.TenantModules.GetEnabledModulesAsync(id, cancellationToken));
     }
@@ -160,8 +163,21 @@ public sealed class TenantService
     }
 
     /// <summary>Tenant self-service: an Owner updates their own business's name/phone/timezone.</summary>
-    public async Task<TenantResponse> UpdateCurrentAsync(UpdateTenantRequest request, CancellationToken cancellationToken)
-        => await UpdateAsync(RequireTenant(), request, cancellationToken);
+    /// <summary>⚠ Keeps ShowCallCosts exactly as it was. A tenant editing their own name and
+    /// timezone does not get to decide whether they may see our costs, and the way to guarantee
+    /// that is to carry the stored value across rather than to trust a field not to arrive.</summary>
+    public async Task<TenantResponse> UpdateCurrentAsync(
+        UpdateOwnTenantRequest request, CancellationToken cancellationToken)
+    {
+        var tenantId = RequireTenant();
+        var tenant = await _uow.Tenants.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Tenant), tenantId);
+
+        return await UpdateAsync(
+            tenantId,
+            new UpdateTenantRequest(request.Name, request.Timezone, request.PhoneLine, tenant.ShowCallCosts),
+            cancellationToken);
+    }
 
     public async Task DeactivateAsync(int id, CancellationToken cancellationToken)
     {
@@ -187,6 +203,6 @@ public sealed class TenantService
     /// <summary>Modules are passed in rather than loaded here, so a list of tenants costs one
     /// query for all their grants instead of one per row.</summary>
     private static TenantResponse ToResponse(Tenant tenant, IReadOnlyList<Module> enabledModules)
-        => new(tenant.Id, tenant.Name, tenant.Timezone, tenant.PhoneLine, tenant.Status, tenant.CreatedAt,
-            enabledModules);
+        => new(tenant.Id, tenant.Name, tenant.Timezone, tenant.PhoneLine, tenant.ShowCallCosts,
+            tenant.Status, tenant.CreatedAt, enabledModules);
 }

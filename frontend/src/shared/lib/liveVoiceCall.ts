@@ -9,6 +9,7 @@
 // chipmunk — and it will still transcribe *something*, which is worse than failing outright
 // because the call appears to work while every word is wrong.
 
+import { CALL_PIPELINES } from "@/shared/api/types";
 import type { CallPipeline, Module } from "@/shared/api/types";
 
 interface PipelineProfile {
@@ -79,7 +80,9 @@ export class LiveVoiceCall {
     private readonly apiBaseUrl: string,
     private readonly token: string,
     private readonly callbacks: LiveCallCallbacks,
-    private readonly pipeline: CallPipeline = "OpenAiRealtime_2_1",
+    // Same reasoning as LiveCallPage's initial state: follow the offered list rather than
+    // naming one, so a default cannot outlive the list it came from.
+    private readonly pipeline: CallPipeline = CALL_PIPELINES[0],
     /** Which line is being dialled. One line answers as one module, so this decides the agent's
      *  tools and instructions — the stand-in for the inbound number a real phone call carries. */
     private readonly module: Module = "Appointment",

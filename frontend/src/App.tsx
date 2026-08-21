@@ -8,6 +8,7 @@ import { TenantListPage } from "@/pages/TenantList";
 import { CreateTenantPage } from "@/pages/CreateTenant";
 import { TenantDetailPage } from "@/pages/TenantDetail";
 import { AdminPage } from "@/pages/Admin";
+import { TenantDashboardPage } from "@/pages/TenantDashboard";
 import { MODULE_REGISTRY } from "@/modules/registry";
 import { ModuleOverlays } from "@/modules/ModuleOverlays";
 
@@ -51,6 +52,17 @@ export function App() {
           element={
             <RequireRole roles={["PlatformAdmin"]}>
               <TenantDetailPage />
+            </RequireRole>
+          }
+        />
+        {/* Its own page rather than a panel on the detail screen: the detail screen is where a
+            tenant is configured, and this is where they are read. Two different jobs that happen
+            to be about the same row. */}
+        <Route
+          path="/admin/tenants/:id/dashboard"
+          element={
+            <RequireRole roles={["PlatformAdmin"]}>
+              <TenantDashboardPage />
             </RequireRole>
           }
         />

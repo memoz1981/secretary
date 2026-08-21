@@ -1,3 +1,5 @@
+using Secretary.Application.Abstractions.Persistence;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Services;
 using Secretary.Application.Tests.TestSupport;
 using Secretary.Domain.Entities;
@@ -21,7 +23,7 @@ public sealed class DashboardServiceTests
 
     public DashboardServiceTests()
     {
-        _sut = new DashboardService(_uow.Object);
+        _sut = new DashboardService(_uow.Object, CostsVisible(_uow.UnitOfWork.Object));
     }
 
     private static Call MakeCall(
@@ -160,4 +162,16 @@ public sealed class DashboardServiceTests
 
         result.AppointmentVolume.ShouldBe(1);
     }
+
+    /// <summary>Costs visible, so these tests are about the figures rather than about who may
+    /// see them. A caller with no tenant of their own is the platform admin, and the platform
+    /// admin sees everything — see CallCostVisibility, and CallCostVisibilityTests for the rule
+    /// itself.</summary>
+    private static CallCostVisibility CostsVisible(IUnitOfWork uow)
+    {
+        var platformAdmin = new Mock<ICurrentTenantProvider>();
+        platformAdmin.SetupGet(t => t.TenantId).Returns((int?)null);
+        return new CallCostVisibility(uow, platformAdmin.Object);
+    }
+
 }

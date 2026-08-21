@@ -186,6 +186,12 @@ internal sealed class OrderCallRepository : IOrderCallRepository
 
         return await query.OrderByDescending(c => c.StartedAt).ToListAsync(cancellationToken);
     }
+    public async Task<IReadOnlyList<OrderCall>> GetForTenantAsync(int tenantId, CancellationToken cancellationToken)
+        => await _db.OrderCalls
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
 }
 
 internal sealed class OrderSettingsRepository : IOrderSettingsRepository

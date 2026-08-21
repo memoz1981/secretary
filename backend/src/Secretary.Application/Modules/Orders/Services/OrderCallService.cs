@@ -24,9 +24,14 @@ public sealed class OrderCallService
     private readonly ICurrentTenantProvider _currentTenant;
     private readonly TokenPricebook _pricebook;
 
+    /// <summary>Whether this caller may see what a call cost. See CallCostVisibility.</summary>
+    private readonly CallCostVisibility _costs;
+
     public OrderCallService(
-        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook)
+        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook,
+        CallCostVisibility costs)
     {
+        _costs = costs;
         _uow = uow;
         _clock = clock;
         _currentTenant = currentTenant;
@@ -69,7 +74,11 @@ public sealed class OrderCallService
         var names = (await _uow.Customers.GetAllAsync(cancellationToken))
             .ToDictionary(c => c.Id, c => c.Name);
 
-        return calls.Select(call => ToResponse(call, NameFor(names, call.CustomerId))).ToList();
+        var showCosts = await _costs.IsAllowedAsync(cancellationToken);
+        return calls
+            .Select(call => ToResponse(
+                call, NameFor(names, call.CustomerId), showCosts ? call.CostUsd : null))
+            .ToList();
     }
 
     public async Task<OrderCallDetailResponse> GetDetailAsync(int id, CancellationToken cancellationToken)
@@ -86,7 +95,7 @@ public sealed class OrderCallService
             ? await _uow.Customers.GetByIdAsync(customerId, cancellationToken)
             : null;
 
-        return ToResponse(call, customer?.Name);
+        return ToResponse(call, customer?.Name, await _costs.ShowAsync(call.CostUsd, cancellationToken));
     }
 
     private static string? NameFor(IReadOnlyDictionary<int, string?> names, int? customerId)
@@ -109,9 +118,10 @@ public sealed class OrderCallService
         return described.Length <= agentModelColumnLength ? described : described[..agentModelColumnLength];
     }
 
-    private static OrderCallResponse ToResponse(OrderCall call, string? customerName)
+    private static OrderCallResponse ToResponse(OrderCall call, string? customerName, decimal? costUsd)
         => new(
             call.Id, call.CustomerId, customerName, call.CallerPhoneNumber, call.RelatedOrderId, call.Outcome,
-            call.DurationSeconds, call.TurnCount, call.CallerTurnCount, call.StartedAt, call.AgentModel,
-            call.Pipeline, call.TokenUsage, call.CostUsd);
+            call.DurationSeconds, call.TurnCount, call.CallerTurnCount, call.StartedAt,
+            costUsd is null ? null : call.AgentModel,
+            call.Pipeline, call.TokenUsage, costUsd);
 }

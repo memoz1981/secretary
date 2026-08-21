@@ -48,6 +48,13 @@ public interface IOrderRepository : IRepository<Order>
 
 public interface IOrderCallRepository : IRepository<OrderCall>
 {
+    /// <summary>Every call for one tenant, for the platform admin's view of them.
+    ///
+    /// ⚠ Ignores the tenant query filter and takes the id explicitly. The platform admin has no
+    /// TenantId of their own, so the ambient filter — the thing that keeps tenants apart
+    /// everywhere else — matches nothing at all for the one caller allowed to look across them.</summary>
+    Task<IReadOnlyList<OrderCall>> GetForTenantAsync(int tenantId, CancellationToken cancellationToken);
+
     /// <summary>Newest first, optionally bounded. The call log is read as "what happened
     /// today", so the default order is the one the page wants.</summary>
     Task<IReadOnlyList<OrderCall>> SearchAsync(

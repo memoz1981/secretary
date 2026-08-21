@@ -44,6 +44,19 @@ export function TenantDetailPage() {
   /// without a word confirming it, the only way to know it worked was to leave and come back.
   const [justSaved, setJustSaved] = useState(false);
 
+  /// Saving the details changed nothing visible — the fields already show what you typed — so
+  /// without a word confirming it, the only way to know was to leave and come back. Same
+  /// reasoning as the module switches above.
+  const [detailsSaved, setDetailsSaved] = useState(false);
+
+  /// Every edit clears the confirmation. A "Saved" that stays put while you type is worse than
+  /// none: it says the thing on screen is the thing on the server, and it stops being true the
+  /// moment you touch a field.
+  function edit(patch: Partial<NonNullable<typeof form>>) {
+    setDetailsSaved(false);
+    setForm((current) => (current === null ? current : { ...current, ...patch }));
+  }
+
   const serverModules = modulesState.status === "success" ? modulesState.data : null;
   if (serverModules && !moduleDraft) {
     setModuleDraft(Object.fromEntries(serverModules.map((m) => [m.module, m.enabled])));
@@ -53,16 +66,28 @@ export function TenantDetailPage() {
     ? serverModules.filter((m) => moduleDraft[m.module] !== m.enabled)
     : [];
 
-  const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
+  const [form, setForm] =
+    useState<{ name: string; timezone: string; phoneLine: string; showCallCosts: boolean } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
   if (tenant && !form) {
-    setForm({ name: tenant.name, timezone: tenant.timezone, phoneLine: tenant.phoneLine ?? "" });
+    setForm({
+      name: tenant.name,
+      timezone: tenant.timezone,
+      phoneLine: tenant.phoneLine ?? "",
+      showCallCosts: tenant.showCallCosts,
+    });
   }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     if (!form) return;
-    await updateTenant(token!, tenantId, { name: form.name, timezone: form.timezone, phoneLine: form.phoneLine || null });
+    await updateTenant(token!, tenantId, {
+      name: form.name,
+      timezone: form.timezone,
+      phoneLine: form.phoneLine || null,
+      showCallCosts: form.showCallCosts,
+    });
+    setDetailsSaved(true);
     setRefreshKey((k) => k + 1);
   }
 
@@ -109,19 +134,40 @@ export function TenantDetailPage() {
             <Pill variant={tenant.status === "Active" ? "success" : "neutral"}>
               {tenant.status === "Active" ? t("statusActive") : t("statusInactive")}
             </Pill>
+
           </h1>
+          {/* Above the settings rather than squeezed into the heading beside the name: what an
+              account is doing is the first thing anybody opening it wants, and configuring it is
+              the second. A real button, because it goes somewhere. */}
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <Button type="button" onClick={() => navigate(`/admin/tenants/${tenantId}/dashboard`)}>
+              {t("tenantDashboard")}
+            </Button>
+          </div>
           <Card>
             <form onSubmit={handleSave}>
-              <TextField label={t("businessName")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <TextField label={t("businessName")} value={form.name} onChange={(e) => edit({ name: e.target.value })} />
               <SelectField
                 label={t("timezone")}
                 value={form.timezone}
-                onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+                onChange={(e) => edit({ timezone: e.target.value })}
                 options={[{ value: "Asia/Baku", label: "Asia/Baku" }]}
               />
-              <TextField label={t("phoneLine")} value={form.phoneLine} onChange={(e) => setForm({ ...form, phoneLine: e.target.value })} />
+              <TextField label={t("phoneLine")} value={form.phoneLine} onChange={(e) => edit({ phoneLine: e.target.value })} />
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={form.showCallCosts}
+                  onChange={(e) => edit({ showCallCosts: e.target.checked })}
+                />
+                <span>{t("showCallCosts")}</span>
+              </label>
+              <div className="note">{t("showCallCostsExplain")}</div>
               <div className="actions">
                 <Button type="submit">{t("saveChanges")}</Button>
+                {detailsSaved && (
+                  <span className="sub" style={{ alignSelf: "center" }}>{t("tenantDetailsSaved")}</span>
+                )}
                 <Button type="button" variant="danger" onClick={handleToggleStatus}>
                   {tenant.status === "Active" ? t("deactivateTenant") : t("reactivateTenant")}
                 </Button>

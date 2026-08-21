@@ -426,6 +426,12 @@ export const translations = {
   },
   timezone: { az: "Saat qurşağı", ru: "Часовой пояс", en: "Time zone" },
   phoneLine: { az: "Telefon xətti", ru: "Телефонная линия", en: "Phone line" },
+  showCallCosts: { az: "Zəng xərclərini göstər", ru: "Показывать стоимость звонков", en: "Show call costs" },
+  showCallCostsExplain: {
+    az: "Söndürülübsə, müştəri zənglərin qiymətini görmür. Yalnız demo hesablar üçün.",
+    ru: "Если выключено, арендатор не видит стоимость звонков. Только для демо-аккаунтов.",
+    en: "Off, and the tenant never sees what a call cost. Demonstration accounts only.",
+  },
   phoneLinePlaceholder: {
     az: "Təyin edilməyib — sonra qoşulacaq",
     ru: "Не назначено — подключим позже",
@@ -641,6 +647,7 @@ export const translations = {
   // "Sual/cavab" — questions the caller asked over answers the agent gave, shown as "4/5".
   colQuestionsAnswers: { az: "Sual/cavab", ru: "Вопр./отв.", en: "Q/A" },
   colPipeline: { az: "Rejim", ru: "Режим", en: "Mode" },
+  unknownCaller: { az: "Naməlum zəng edən", ru: "Неизвестный абонент", en: "Unknown caller" },
   allPipelines: { az: "Bütün rejimlər", ru: "Все режимы", en: "All modes" },
   spendByPipeline: { az: "Rejimlər üzrə xərc", ru: "Расходы по режимам", en: "Spend by mode" },
   colCalls: { az: "Zənglər", ru: "Звонки", en: "Calls" },
@@ -891,6 +898,29 @@ export const translations = {
   rangeWeek: { az: "Bu həftə", ru: "На этой неделе", en: "This week" },
   rangeMonth: { az: "Bu ay", ru: "В этом месяце", en: "This month" },
   totalCalls: { az: "Ümumi zənglər", ru: "Всего звонков", en: "Total calls" },
+  totalMinutes: { az: "Ümumi müddət", ru: "Общая длительность", en: "Total time" },
+  usage: { az: "İstifadə", ru: "Использование", en: "Usage" },
+  byModule: { az: "Modullar üzrə", ru: "По модулям", en: "By module" },
+  module: { az: "Modul", ru: "Модуль", en: "Module" },
+  howCallsEnded: { az: "Zənglər necə bitdi", ru: "Чем закончились звонки", en: "How calls ended" },
+  categoryAnswered: { az: "Cavablandı", ru: "Обработан", en: "Answered" },
+  categoryForwarded: { az: "Operatora ötürüldü", ru: "Передан оператору", en: "Forwarded to a person" },
+  categoryUnfinished: { az: "Yarımçıq", ru: "Не завершён", en: "Unfinished" },
+  categoryNotAnswered: { az: "Cavab verilmədi", ru: "Не ответили", en: "Not answered" },
+  // "İcarəçi" is a lessee — a tenant of a building. Right for the code, wrong on screen:
+  // these are customers who bought the product, and nobody in the business calls them
+  // that out loud.
+  tenantDashboard: { az: "Müştəri paneli", ru: "Панель клиента", en: "Customer dashboard" },
+  tenantDetailsSaved: { az: "Yadda saxlanıldı.", ru: "Сохранено.", en: "Saved." },
+  tenantDashboardSubtitle: {
+    az: "Bütün modullar üzrə zənglər və xərclər.",
+    ru: "Звонки и расходы по всем модулям.",
+    en: "Calls and cost across every module they hold.",
+  },
+  // No arrow in the string. The one place it is rendered draws its own, and having both
+  // produced "← ← ...".
+  backToTenant: { az: "Əsas səhifəyə qayıt", ru: "Вернуться на главную", en: "Back to the main page" },
+  couldNotLoad: { az: "Yüklənmədi.", ru: "Не удалось загрузить.", en: "Couldn't load." },
   resolvedByAgent: {
     az: "Süni intellekt tərəfindən həll edilib",
     ru: "Решено ИИ-агентом",

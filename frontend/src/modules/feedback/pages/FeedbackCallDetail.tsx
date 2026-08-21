@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { Card } from "@/shared/components/Card";
@@ -10,7 +11,7 @@ import { formatDayMonthTime, formatTimeOfDay } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getFeedbackCall } from "@/modules/feedback/api/feedback";
-import { maskAzPhone } from "@/modules/feedback/api/phone";
+import { maskAzPhone, revealAzPhone } from "@/modules/feedback/api/phone";
 
 /** One call, in full: who, when, what it cost, and every answer with the time it was given.
  *
@@ -27,6 +28,8 @@ export function FeedbackCallDetailPage() {
   const { t, language } = useLanguage();
   const shell = useBusinessShell();
   const navigate = useNavigate();
+
+  const [numberShown, setNumberShown] = useState(false);
 
   const state = useApiData(() => getFeedbackCall(token!, Number(id)), [token, id]);
 
@@ -77,7 +80,18 @@ export function FeedbackCallDetailPage() {
           </div>
           <div>
             <div className="label">{t("colPhone")}</div>
-            <div className="value mono muted">{maskAzPhone(call.phoneNumber)}</div>
+            {/* Masked, with a way to see it. It had no way at all, which on the one page that
+                names a single person is where you are most likely to want to ring them. */}
+            {numberShown ? (
+              <div className="value mono">{revealAzPhone(call.phoneNumber)}</div>
+            ) : (
+              <div className="value mono muted">
+                {maskAzPhone(call.phoneNumber)}{" "}
+                <button className="link" onClick={() => setNumberShown(true)}>
+                  {t("showNumber")}
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <div className="label">{t("colStatus")}</div>
@@ -101,20 +115,27 @@ export function FeedbackCallDetailPage() {
               {call.callerTurnCount}/{call.turnCount}
             </div>
           </div>
-          <div>
-            <div className="label">{t("colAgent")}</div>
-            <div className="value" title={call.agentModel}>
-              {pipelineLabel(call.pipeline)}
-            </div>
-          </div>
-          <div>
-            <div className="label">{t("colCost")}</div>
-            <div className="value mono">{formatUsd(call.costUsd)}</div>
-          </div>
-          <div>
-            <div className="label">{t("colCostPerMinute")}</div>
-            <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
-          </div>
+          {/* See CallCostVisibility — absent means withheld, not unknown. The mode goes with the
+              money: naming the provider hands over half of what the flag exists to withhold,
+              because the provider publishes the other half. */}
+          {call.costUsd !== null && (
+            <>
+              <div>
+                <div className="label">{t("colAgent")}</div>
+                <div className="value" title={call.agentModel ?? undefined}>
+                  {pipelineLabel(call.pipeline)}
+                </div>
+              </div>
+              <div>
+                <div className="label">{t("colCost")}</div>
+                <div className="value mono">{formatUsd(call.costUsd)}</div>
+              </div>
+              <div>
+                <div className="label">{t("colCostPerMinute")}</div>
+                <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
+              </div>
+            </>
+          )}
         </div>
       </Card>
 

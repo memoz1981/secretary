@@ -8,6 +8,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
+import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getCallDetail } from "@/modules/appointments/api/calls";
 import type { CallOutcome, CallResponse } from "@/shared/api/types";
@@ -52,26 +53,41 @@ function CallCostCard({ call }: { call: CallResponse }) {
     <Card>
       <h2>{t("callCost")}</h2>
       <div className="field-grid">
-        <div className="field">
-          <label>{t("callCost")}</label>
-          <div className="value mono">{formatUsd(call.costUsd)}</div>
-        </div>
-        <div className="field">
-          <label>{t("costPerMinute")}</label>
-          <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
-        </div>
-        <div className="field">
-          <label>{t("costPerAnswer")}</label>
-          <div className="value mono">{formatUsd(call.costPerAnswerUsd)}</div>
-        </div>
-        <div className="field">
-          <label>{t("colPipeline")}</label>
-          <div className="value">{pipelineLabel(call.pipeline)}</div>
-        </div>
-        <div className="field">
-          <label>{t("agentModel")}</label>
-          <div className="value mono">{call.agentModel || "—"}</div>
-        </div>
+        {/* Only the money goes when this tenant may not see costs — see CallCostVisibility.
+            The pipeline, the model and the token counts are theirs either way, and a field
+            reading "—" would look like a figure we failed to compute rather than one withheld. */}
+        {call.costUsd !== null && (
+          <>
+            <div className="field">
+              <label>{t("callCost")}</label>
+              <div className="value mono">{formatUsd(call.costUsd)}</div>
+            </div>
+            <div className="field">
+              <label>{t("costPerMinute")}</label>
+              <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
+            </div>
+            <div className="field">
+              <label>{t("costPerAnswer")}</label>
+              <div className="value mono">{formatUsd(call.costPerAnswerUsd)}</div>
+            </div>
+          </>
+        )}
+        {/* Withheld with the costs, for the same reason as the model name: the provider's rates
+            are published. */}
+        {call.costUsd !== null && (
+          <div className="field">
+            <label>{t("colPipeline")}</label>
+            <div className="value">{pipelineLabel(call.pipeline)}</div>
+          </div>
+        )}
+        {/* Withheld with the costs — see CallCostVisibility. Which model answered is the same
+            commercial fact, because the rates are published. */}
+        {call.agentModel !== null && (
+          <div className="field">
+            <label>{t("agentModel")}</label>
+            <div className="value mono">{call.agentModel || "—"}</div>
+          </div>
+        )}
         <div className="field">
           <label>{t("totalTokens")}</label>
           <div className="value mono">{formatTokens(usage.totalTokens)}</div>
@@ -150,7 +166,9 @@ export function CallDetailPage() {
                 </div>
                 <div className="field">
                   <label>{t("colClient")}</label>
-                  <div className="value">{state.data.call.clientName ?? state.data.call.callerPhoneNumber}</div>
+                  <div className="value">
+                    {callerLabel(state.data.call.clientName, state.data.call.callerPhoneNumber, t("unknownCaller"))}
+                  </div>
                 </div>
               </div>
             </Card>

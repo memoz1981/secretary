@@ -25,7 +25,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<TokenPricebook>();
 
         services.AddScoped<AuthService>();
+        services.AddScoped<CallCostVisibility>();
         services.AddScoped<TenantService>();
+        services.AddScoped<TenantInsightsService>();
         services.AddScoped<AccountService>();
         services.AddScoped<ProviderService>();
         services.AddScoped<ServiceOfferingService>();

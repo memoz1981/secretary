@@ -5,7 +5,9 @@ import type {
   CreateTenantResult,
   Module,
   TenantModuleResponse,
+  TenantInsightsResponse,
   TenantResponse,
+  UpdateOwnTenantRequest,
   UpdateTenantRequest,
 } from "@/shared/api/types";
 
@@ -63,6 +65,11 @@ export function getCurrentTenant(token: string) {
   return apiFetch<TenantResponse>("/api/tenant", { token });
 }
 
-export function updateCurrentTenant(token: string, request: UpdateTenantRequest) {
+export function updateCurrentTenant(token: string, request: UpdateOwnTenantRequest) {
   return apiFetch<TenantResponse>("/api/tenant", { method: "PUT", body: request, token });
+}
+
+/** What a tenant has used, across every module they hold. Platform admin only. */
+export function getTenantInsights(token: string, id: number) {
+  return apiFetch<TenantInsightsResponse>(`/api/tenants/${id}/insights`, { token });
 }

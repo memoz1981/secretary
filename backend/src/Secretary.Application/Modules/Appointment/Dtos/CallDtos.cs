@@ -19,20 +19,25 @@ public sealed record CallResponse(
     int? WaitTimeSeconds,
     string RecordingUrl,
     Instant StartedAt,
-    string AgentModel,
+    /// <summary>Null when this caller may not be shown call costs. Which model answered is
+    /// the same commercial fact as what it cost — the rates are published — so the two are
+    /// withheld together. See CallCostVisibility.</summary>
+    string? AgentModel,
     CallPipeline Pipeline,
     TokenUsage TokenUsage,
-    decimal CostUsd)
+    decimal? CostUsd)
 {
     /// <summary>Null rather than zero for a call too short to divide by — a call that lasted no
     /// measurable time has no meaningful rate, and showing "$0.00/min" for it would drag the
     /// eye to a number that means nothing.</summary>
-    public decimal? CostPerMinuteUsd => DurationSeconds <= 0 ? null : CostUsd * 60m / DurationSeconds;
+    public decimal? CostPerMinuteUsd =>
+        CostUsd is not { } cost || DurationSeconds <= 0 ? null : cost * 60m / DurationSeconds;
 
     /// <summary>Cost per answer the agent gave. The more useful of the two rates in practice:
     /// minutes vary with how long the caller thinks, whereas every answer is a model round-trip
     /// billed the whole conversation so far, which is what actually drives the bill.</summary>
-    public decimal? CostPerAnswerUsd => TurnCount <= 0 ? null : CostUsd / TurnCount;
+    public decimal? CostPerAnswerUsd =>
+        CostUsd is not { } perAnswer || TurnCount <= 0 ? null : perAnswer / TurnCount;
 }
 
 public sealed record CallDetailResponse(CallResponse Call, string? Transcript);
@@ -40,6 +45,13 @@ public sealed record CallDetailResponse(CallResponse Call, string? Transcript);
 /// <summary>Logged once, at the end of a call, by the Agent-role caller (or derived
 /// server-side for calls staff handle manually — see CallService).</summary>
 public sealed record LogCallRequest(
+    /// <summary>Who the agent identified, when it did.
+    ///
+    /// ⚠ Passed rather than looked up. The lookup is by phone number, and a browser call has no
+    /// phone number — every local call is logged against the literal "local-device-call", which
+    /// matches no client. So the log was blank for calls that had just booked an appointment for
+    /// somebody named.</summary>
+    int? ClientId,
     string CallerPhoneNumber,
     int? RelatedAppointmentId,
     CallClassification Classification,

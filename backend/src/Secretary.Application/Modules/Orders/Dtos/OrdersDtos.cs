@@ -134,18 +134,23 @@ public sealed record OrderCallResponse(
     int TurnCount,
     int CallerTurnCount,
     Instant StartedAt,
-    string AgentModel,
+    /// <summary>Null when this caller may not be shown call costs. Which model answered is
+    /// the same commercial fact as what it cost — the rates are published — so the two are
+    /// withheld together. See CallCostVisibility.</summary>
+    string? AgentModel,
     CallPipeline Pipeline,
     TokenUsage TokenUsage,
-    decimal CostUsd)
+    decimal? CostUsd)
 {
     /// <summary>Null rather than zero for a call too short to divide by.</summary>
-    public decimal? CostPerMinuteUsd => DurationSeconds <= 0 ? null : CostUsd * 60m / DurationSeconds;
+    public decimal? CostPerMinuteUsd =>
+        CostUsd is not { } cost || DurationSeconds <= 0 ? null : cost * 60m / DurationSeconds;
 
     /// <summary>Cost per answer, which is the rate that actually tracks the bill: every answer
     /// is a round trip billed the whole conversation so far, while minutes vary with how long
     /// the caller spends thinking.</summary>
-    public decimal? CostPerAnswerUsd => TurnCount <= 0 ? null : CostUsd / TurnCount;
+    public decimal? CostPerAnswerUsd =>
+        CostUsd is not { } perAnswer || TurnCount <= 0 ? null : perAnswer / TurnCount;
 
     /// <summary>The plain version of "could the agent handle it" — one boolean rather than
     /// asking the page to know which of six outcomes count as success.</summary>

@@ -13,9 +13,13 @@ public sealed class DashboardService
 {
     private readonly IUnitOfWork _uow;
 
-    public DashboardService(IUnitOfWork uow)
+    /// <summary>Whether this caller may see what the calls cost. See CallCostVisibility.</summary>
+    private readonly CallCostVisibility _costs;
+
+    public DashboardService(IUnitOfWork uow, CallCostVisibility costs)
     {
         _uow = uow;
+        _costs = costs;
     }
 
     public async Task<DashboardSummaryResponse> GetSummaryAsync(Instant from, Instant to, CancellationToken cancellationToken)
@@ -35,6 +39,10 @@ public sealed class DashboardService
         var reminderCalls = calls.Where(c => c.Classification == CallClassification.ReminderConfirmation).ToList();
         var reminderNoAnswer = reminderCalls.Count(c => c.Outcome == CallOutcome.NoAnswer);
 
+        // ⚠ Every money figure on this page goes through the same gate, including the ones
+        // derived from a total. Hiding TotalCostUsd while leaving the per-minute average in
+        // place would give the number away by division.
+        var showCosts = await _costs.IsAllowedAsync(cancellationToken);
         var totalCostUsd = calls.Sum(c => c.CostUsd);
         var totalSeconds = calls.Sum(c => (long)c.DurationSeconds);
         var totalAnswers = calls.Sum(c => (long)c.TurnCount);
@@ -54,12 +62,12 @@ public sealed class DashboardService
             AverageTurnsToResolution: totalCalls == 0 ? 0 : calls.Average(c => c.TurnCount),
             AppointmentVolume: appointments.Count(a => a.AppointmentStatus != Domain.Enums.AppointmentStatus.Cancelled),
             ReminderNoAnswerRate: Rate(reminderNoAnswer, reminderCalls.Count),
-            TotalCostUsd: totalCostUsd,
-            AverageCostPerCallUsd: Per(totalCostUsd, totalCalls),
-            AverageCostPerMinuteUsd: Per(totalCostUsd * 60m, totalSeconds),
-            AverageCostPerAnswerUsd: Per(totalCostUsd, totalAnswers),
+            TotalCostUsd: showCosts ? totalCostUsd : null,
+            AverageCostPerCallUsd: showCosts ? Per(totalCostUsd, totalCalls) : null,
+            AverageCostPerMinuteUsd: showCosts ? Per(totalCostUsd * 60m, totalSeconds) : null,
+            AverageCostPerAnswerUsd: showCosts ? Per(totalCostUsd, totalAnswers) : null,
             TotalTokens: totalTokens,
-            SpendByPipeline: SpendByPipeline(calls));
+            SpendByPipeline: showCosts ? SpendByPipeline(calls) : []);
     }
 
     /// <summary>One row per pipeline that actually served a call in the range.

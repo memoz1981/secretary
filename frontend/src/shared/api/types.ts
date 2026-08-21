@@ -29,13 +29,17 @@ export type CallPipeline =
   | "OpenAiRealtime_2_1"
   | "GeminiLive_3_1";
 
-/** Everything the Dashboard breaks spend down by, including options not yet dialable — a
- *  missing row reads as "no data", when the useful fact is "not built yet". Whether one can
- *  actually be dialled is PIPELINE_INFO[x].enabled. */
-export const CALL_PIPELINES: CallPipeline[] = [
-  "OpenAiRealtime_2_1",
-  "GeminiLive_3_1",
-];
+/** The pipelines this front end offers and reports on.
+ *
+ * ⚠ Gemini only. OpenAI realtime is still built, still priced, still dialable by the API and
+ * still recorded on every call that used it — this list is the front end's opinion, not the
+ * product's capability. It came out because it is not going to be used: a picker with one real
+ * option and one nobody chooses is a decision presented as a question, and a spend table
+ * comparing one provider against an empty column says nothing.
+ *
+ * Putting it back is this array. Nothing in the backend was touched, so historical OpenAI calls
+ * keep their pipeline, their model name and their cost, and reappear the moment it returns. */
+export const CALL_PIPELINES: CallPipeline[] = ["GeminiLive_3_1"];
 
 // ---- Auth ----
 export interface LoginRequest {
@@ -80,13 +84,54 @@ export interface TenantResponse {
   name: string;
   timezone: string;
   phoneLine: string | null;
+  /** Whether this tenant may be shown what their AI calls cost. The platform's switch, off by
+   *  default — the margin between what a call costs and what they pay is readable from it. */
+  showCallCosts: boolean;
   status: EntityStatus;
   createdAt: string;
 }
+/** How a call ended, in the one vocabulary all three modules share. Mirrors
+ *  Domain/Common/ValueObjects/CallCategories.cs. */
+export type CallCategory = "NotAnswered" | "Answered" | "Forwarded" | "Unfinished";
+
+/** The order a reader wants them: what worked, what needed us, what went wrong, and who we
+ *  never got hold of. */
+export const CALL_CATEGORIES: CallCategory[] = ["Answered", "Forwarded", "Unfinished", "NotAnswered"];
+
+export interface TenantModuleUsage {
+  module: Module;
+  calls: number;
+  durationSeconds: number;
+  tokens: number;
+  costUsd: number;
+}
+
+export interface TenantCategoryUsage {
+  category: CallCategory;
+  calls: number;
+}
+
+/** What one tenant has used, for the platform admin looking at them. Money is unconditional
+ *  here — this is only ever built for a caller with no tenant of their own. */
+export interface TenantInsightsResponse {
+  tenantId: number;
+  tenantName: string;
+  totalCalls: number;
+  totalDurationSeconds: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  byModule: TenantModuleUsage[];
+  byCategory: TenantCategoryUsage[];
+  /** Null when nothing has been dialled — an average over no calls is not zero. */
+  averageCostPerCallUsd: number | null;
+  averageDurationSeconds: number | null;
+}
+
 export interface CreateTenantRequest {
   name: string;
   timezone: string;
   phoneLine: string | null;
+  showCallCosts: boolean;
   ownerName: string;
   ownerEmail: string;
   ownerPassword: string;
@@ -98,6 +143,16 @@ export interface CreateTenantResult {
   agentApiKey: string;
 }
 export interface UpdateTenantRequest {
+  name: string;
+  timezone: string;
+  phoneLine: string | null;
+  showCallCosts: boolean;
+}
+
+/** What a tenant may change about themselves — the same details minus the one that is not
+ *  theirs. A request type is the list of things a caller is allowed to say, and leaving a field
+ *  on it is permission. */
+export interface UpdateOwnTenantRequest {
   name: string;
   timezone: string;
   phoneLine: string | null;
@@ -255,11 +310,14 @@ export interface CallResponse {
   waitTimeSeconds: number | null;
   recordingUrl: string;
   startedAt: string;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
   /** Priced when the call was logged, at the rates in force then — never recalculated. */
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   /** Null when the call was too short (or had too few answers) for a rate to mean anything. */
   costPerMinuteUsd: number | null;
   costPerAnswerUsd: number | null;
@@ -281,10 +339,13 @@ export interface OrderCallResponse {
   /** Questions the caller asked. */
   callerTurnCount: number;
   startedAt: string;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   costPerMinuteUsd: number | null;
   costPerAnswerUsd: number | null;
   resolvedByAgent: boolean;
@@ -323,11 +384,11 @@ export interface DashboardSummaryResponse {
   averageTurnsToResolution: number;
   appointmentVolume: number;
   reminderNoAnswerRate: number;
-  totalCostUsd: number;
-  averageCostPerCallUsd: number;
+  totalCostUsd: number | null;
+  averageCostPerCallUsd: number | null;
   /** Weighted by call length, not an average of each call's own rate. */
-  averageCostPerMinuteUsd: number;
-  averageCostPerAnswerUsd: number;
+  averageCostPerMinuteUsd: number | null;
+  averageCostPerAnswerUsd: number | null;
   totalTokens: number;
   /** One row per pipeline that actually served a call in the range. Pipelines nobody dialled
    *  are omitted — a "$0.00 over 0 calls" row reads as free rather than unused. */
@@ -336,9 +397,9 @@ export interface DashboardSummaryResponse {
 export interface PipelineSpend {
   pipeline: CallPipeline;
   calls: number;
-  totalCostUsd: number;
-  averageCostPerCallUsd: number;
-  averageCostPerMinuteUsd: number;
+  totalCostUsd: number | null;
+  averageCostPerCallUsd: number | null;
+  averageCostPerMinuteUsd: number | null;
   averageCallDurationSeconds: number;
   /** The models actually billed — the pipeline name gives the architecture, this the receipt. */
   models: string;
@@ -526,7 +587,7 @@ export interface SurveyRequestResponse {
   /** Somebody a person still has to deal with — a breakdown, or a number that never answered
    *  and has run out of retries. A refusal needs nobody. */
   needsFollowUp: boolean;
-  totalCostUsd: number;
+  totalCostUsd: number | null;
 }
 
 export interface FeedbackCallResponse {
@@ -544,10 +605,13 @@ export interface FeedbackCallResponse {
   durationSeconds: number;
   turnCount: number;
   callerTurnCount: number;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   answeredCount: number;
   questionCount: number;
   isCompleted: boolean;
@@ -583,7 +647,7 @@ export interface FeedbackCoverage {
   needsHuman: number;
   attempts: number;
   averageDurationSeconds: number;
-  totalCostUsd: number;
+  totalCostUsd: number | null;
   /** People who picked up and engaged. */
   reached: number;
   /** Completed ÷ reached. Never ÷ requested — a wrong phone number is not the agent failing at
