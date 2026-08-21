@@ -122,11 +122,7 @@ public sealed class FeedbackTools
                  + "speaking.")]
     public async Task<string> RecordAnswer(
         [Description("What you heard them say. Used only if the line's own transcription failed.")]
-        string spokenAnswer,
-        [Description("Only for a question that came with OPTIONS or a yes/no. The option you are sure they "
-                     + "chose, copied character for character from the list you were given. Leave it empty if "
-                     + "you are not sure, or if they said something that is not on the list.")]
-        string? chosenOption = null)
+        string spokenAnswer)
     {
         var callId = _session.Require();
         var question = await _calls.GetNextQuestionAsync(callId, default);
@@ -174,11 +170,7 @@ public sealed class FeedbackTools
             return await RecordedAndNext(callId);
         }
 
-        // Code first, every time. The model is asked only for what code could not settle — see
-        // FeedbackCallService.NominatedOptionAsync for why that gap exists at all.
-        var option = await _calls.MatchOptionAsync(question.QuestionId, said, default)
-                     ?? await _calls.NominatedOptionAsync(question.QuestionId, chosenOption, default);
-
+        var option = await _calls.MatchOptionAsync(question.QuestionId, said, default);
         if (option is not null)
         {
             // ⚠ They named the catch-all rather than saying what it was. "Digər" on its own is a

@@ -215,43 +215,6 @@ public sealed class OptionMatchingTests
         match!.Text.ShouldBe("Yaxşı");
     }
 
-    // ---- The one place the model is allowed near the choice ----
-
-    /// <summary>⚠ A caller said "reception"; the option was typed "Resepshn". The same word in two
-    /// orthographies, diverging at the third letter — no prefix, containment or edit-distance rule
-    /// bridges that without also matching things that are genuinely different. The model crosses
-    /// it without effort, so it is allowed to point at an option after every code rule has failed.</summary>
-    [Theory]
-    [InlineData("Resepshn")]
-    [InlineData("resepshn")]
-    [InlineData("RESEPSHN")]
-    public async Task A_nomination_is_accepted_when_it_names_a_real_option(string nominated)
-    {
-        GivenChoice("Resepshn", "Xidmet emekdasi");
-
-        var match = await _sut.NominatedOptionAsync(10, nominated, default);
-
-        match.ShouldNotBeNull();
-        match!.Text.ShouldBe("Resepshn");
-    }
-
-    /// <summary>⚠ The guarantee. It nominates from a closed set and nothing else counts — a model
-    /// that invents an option, paraphrases one, or offers a whole sentence gets nowhere. Without
-    /// this the tool would be back to letting the model decide what the caller said, which is the
-    /// failure this module has spent a week designing against.</summary>
-    [Theory]
-    [InlineData("Reception desk")]
-    [InlineData("Qəbul")]
-    [InlineData("Resep")]
-    [InlineData("")]
-    [InlineData(null)]
-    public async Task Anything_that_is_not_an_option_on_file_is_refused(string? nominated)
-    {
-        GivenChoice("Resepshn", "Xidmet emekdasi");
-
-        (await _sut.NominatedOptionAsync(10, nominated, default)).ShouldBeNull();
-    }
-
     private static T WithId<T>(T entity, int id)
         where T : BaseEntity
     {
