@@ -8,6 +8,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
+import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getCallDetail } from "@/modules/appointments/api/calls";
 import type { CallOutcome, CallResponse } from "@/shared/api/types";
@@ -165,7 +166,9 @@ export function CallDetailPage() {
                 </div>
                 <div className="field">
                   <label>{t("colClient")}</label>
-                  <div className="value">{state.data.call.clientName ?? state.data.call.callerPhoneNumber}</div>
+                  <div className="value">
+                    {callerLabel(state.data.call.clientName, state.data.call.callerPhoneNumber, t("unknownCaller"))}
+                  </div>
                 </div>
               </div>
             </Card>

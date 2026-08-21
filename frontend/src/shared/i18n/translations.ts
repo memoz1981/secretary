@@ -647,6 +647,7 @@ export const translations = {
   // "Sual/cavab" — questions the caller asked over answers the agent gave, shown as "4/5".
   colQuestionsAnswers: { az: "Sual/cavab", ru: "Вопр./отв.", en: "Q/A" },
   colPipeline: { az: "Rejim", ru: "Режим", en: "Mode" },
+  unknownCaller: { az: "Naməlum zəng edən", ru: "Неизвестный абонент", en: "Unknown caller" },
   allPipelines: { az: "Bütün rejimlər", ru: "Все режимы", en: "All modes" },
   spendByPipeline: { az: "Rejimlər üzrə xərc", ru: "Расходы по режимам", en: "Spend by mode" },
   colCalls: { az: "Zənglər", ru: "Звонки", en: "Calls" },

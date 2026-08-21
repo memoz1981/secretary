@@ -8,6 +8,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
+import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { searchCalls } from "@/modules/appointments/api/calls";
 import { CALL_PIPELINES, type CallClassification, type CallOutcome, type CallPipeline } from "@/shared/api/types";
 import { PIPELINE_INFO, pipelineLabel } from "@/shared/lib/pipelines";
@@ -120,7 +121,7 @@ export function CallLogPage() {
           ...(showsCosts
             ? [{ header: t("colPipeline"), render: (c: CallResponse) => pipelineLabel(c.pipeline) }]
             : []),
-          { header: t("colClient"), render: (c) => c.clientName ?? c.callerPhoneNumber },
+          { header: t("colClient"), render: (c) => callerLabel(c.clientName, c.callerPhoneNumber, t("unknownCaller")) },
           { header: t("colClassification"), render: (c) => translateEnum(callClassificationLabels, c.classification, language) },
           {
             header: t("colOutcome"),

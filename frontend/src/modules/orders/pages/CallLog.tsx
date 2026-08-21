@@ -6,6 +6,7 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
+import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { searchOrderCalls } from "@/modules/orders/api/calls";
 import type { CallOutcome, OrderCallResponse } from "@/shared/api/types";
 import { pipelineLabel } from "@/shared/lib/pipelines";
@@ -70,7 +71,7 @@ export function OrderCallLogPage() {
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.startedAt, language), className: "mono" },
           // The name when the agent got that far, the raw caller identifier when it did not.
           // Which of the two is showing is itself the answer to "did identification work".
-          { header: t("colCustomer"), render: (c) => c.customerName ?? c.callerPhoneNumber },
+          { header: t("colCustomer"), render: (c) => callerLabel(c.customerName, c.callerPhoneNumber, t("unknownCaller")) },
           {
             header: t("colOrder"),
             render: (c) => (c.relatedOrderId === null ? "—" : `#${c.relatedOrderId}`),
