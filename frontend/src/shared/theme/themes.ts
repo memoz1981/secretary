@@ -4,7 +4,10 @@
  * survives reloads and new sessions on the same browser. */
 export type ThemeId = "ledger" | "dark" | "forest" | "graphite" | "ocean";
 
-export const DEFAULT_THEME: ThemeId = "ledger";
+/** ⚠ Change this and index.html together. The pre-paint script there cannot import from here —
+ *  it runs before any module loads, which is the whole point of it — so the default lives in two
+ *  places, and the two disagreeing means a flash of the wrong theme on every first visit. */
+export const DEFAULT_THEME: ThemeId = "graphite";
 
 export const THEME_IDS: ThemeId[] = ["ledger", "dark", "forest", "graphite", "ocean"];
 

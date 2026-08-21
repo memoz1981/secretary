@@ -16,6 +16,17 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M4.5 5h3.2l1.4 3.5-2 1.3a11.5 11.5 0 0 0 5.1 5.1l1.3-2 3.5 1.4v3.2a1.5 1.5 0 0 1-1.6 1.5A15.5 15.5 0 0 1 3 6.6 1.5 1.5 0 0 1 4.5 5z" />
     </>
   ),
+  /** A handset with an arrow each way. phoneIn draws one arrow pointing in, which was right when
+   *  the first step said "a customer calls" and wrong the moment it also meant the agent ringing
+   *  out — an icon that contradicts the sentence beside it is read before the sentence is. */
+  phoneBoth: (
+    <>
+      <path d="M4.5 5h3.2l1.4 3.5-2 1.3a11.5 11.5 0 0 0 5.1 5.1l1.3-2 3.5 1.4v3.2a1.5 1.5 0 0 1-1.6 1.5A15.5 15.5 0 0 1 3 6.6 1.5 1.5 0 0 1 4.5 5z" />
+      <path d="M14 3.5h6.5V10" />
+      <path d="M20.5 3.5L15 9" />
+      <path d="M21 8.5v-5h-5" />
+    </>
+  ),
   speak: (
     <>
       <rect x="3" y="3.5" width="18" height="13" rx="3.5" />

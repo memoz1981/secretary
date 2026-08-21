@@ -24,6 +24,16 @@
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #e3ebe8; /* accent-tinted backgrounds, e.g. selected day */
 
+  /* The landing motto, and only that. It used to wear --color-accent, which made the one line
+     meant to catch a stranger's eye the same colour as every button on the page — the thing you
+     want read first was tinted like furniture.
+
+     A colour per theme rather than one for all five: each theme's accent already occupies a
+     different part of the wheel, so a single motto colour would clash somewhere. Each of these
+     was picked against its own theme's canvas and checked for contrast — all clear 4.5:1, which
+     is the small-text threshold, and this is large bold text. */
+  --color-motto: #9c4a24;
+
   /* ---- Color: semantic status (call outcomes, appointment state) ----
      Fixed regardless of visual direction — never reuse --color-accent for these. */
   --color-success: #3f8a4f;
@@ -128,6 +138,7 @@
   --color-accent-hover: #24564d;
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #e3ebe8;
+  --color-motto: #9c4a24;
   --color-success: #3f8a4f;
   --color-success-bg: #e5f0e6;
   --color-warning: #b3872f;
@@ -151,6 +162,7 @@
   --color-accent-hover: #74b3a5;
   --color-accent-ink: #12211d;
   --color-accent-subtle: #223531;
+  --color-motto: #e0a94a;
   --color-success: #6ab476;
   --color-success-bg: #223224;
   --color-warning: #d1a052;
@@ -186,6 +198,7 @@
   --color-accent-hover: #0d4526;
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #c3ddca;
+  --color-motto: #7d2a4a;
   --color-success: #1f6b3d;
   --color-success-bg: #c8e2d0;
   --color-warning: #8a6718;
@@ -209,6 +222,7 @@
   --color-accent-hover: #f0c65a;
   --color-accent-ink: #1a1508;
   --color-accent-subtle: #322b16;
+  --color-motto: #6fcede;
   --color-success: #62b877;
   --color-success-bg: #1e2f23;
   --color-warning: #e59355;
@@ -244,6 +258,7 @@
   --color-accent-hover: #0a3760;
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #bcd6ec;
+  --color-motto: #a34220;
   --color-success: #1f6b4a;
   --color-success-bg: #c6e0d5;
   --color-warning: #8a6718;
