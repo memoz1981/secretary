@@ -37,6 +37,7 @@ public static class AgentsServiceCollectionExtensions
 
         // Scoped to the call: which queued survey call this conversation is. Set before the
         // agent starts, not discovered by it — that is what makes the module outbound-shaped.
+        services.AddScoped<CallerSpeech>();
         services.AddScoped<Feedback.FeedbackCallSession>();
         services.AddScoped<FeedbackTools>();
 

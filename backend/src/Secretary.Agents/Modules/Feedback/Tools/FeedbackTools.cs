@@ -15,19 +15,30 @@ namespace Secretary.Agents.Tools;
 /// order line's address id, applied before it could bite: a model asked to copy an identifier out
 /// of a conversation will eventually copy the wrong one.
 ///
-/// Nor does the model decide which option was chosen. It passes on what it heard and the service
-/// matches it against the stored options — a model left to judge that will confidently record an
-/// answer nobody gave.</summary>
+/// Nor does the model decide which option was chosen, and nor does it supply the caller's words.
+/// Both come from the transcription: a model asked to report what somebody said reports a tidied
+/// version, and on a real call "Ömür əllərim belə çox gözləmədim" was stored as "Ümumi rəylərim.
+/// Belə, çox gözləmədim" — the model's expectation, in the one field that exists to hold the
+/// caller's own words. What it passes is now a fallback for when there is no transcription.
+///
+/// ⚠ Every label in a result is UPPERCASE and English, and that is not decoration. The Azerbaijani
+/// word "Variantlar:" was used as a separator once and the agent read it out to the caller as
+/// though it were part of the question. A label the model would be embarrassed to say aloud is a
+/// label it does not say aloud.</summary>
 public sealed class FeedbackTools
 {
     private readonly FeedbackCallService _calls;
     private readonly FeedbackCallSession _session;
+    private readonly CallerSpeech _speech;
     private readonly EscalationTools _escalation;
 
-    public FeedbackTools(FeedbackCallService calls, FeedbackCallSession session, EscalationTools escalation)
+    public FeedbackTools(
+        FeedbackCallService calls, FeedbackCallSession session, CallerSpeech speech,
+        EscalationTools escalation)
     {
         _calls = calls;
         _session = session;
+        _speech = speech;
         _escalation = escalation;
     }
 
@@ -45,29 +56,34 @@ public sealed class FeedbackTools
         // over. See FeedbackCallSession.ServedQuestionId.
         _session.Served(question.QuestionId, question.QuestionType == FeedbackQuestionType.Open);
 
+        // Everything the caller says from here is the answer to this question.
+        _speech.StartOfAnswer();
+
         // ⚠ Only a Choice carries its options here, and that is deliberate. A yes/no question
         // already contains its answers, and reading "1, 2, 3, 4, 5" after "birdən beşə qədər" is
         // the readback a caller sat through five times before hanging up. What is not in the
         // marker cannot be read out.
         return question.QuestionType switch
         {
-            FeedbackQuestionType.Open => $"OPEN_QUESTION. {question.Text}",
-            FeedbackQuestionType.YesNo => $"YES_NO_QUESTION. {question.Text}",
-            FeedbackQuestionType.Scale => $"SCALE_QUESTION. {question.Text} (1-{question.ScaleMax})",
+            FeedbackQuestionType.Open => $"OPEN_QUESTION ASK: {question.Text}",
+            FeedbackQuestionType.YesNo => $"YES_NO_QUESTION ASK: {question.Text}",
+            FeedbackQuestionType.Scale =>
+                $"SCALE_QUESTION ASK: {question.Text} RANGE: 1-{question.ScaleMax}",
             // ⚠ "Digər" is left out of the list on purpose. Reading it aloud invites the caller
             // to answer with the word instead of with the thing: one said "digərini, digər
             // sözün" and the survey recorded "Digər" with nothing behind it, having already
             // discarded the real answer they gave a moment earlier. It is a catch-all, not a
             // choice — anything off the list becomes it, with their own words attached.
-            _ => $"CHOICE_QUESTION. {question.Text} Variantlar: "
+            _ => $"CHOICE_QUESTION ASK: {question.Text} OPTIONS: "
                  + string.Join("; ", question.Options.Where(o => !o.IsOther).Select(o => o.Text)),
         };
     }
 
-    [Description("Records what the caller answered to the question you just asked. Pass their words exactly as "
-                 + "they said them.")]
+    [Description("Records the caller's answer to the question you just asked. Call it once they have finished "
+                 + "speaking.")]
     public async Task<string> RecordAnswer(
-        [Description("Exactly what the caller said, in their own words")] string spokenAnswer)
+        [Description("What you heard them say. Used only if the line's own transcription failed.")]
+        string spokenAnswer)
     {
         var callId = _session.Require();
         var question = await _calls.GetNextQuestionAsync(callId, default);
@@ -76,7 +92,13 @@ public sealed class FeedbackTools
             return "SURVEY_DONE.";
         }
 
-        if (string.IsNullOrWhiteSpace(spokenAnswer))
+        // ⚠ The transcription first, the model's report second. A model asked what somebody said
+        // answers with a tidied version of it — "Ömür əllərim belə çox gözləmədim" came back as
+        // "Ümumi rəylərim. Belə, çox gözləmədim", which is a plausible sentence nobody uttered.
+        // The provider already sends us the words; the argument is for when it does not.
+        var said = _speech.SinceQuestion() ?? spokenAnswer;
+
+        if (string.IsNullOrWhiteSpace(said))
         {
             return "NOTHING_HEARD.";
         }
@@ -95,7 +117,7 @@ public sealed class FeedbackTools
             // the sentence turns up next. That is not a stray answer, it is the same one
             // continuing, and it used to be thrown away as "never asked".
             return _session is { ServedIsOpen: true, ServedQuestionId: { } servedId }
-                   && await _calls.ExtendOpenAnswerAsync(callId, servedId, spokenAnswer, default)
+                   && await _calls.ExtendOpenAnswerAsync(callId, servedId, said, default)
                 ? "RECORDED."
                 : "NO_QUESTION_ASKED.";
         }
@@ -105,11 +127,11 @@ public sealed class FeedbackTools
         // off — without the transcript there is nothing to store.
         if (question.QuestionType == FeedbackQuestionType.Open)
         {
-            await _calls.RecordOpenAsync(callId, question.QuestionId, spokenAnswer, default);
+            await _calls.RecordOpenAsync(callId, question.QuestionId, said, default);
             return "RECORDED.";
         }
 
-        var option = await _calls.MatchOptionAsync(question.QuestionId, spokenAnswer, default);
+        var option = await _calls.MatchOptionAsync(question.QuestionId, said, default);
         if (option is not null)
         {
             // ⚠ They named the catch-all rather than saying what it was. "Digər" on its own is a
@@ -123,7 +145,7 @@ public sealed class FeedbackTools
 
             if (option.IsOther)
             {
-                await _calls.RecordOtherAsync(callId, question.QuestionId, option.Id, spokenAnswer, default);
+                await _calls.RecordOtherAsync(callId, question.QuestionId, option.Id, said, default);
                 return "RECORDED.";
             }
 
@@ -136,7 +158,7 @@ public sealed class FeedbackTools
         // is a count with nothing behind it.
         if (question.Options.FirstOrDefault(o => o.IsOther) is { } other)
         {
-            await _calls.RecordOtherAsync(callId, question.QuestionId, other.Id, spokenAnswer, default);
+            await _calls.RecordOtherAsync(callId, question.QuestionId, other.Id, said, default);
             return "RECORDED.";
         }
 
