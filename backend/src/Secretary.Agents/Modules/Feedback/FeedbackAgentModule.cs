@@ -62,6 +62,19 @@ public sealed class FeedbackAgentModule : IAgentModule
 
         var subject = await _calls.GetSubjectAsync(callId, cancellationToken);
 
+        // ⚠ The first question is handed over here rather than fetched after the caller agrees.
+        //
+        // Twice now the agent has invented one in that gap. It greets, they say "bəli, buyurun",
+        // and for the moment it takes to call GetNextQuestion it has agreement and nothing to
+        // ask — so it made up "gələn zənglərimizi dəyərləndirmək üçün birdən beşə qədər necə
+        // qiymətləndirərdiniz?", a question in no questionnaire, and asked it twice. The tools
+        // refused the answer, which is the guard working, but the caller had still been asked
+        // something nobody wrote and spent half a minute on it.
+        //
+        // Instructions did not stop this: "you do not know the questions" is already in them, in
+        // bold. Removing the empty-handed moment does.
+        var first = await _feedbackTools.GetNextQuestion();
+
         // ⚠ Each name is labelled with the job it does. On a real call the agent introduced
         // itself as "Toyota Servis" — the questionnaire, not the business. Two proper nouns
         // arrived in the same paragraph, one of them was who you are and the other was what you
@@ -77,6 +90,13 @@ public sealed class FeedbackAgentModule : IAgentModule
                   bağlı zəng edirəm", never "{subject.SurveyName} adından".
                 - It has {subject.QuestionCount} question(s). Say how many, once, at the start, so
                   they know what they agreed to.
+
+                ## The first question, already in your hand
+
+                {first}
+
+                Ask it once they agree, then record their answer as usual. You have it here so
+                that there is no moment where you have agreement and nothing to ask.
                 """;
     }
 
