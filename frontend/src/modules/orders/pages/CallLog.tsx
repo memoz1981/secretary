@@ -94,10 +94,19 @@ export function OrderCallLogPage() {
           },
           // The mode, with the exact model behind it on hover — the rate card is per model, and
           // a model swap is when a jump in the cost column needs explaining.
-          {
-            header: t("colAgent"),
-            render: (c) => <span title={c.agentModel ?? undefined}>{pipelineLabel(c.pipeline)}</span>,
-          },
+          //
+          // ⚠ Withheld with the costs. Naming the provider hands over half of what the flag
+          // exists to withhold, because the provider publishes the other half.
+          ...(showsCosts
+            ? [
+                {
+                  header: t("colAgent"),
+                  render: (c: OrderCallResponse) => (
+                    <span title={c.agentModel ?? undefined}>{pipelineLabel(c.pipeline)}</span>
+                  ),
+                },
+              ]
+            : []),
           // See CallCostVisibility — absent means withheld, and a column of dashes reads as
           // data that failed to load.
           ...(showsCosts

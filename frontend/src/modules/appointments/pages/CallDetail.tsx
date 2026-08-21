@@ -71,10 +71,14 @@ function CallCostCard({ call }: { call: CallResponse }) {
             </div>
           </>
         )}
-        <div className="field">
-          <label>{t("colPipeline")}</label>
-          <div className="value">{pipelineLabel(call.pipeline)}</div>
-        </div>
+        {/* Withheld with the costs, for the same reason as the model name: the provider's rates
+            are published. */}
+        {call.costUsd !== null && (
+          <div className="field">
+            <label>{t("colPipeline")}</label>
+            <div className="value">{pipelineLabel(call.pipeline)}</div>
+          </div>
+        )}
         {/* Withheld with the costs — see CallCostVisibility. Which model answered is the same
             commercial fact, because the rates are published. */}
         {call.agentModel !== null && (

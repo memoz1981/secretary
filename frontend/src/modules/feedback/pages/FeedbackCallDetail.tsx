@@ -115,15 +115,17 @@ export function FeedbackCallDetailPage() {
               {call.callerTurnCount}/{call.turnCount}
             </div>
           </div>
-          <div>
-            <div className="label">{t("colAgent")}</div>
-            <div className="value" title={call.agentModel ?? undefined}>
-              {pipelineLabel(call.pipeline)}
-            </div>
-          </div>
-          {/* See CallCostVisibility — absent means withheld, not unknown. */}
+          {/* See CallCostVisibility — absent means withheld, not unknown. The mode goes with the
+              money: naming the provider hands over half of what the flag exists to withhold,
+              because the provider publishes the other half. */}
           {call.costUsd !== null && (
             <>
+              <div>
+                <div className="label">{t("colAgent")}</div>
+                <div className="value" title={call.agentModel ?? undefined}>
+                  {pipelineLabel(call.pipeline)}
+                </div>
+              </div>
               <div>
                 <div className="label">{t("colCost")}</div>
                 <div className="value mono">{formatUsd(call.costUsd)}</div>

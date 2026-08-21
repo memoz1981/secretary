@@ -110,9 +110,16 @@ export function CallLogPage() {
         emptyMessage={classification || outcome || pipeline ? t("noCallsMatchFilters") : t("noCallsYet")}
         columns={[
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.startedAt, language), className: "mono" },
-          // Immediately after the timestamp: with four pipelines in one log, every other column
-          // on the row is meaningless until you know which one produced it.
-          { header: t("colPipeline"), render: (c) => pipelineLabel(c.pipeline) },
+          // Immediately after the timestamp, when it is shown at all: with several pipelines in
+          // one log, every other column on the row is meaningless until you know which one
+          // produced it.
+          //
+          // ⚠ Withheld with the costs. Which architecture answered names the provider, the
+          // provider publishes its rates, and a tenant who has one of those can work out the
+          // other — which is the number the flag exists to withhold.
+          ...(showsCosts
+            ? [{ header: t("colPipeline"), render: (c: CallResponse) => pipelineLabel(c.pipeline) }]
+            : []),
           { header: t("colClient"), render: (c) => c.clientName ?? c.callerPhoneNumber },
           { header: t("colClassification"), render: (c) => translateEnum(callClassificationLabels, c.classification, language) },
           {
