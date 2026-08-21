@@ -1,4 +1,4 @@
-/** Azerbaijani mobile numbers, in the shape this product writes them: `+994(50)250-58-32`.
+/** Azerbaijani mobile numbers, in the shape this product writes them: `+994(00)000-00-00`.
  *
  * The operator code has no leading zero inside the brackets — `+994` replaces it. People write
  * `055` locally and `+994 55` internationally, and both are the same number; typing either here

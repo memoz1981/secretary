@@ -715,9 +715,9 @@ export const translations = {
   },
   customerName: { az: "Müştərinin adı", ru: "Имя клиента", en: "Customer name" },
   enterValidPhone: {
-    az: "Nömrəni +994(50)250-58-32 formatında yazın",
-    ru: "Формат: +994(50)250-58-32",
-    en: "Enter the number as +994(50)250-58-32",
+    az: "Nömrəni +994(00)000-00-00 formatında yazın",
+    ru: "Формат: +994(00)000-00-00",
+    en: "Enter the number as +994(00)000-00-00",
   },
   makeCall: { az: "Zəng et", ru: "Позвонить", en: "Make call" },
   hangUp: { az: "Bitir", ru: "Завершить", en: "Hang up" },
@@ -793,6 +793,8 @@ export const translations = {
   ringAgain: { az: "Yenidən zəng et", ru: "Позвонить снова", en: "Ring again" },
   stopChasing: { az: "Dayandır", ru: "Прекратить", en: "Stop chasing" },
   showNumber: { az: "Nömrəni göstər", ru: "Показать номер", en: "Show number" },
+  showNumbers: { az: "Nömrələri göstər", ru: "Показывать номера", en: "Show numbers" },
+  allStatuses: { az: "Bütün statuslar", ru: "Все статусы", en: "All statuses" },
   scheduledDialsWaitForTelephony: {
     az: "Avtomatik zənglər telefoniya qoşulana qədər işə düşməyəcək — cəhdlər sayılır, zəng edilmir.",
     ru: "Автодозвон заработает после подключения телефонии — попытки считаются, звонков нет.",

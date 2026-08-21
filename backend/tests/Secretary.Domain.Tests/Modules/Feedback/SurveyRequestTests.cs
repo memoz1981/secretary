@@ -18,7 +18,7 @@ public sealed class SurveyRequestTests
 {
     private static readonly Instant Now = Instant.FromUnixTimeSeconds(1_754_000_000);
 
-    private static SurveyRequest Queued() => SurveyRequest.Queue(1, 2, "Mehdi", "+994502505832", Now);
+    private static SurveyRequest Queued() => SurveyRequest.Queue(1, 2, "Mehdi", "+994501112233", Now);
 
     /// <summary>A business open around the clock, so these tests are about the retry rule and not
     /// about opening hours. CallingHoursTests covers the clamp.</summary>
@@ -142,7 +142,7 @@ public sealed class SurveyRequestTests
     [Fact]
     public void A_request_needs_somebody_to_be_about_and_a_number_to_reach_them_on()
     {
-        Should.Throw<ArgumentException>(() => SurveyRequest.Queue(1, 2, "  ", "+994502505832", Now));
+        Should.Throw<ArgumentException>(() => SurveyRequest.Queue(1, 2, "  ", "+994501112233", Now));
         Should.Throw<ArgumentException>(() => SurveyRequest.Queue(1, 2, "Mehdi", "  ", Now));
     }
 }

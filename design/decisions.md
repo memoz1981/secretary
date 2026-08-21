@@ -268,7 +268,7 @@ A fourth item surfaced from the same call log, and it was the serious one:
   while the caller is already hearing audio.
 - **Phone numbers are canonicalised** on write and on lookup (`PhoneNumberNormalizer`), which is
   why the caller was not recognised: numbers arrive as speech and were stored verbatim, leaving
-  two "Mehdi" rows — `0535353535` and `055 250 58 32`.
+  two "Mehdi" rows — `0535353535` and `050 111 22 33`.
 
 ⚠️ **Existing rows were not back-filled.** Clients created before this keep their as-spoken
 number and will not match a normalised lookup. Fine for the demo data; a real deployment needs a
