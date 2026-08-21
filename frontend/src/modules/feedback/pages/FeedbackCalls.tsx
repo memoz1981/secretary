@@ -10,7 +10,7 @@ import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { getSurveys, searchFeedbackCalls } from "@/modules/feedback/api/feedback";
-import { maskAzPhone } from "@/modules/feedback/api/phone";
+import { revealAzPhone } from "@/modules/feedback/api/phone";
 import type { FeedbackCallStatus } from "@/shared/api/types";
 
 function statusVariant(status: FeedbackCallStatus): "success" | "warning" | "critical" | "neutral" {
@@ -31,6 +31,7 @@ export function FeedbackCallsPage() {
   const shell = useBusinessShell();
   const navigate = useNavigate();
   const [surveyId, setSurveyId] = useState("");
+  const [shown, setShown] = useState<ReadonlySet<number>>(new Set());
 
   const surveys = useApiData(() => getSurveys(token!), [token]);
   const state = useApiData(
@@ -67,9 +68,26 @@ export function FeedbackCallsPage() {
         columns={[
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.createdAt, language), className: "mono" },
           { header: t("customerName"), render: (c) => c.personName },
-          // Masked, not shown. The list is read over somebody's shoulder more often than the
-          // number on it is needed.
-          { header: t("colPhone"), render: (c) => maskAzPhone(c.phoneNumber), className: "mono muted" },
+          {
+            // Masked until asked for, the same as the follow-up list. A column of
+            // +994(00)000-00-00 is not privacy, it is a column of nothing — somebody looking at
+            // a call usually wants to be able to ring the person back about it.
+            header: t("colPhone"),
+            render: (c) =>
+              shown.has(c.id) ? (
+                <span className="mono">{revealAzPhone(c.phoneNumber)}</span>
+              ) : (
+                <button
+                  className="link"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShown((current) => new Set(current).add(c.id));
+                  }}
+                >
+                  {t("showNumber")}
+                </button>
+              ),
+          },
           { header: t("questionnaire"), render: (c) => c.surveyName },
           // ⚠ This column is why the split happened. Five rows here on 15 August were one
           // person and one survey; without the attempt number they read as five surveys.

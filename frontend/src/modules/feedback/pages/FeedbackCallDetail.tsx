@@ -153,17 +153,23 @@ export function FeedbackCallDetailPage() {
         )}
       </Card>
 
-      {transcript && (
-        <Card>
+      {/* ⚠ Always rendered, even empty. It used to vanish when there was nothing to show, and
+          the honest reading of a missing card is "this feature does not exist" — which is what
+          somebody concluded after a call that never called EndCall, so the row was never
+          finished and nothing was ever written. An empty card says which of the two it is. */}
+      <Card>
           <h2>{t("transcript")}</h2>
           {/* The date once, above; each line carries its own clock time. The lines used to be
               seconds-into-the-call — "[00:14]", which reads as a time of day and is not one. */}
           <div className="score-caption" style={{ marginTop: 0, marginBottom: "var(--space-3)" }}>
             {formatDayMonthTime(call.createdAt, language)}
           </div>
-          <pre className="transcript">{transcript}</pre>
+          {transcript ? (
+            <pre className="transcript">{transcript}</pre>
+          ) : (
+            <div className="note">{t("noTranscriptYet")}</div>
+          )}
         </Card>
-      )}
     </AppShell>
   );
 }
