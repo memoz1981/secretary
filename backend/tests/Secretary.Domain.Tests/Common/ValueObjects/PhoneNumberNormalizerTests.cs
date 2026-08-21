@@ -5,7 +5,7 @@ using Xunit;
 namespace Secretary.Domain.Tests;
 
 /// <summary>The reason this exists: two "Mehdi" client rows, one "0535353535" and one
-/// "055 250 58 32", because a number reaches us as speech and gets read out differently each
+/// "050 111 22 33", because a number reaches us as speech and gets read out differently each
 /// time. Worth tests of its own — the first version of it turned "+994000000" into
 /// "+994994000000", which the Client tests caught only by accident.</summary>
 public sealed class PhoneNumberNormalizerTests

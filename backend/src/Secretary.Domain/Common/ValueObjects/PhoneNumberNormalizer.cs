@@ -8,7 +8,7 @@ namespace Secretary.Domain.ValueObjects;
 /// person says "0 55 355 88 32" one day and "+994 55 355 88 32" the next. Stored verbatim, those
 /// are two different strings, and a returning caller is not recognised — which then leads to a
 /// second client row for one person. That is exactly what happened on the first Gemini calls:
-/// two "Mehdi" records, one "0535353535" and one "055 250 58 32".
+/// two "Mehdi" records, one "0501112233" and one "050 111 22 33".
 ///
 /// Deliberately conservative. Azerbaijani numbers are canonicalised to E.164; anything that does
 /// not look Azerbaijani only loses its separators, because mangling a number we do not recognise

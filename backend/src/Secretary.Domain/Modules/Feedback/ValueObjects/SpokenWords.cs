@@ -73,17 +73,48 @@ public static class YesNoWords
         "xeyr", "xeyir", "yox", "yoxdur", "yoxe", "deyil", "net", "no", "nope", "nah",
     };
 
+    /// <summary>Azerbaijani negation lives on the end of the verb. A caller who answers a
+    /// question by echoing its verb says no by echoing it in the negative — "olundu" against
+    /// "olunmadı" — and the two differ only in a suffix.</summary>
+    private static readonly string[] NegativeEndings = ["madi", "medi", "mir", "mur", "maz", "mez", "mayib", "meyib"];
+
     /// <summary>True for yes, false for no, null for neither — and null for both.
     ///
     /// Both matters: "hə, yox, gözləmədim" contains one of each, and picking whichever the loop
     /// reached first would record an answer on a coin toss. Refusing sends it back for one repeat,
     /// which is what an ambiguous answer deserves.</summary>
-    public static bool? Read(string? spoken)
+    /// <param name="questionText">The question as asked, when there is one.
+    ///
+    /// ⚠ Because people answer a yes/no question by echoing its verb rather than by saying yes.
+    /// Asked "Sizə servis kitabçası təqdim olundu?" a caller answered "olundu" — twice — and was
+    /// refused both times, and the call ended on it. No list of synonyms could have held that
+    /// word: the affirmative depends on the question. Echoing it back is the affirmative, and the
+    /// question is the only place to learn which word to expect.</param>
+    public static bool? Read(string? spoken, string? questionText = null)
     {
         var words = SpokenWords.Fold(spoken);
-        var saidYes = words.Any(Yes.Contains);
-        var saidNo = words.Any(No.Contains);
+        var asked = SpokenWords.Fold(questionText);
+
+        // ⚠ The question's LAST word, not any of its words. Azerbaijani puts the verb at the
+        // end, and the verb is what a caller echoes — "təqdim olundu?" is answered "olundu".
+        // Matching any shared word instead reads "təqdim olunmadı" as agreement, because
+        // "təqdim" is in the question too: the caller would have said no and been recorded as
+        // saying yes, which is the worst direction for this to fail in.
+        var verb = asked.Count > 0 && asked[^1].Length >= 4 ? asked[^1] : null;
+
+        var saidYes = words.Any(Yes.Contains)
+                      || (verb is not null && words.Contains(verb, StringComparer.Ordinal));
+
+        var saidNo = words.Any(No.Contains)
+                     || (verb is not null && words.Any(word => Denies(word, verb)));
 
         return saidYes == saidNo ? null : saidYes;
     }
+
+    /// <summary>The same verb in the negative. It is not a word the question contains — negation
+    /// is a suffix in the middle of it — so it shares the stem and ends in one of the negative
+    /// endings: "olunmadı" against "olundu".</summary>
+    private static bool Denies(string word, string verb)
+        => NegativeEndings.Any(ending => word.EndsWith(ending, StringComparison.Ordinal))
+           && word.StartsWith(verb[..4], StringComparison.Ordinal);
 }

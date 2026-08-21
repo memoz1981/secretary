@@ -120,7 +120,7 @@ export function NewFeedbackCallPage() {
           <TextField
             label={t("colPhone")}
             value={phone}
-            placeholder="+994(50)250-58-32"
+            placeholder="+994(00)000-00-00"
             // Formatted as it is typed rather than corrected afterwards — a field that rewrites
             // itself once you leave it reads as a rejection.
             onChange={(e) => setPhone(formatAzPhone(e.target.value))}

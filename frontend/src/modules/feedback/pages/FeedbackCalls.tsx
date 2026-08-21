@@ -10,8 +10,17 @@ import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { getSurveys, searchFeedbackCalls } from "@/modules/feedback/api/feedback";
-import { maskAzPhone } from "@/modules/feedback/api/phone";
+import { maskAzPhone, revealAzPhone } from "@/modules/feedback/api/phone";
 import type { FeedbackCallStatus } from "@/shared/api/types";
+
+/** Every status a finished or in-flight dial can be in, in the order they happen. */
+const CALL_STATUSES: FeedbackCallStatus[] = [
+  "Created",
+  "InProgress",
+  "Completed",
+  "Abandoned",
+  "NeedsHuman",
+];
 
 function statusVariant(status: FeedbackCallStatus): "success" | "warning" | "critical" | "neutral" {
   if (status === "Completed") return "success";
@@ -31,6 +40,11 @@ export function FeedbackCallsPage() {
   const shell = useBusinessShell();
   const navigate = useNavigate();
   const [surveyId, setSurveyId] = useState("");
+  const [status, setStatus] = useState<FeedbackCallStatus | "">("");
+
+  // One switch for the page, not one per row. Somebody who needs a number usually needs to scan
+  // several, and clicking each in turn is a reveal that pretends to be a decision.
+  const [numbersShown, setNumbersShown] = useState(false);
 
   const surveys = useApiData(() => getSurveys(token!), [token]);
   const state = useApiData(
@@ -38,7 +52,10 @@ export function FeedbackCallsPage() {
     [token, surveyId],
   );
 
-  const rows = state.status === "success" ? state.data : [];
+  // Filtered here rather than in the query: the page already holds every call for the chosen
+  // questionnaire, and a round trip to hide four rows is a round trip for nothing.
+  const all = state.status === "success" ? state.data : [];
+  const rows = status === "" ? all : all.filter((c) => c.status === status);
 
   return (
     <AppShell {...shell}>
@@ -56,6 +73,22 @@ export function FeedbackCallsPage() {
               </option>
             ))}
         </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value as FeedbackCallStatus | "")}>
+          <option value="">{t("allStatuses")}</option>
+          {CALL_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {t(`feedbackStatus${value}`)}
+            </option>
+          ))}
+        </select>
+        <label className="checkbox-row" style={{ margin: 0 }}>
+          <input
+            type="checkbox"
+            checked={numbersShown}
+            onChange={(e) => setNumbersShown(e.target.checked)}
+          />
+          <span>{t("showNumbers")}</span>
+        </label>
       </div>
 
       <DataTable
@@ -67,9 +100,14 @@ export function FeedbackCallsPage() {
         columns={[
           { header: t("colDateTime"), render: (c) => formatDayMonthTime(c.createdAt, language), className: "mono" },
           { header: t("customerName"), render: (c) => c.personName },
-          // Masked, not shown. The list is read over somebody's shoulder more often than the
-          // number on it is needed.
-          { header: t("colPhone"), render: (c) => maskAzPhone(c.phoneNumber), className: "mono muted" },
+          {
+            // Masked until asked for, the same as the follow-up list. A column of
+            // +994(00)000-00-00 is not privacy, it is a column of nothing — somebody looking at
+            // a call usually wants to be able to ring the person back about it.
+            header: t("colPhone"),
+            render: (c) => (numbersShown ? revealAzPhone(c.phoneNumber) : maskAzPhone(c.phoneNumber)),
+            className: "mono",
+          },
           { header: t("questionnaire"), render: (c) => c.surveyName },
           // ⚠ This column is why the split happened. Five rows here on 15 August were one
           // person and one survey; without the attempt number they read as five surveys.

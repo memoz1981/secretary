@@ -29,6 +29,11 @@ public sealed class LiveVoiceCallOrchestrator
     private readonly AgentInstructionContext _instructionContext;
     private readonly AgentModuleRegistry _agentModules;
     private readonly ICurrentTenantModules _modules;
+
+    /// <summary>The caller's own words, kept where a tool can read them. A model asked to pass
+    /// somebody's words on will pass on its own tidied version — see CallerSpeech.</summary>
+    private readonly CallerSpeech _callerSpeech;
+
     private readonly IClock _clock;
     private readonly ILogger<LiveVoiceCallOrchestrator> _logger;
 
@@ -39,8 +44,10 @@ public sealed class LiveVoiceCallOrchestrator
     public LiveVoiceCallOrchestrator(
         RealtimeSessionResolver sessionResolver, RealtimeToolInvoker toolInvoker,
         AgentInstructionContext instructionContext, AgentModuleRegistry agentModules,
-        ICurrentTenantModules modules, IClock clock, ILogger<LiveVoiceCallOrchestrator> logger)
+        ICurrentTenantModules modules, CallerSpeech callerSpeech, IClock clock,
+        ILogger<LiveVoiceCallOrchestrator> logger)
     {
+        _callerSpeech = callerSpeech;
         _sessionResolver = sessionResolver;
         _toolInvoker = toolInvoker;
         _instructionContext = instructionContext;
@@ -687,8 +694,16 @@ public sealed class LiveVoiceCallOrchestrator
                 // how we can tell a real caller turn from the microphone tripping over background
                 // noise or the agent's own voice.
                 case RealtimeEvent.CallerTranscript transcription:
-                    _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+                    // ⚠ RecordCallerLine first, because it flushes whatever the agent was
+                    // saying. Logging the caller before that put an answer above the question it
+                    // answered, and it misled the person reading the log to find out why the
+                    // agent had not waited — which was me.
                     RecordCallerLine(transcription.Text);
+                    _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+
+                    // Kept for the tools as well as the log: an open answer is recorded from
+                    // this, not from what the model reports hearing.
+                    _callerSpeech.Heard(transcription.Text);
 
                     // Also a question, and on Gemini it is usually the only sign of one. Gemini
                     // reports speech starting only when the caller talks OVER the agent, so a

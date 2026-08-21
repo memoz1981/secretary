@@ -715,9 +715,9 @@ export const translations = {
   },
   customerName: { az: "Müştərinin adı", ru: "Имя клиента", en: "Customer name" },
   enterValidPhone: {
-    az: "Nömrəni +994(50)250-58-32 formatında yazın",
-    ru: "Формат: +994(50)250-58-32",
-    en: "Enter the number as +994(50)250-58-32",
+    az: "Nömrəni +994(00)000-00-00 formatında yazın",
+    ru: "Формат: +994(00)000-00-00",
+    en: "Enter the number as +994(00)000-00-00",
   },
   makeCall: { az: "Zəng et", ru: "Позвонить", en: "Make call" },
   hangUp: { az: "Bitir", ru: "Завершить", en: "Hang up" },
@@ -743,7 +743,7 @@ export const translations = {
   // Named for what it actually is. Only the caller's side is transcribed — the providers do that
   // as part of the session, while transcribing the agent's own voice is a separate bill nothing
   // has asked for — and calling it "the transcript" would have people looking for the other half.
-  transcript: { az: "Müştərinin dedikləri", ru: "Слова клиента", en: "What the caller said" },
+  transcript: { az: "Danışığın mətni", ru: "Расшифровка разговора", en: "The conversation" },
   feedbackDashboard: { az: "Rəy paneli", ru: "Панель отзывов", en: "Feedback dashboard" },
   agentQuality: { az: "Agentin işi", ru: "Работа агента", en: "Agent quality" },
   callsQueued: { az: "Növbədə", ru: "В очереди", en: "Queued" },
@@ -793,6 +793,8 @@ export const translations = {
   ringAgain: { az: "Yenidən zəng et", ru: "Позвонить снова", en: "Ring again" },
   stopChasing: { az: "Dayandır", ru: "Прекратить", en: "Stop chasing" },
   showNumber: { az: "Nömrəni göstər", ru: "Показать номер", en: "Show number" },
+  showNumbers: { az: "Nömrələri göstər", ru: "Показывать номера", en: "Show numbers" },
+  allStatuses: { az: "Bütün statuslar", ru: "Все статусы", en: "All statuses" },
   scheduledDialsWaitForTelephony: {
     az: "Avtomatik zənglər telefoniya qoşulana qədər işə düşməyəcək — cəhdlər sayılır, zəng edilmir.",
     ru: "Автодозвон заработает после подключения телефонии — попытки считаются, звонков нет.",
@@ -841,9 +843,14 @@ export const translations = {
   },
   noCallsYet: { az: "Hələ zəng yoxdur.", ru: "Пока нет звонков.", en: "No calls yet." },
   rowClickToCallDetail: {
-    az: "Sətrə klikləyin → Zəng detalları.",
-    ru: "Нажмите на строку → Детали звонка.",
-    en: "Click a row → call details.",
+    az: "Sətrə klikləyin → cavablar və danışığın mətni.",
+    ru: "Нажмите на строку → ответы и расшифровка.",
+    en: "Click a row → the answers and the conversation.",
+  },
+  noTranscriptYet: {
+    az: "Danışığın mətni yalnız zəng bitəndən sonra yazılır.",
+    ru: "Расшифровка сохраняется только после завершения звонка.",
+    en: "The conversation is written down only once the call has ended.",
   },
   failedToLoadCalls: { az: "Zənglər yüklənmədi.", ru: "Не удалось загрузить звонки.", en: "Couldn't load calls." },
 
