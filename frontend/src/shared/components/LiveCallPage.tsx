@@ -27,7 +27,11 @@ export function LiveCallPage({ module }: { module: Module }) {
   const [status, setStatus] = useState<PageStatus>("idle");
   const [micDenied, setMicDenied] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [pipeline, setPipeline] = useState<CallPipeline>("OpenAiRealtime_2_1");
+  // ⚠ The first offered pipeline, not a name written here. It said "OpenAiRealtime_2_1", which
+  // was invisible while a picker sat next to it — and became every call the moment the picker
+  // was hidden for having only one option. A default that does not follow the list is a default
+  // that outlives the list.
+  const [pipeline, setPipeline] = useState<CallPipeline>(CALL_PIPELINES[0]);
   const callRef = useRef<LiveVoiceCall | null>(null);
 
   const inCall = status === "in-call";
