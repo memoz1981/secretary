@@ -73,7 +73,7 @@ public sealed class FeedbackAgentModule : IAgentModule
         //
         // Instructions did not stop this: "you do not know the questions" is already in them, in
         // bold. Removing the empty-handed moment does.
-        var first = await _feedbackTools.GetNextQuestion();
+        var first = await _feedbackTools.FirstQuestionForGreeting();
 
         // ⚠ Each name is labelled with the job it does. On a real call the agent introduced
         // itself as "Toyota Servis" — the questionnaire, not the business. Two proper nouns
@@ -82,21 +82,15 @@ public sealed class FeedbackAgentModule : IAgentModule
         return $"""
                 ## This call
 
-                - You are calling **{subject.PersonName}**. Greet them by name.
-                - You are calling **on behalf of the business named at the top of these
-                  instructions**. That is the only name you introduce yourself with.
-                - The questionnaire is called **"{subject.SurveyName}"**. That is what the call is
-                  about, not who you are — "[business] adından {subject.SurveyName} sorğusu ilə
-                  bağlı zəng edirəm", never "{subject.SurveyName} adından".
-                - It has {subject.QuestionCount} question(s). Say how many, once, at the start, so
-                  they know what they agreed to.
+                - Greet **{subject.PersonName}** by name, on behalf of the business named at the
+                  top of these instructions. That business's name is the only one you introduce
+                  yourself with — the questionnaire is called "{subject.SurveyName}", and that is
+                  what the call is about, never who you are.
+                - Say once that there are **{subject.QuestionCount}** questions. That number and
+                  no other.
+                - {first}
 
-                ## The first question, already in your hand
-
-                {first}
-
-                Ask it once they agree, then record their answer as usual. You have it here so
-                that there is no moment where you have agreement and nothing to ask.
+                Record the answer as usual; the one after it comes back with `RECORDED`.
                 """;
     }
 

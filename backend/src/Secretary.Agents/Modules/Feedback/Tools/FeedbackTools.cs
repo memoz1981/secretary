@@ -49,6 +49,37 @@ public sealed class FeedbackTools
         return await Describe(await _calls.GetNextQuestionAsync(_session.Require(), default));
     }
 
+    /// <summary>The first question, written as a line of instructions rather than as a tool
+    /// result, for the greeting.
+    ///
+    /// ⚠ The marker form went in here first — "YES_NO_QUESTION ASK: …" — and putting a tool
+    /// result inside the instructions is asking for it to be read out, which is the mistake this
+    /// module keeps making in different clothes. Markers belong in results; instructions are
+    /// prose.</summary>
+    internal async Task<string> FirstQuestionForGreeting()
+    {
+        var question = await _calls.GetNextQuestionAsync(_session.Require(), default);
+        if (question is null)
+        {
+            return "There are no questions to ask. Apologise briefly and end the call.";
+        }
+
+        _ = await Describe(question);
+
+        var note = question.QuestionType switch
+        {
+            FeedbackQuestionType.YesNo => " It is a yes/no question — do not read the answers out.",
+            FeedbackQuestionType.Scale =>
+                $" Say the range as words — birdən {question.ScaleMax}-ə qədər — and never count the numbers out.",
+            FeedbackQuestionType.Choice =>
+                " Read these options after it, pausing between them: "
+                + string.Join("; ", question.Options.Where(o => !o.IsOther).Select(o => o.Text)),
+            _ => " Let them answer in their own words.",
+        };
+
+        return $"Then ask this, and nothing else: \"{question.Text}\".{note}";
+    }
+
     /// <summary>One question, in the shape the agent is meant to ask it — and the bookkeeping
     /// that goes with handing it over.</summary>
     private async Task<string> Describe(FeedbackQuestionForAgent? question)
@@ -158,7 +189,7 @@ public sealed class FeedbackTools
             }
 
             await _calls.RecordChoiceAsync(callId, question.QuestionId, option.Id, default);
-            return await RecordedAndNext(callId, option.Text);
+            return await RecordedAndNext(callId);
         }
 
         // A question that allows "Digər" has no unmatchable answer — that is what allowing it
@@ -198,11 +229,13 @@ public sealed class FeedbackTools
     ///
     /// The order line learned the same thing: one PlaceOrder with everything in it, rather than a
     /// ladder of calls each costing a turn.</summary>
-    private async Task<string> RecordedAndNext(int callId, string? optionText = null)
-    {
-        var recorded = optionText is null ? "RECORDED." : $"RECORDED. {optionText}";
-        return $"{recorded} NEXT — {await Describe(await _calls.GetNextQuestionAsync(callId, default))}";
-    }
+    /// ⚠ The matched option is deliberately NOT named in the result. It was, for one round, and
+    /// the agent read it back: "Bəli. Bir-dən ona qədər neçə xal…", "Bir. Sizə servis kitabçası…".
+    /// The instructions say not to repeat an answer back, and a value put in front of the model is
+    /// worth more than a rule about not saying it. Nothing needed the name; it was there to make
+    /// the log easier to read, and the log has the tool call beside it anyway.
+    private async Task<string> RecordedAndNext(int callId)
+        => $"RECORDED. NEXT — {await Describe(await _calls.GetNextQuestionAsync(callId, default))}";
 
     [Description("Records that the caller would rather not answer this question. Only after they have made that "
                  + "clear — never to move things along.")]
