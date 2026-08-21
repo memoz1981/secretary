@@ -77,7 +77,7 @@ public sealed class AuthServiceTests
     {
         // TC-TENANT-03: deactivating a tenant must actually block its accounts from logging in.
         var now = Instant.FromUtc(2026, 7, 11, 9, 0);
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, now);
         tenant.Deactivate(now);
         var account = Account.CreateOwner(tenant.Id, "Elvin", "elvin@business.az", "hashed", now);
 
@@ -92,7 +92,7 @@ public sealed class AuthServiceTests
     public async Task LoginAsync_succeeds_when_tenant_is_active()
     {
         var now = Instant.FromUtc(2026, 7, 11, 9, 0);
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, now);
         var account = Account.CreateOwner(tenant.Id, "Elvin", "elvin@business.az", "hashed", now);
 
         _uow.Accounts.Setup(a => a.GetByEmailAsync("elvin@business.az", default)).ReturnsAsync(account);
@@ -125,7 +125,7 @@ public sealed class AuthServiceTests
     public async Task GetMeAsync_returns_name_email_role_and_tenant_name()
     {
         var now = Instant.FromUtc(2026, 7, 11, 9, 0);
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, now);
         var account = Account.CreateOwner(tenant.Id, "Elvin Mammadov", "elvin@business.az", "hashed", now);
 
         _uow.Accounts.Setup(a => a.GetByIdAsync(account.Id, default)).ReturnsAsync(account);

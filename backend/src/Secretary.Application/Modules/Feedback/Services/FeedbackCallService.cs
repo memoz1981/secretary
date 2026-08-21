@@ -24,9 +24,14 @@ public sealed class FeedbackCallService
     private readonly ICurrentTenantProvider _currentTenant;
     private readonly TokenPricebook _pricebook;
 
+    /// <summary>Whether this caller may see what a call cost. See CallCostVisibility.</summary>
+    private readonly CallCostVisibility _costs;
+
     public FeedbackCallService(
-        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook)
+        IUnitOfWork uow, IClock clock, ICurrentTenantProvider currentTenant, TokenPricebook pricebook,
+        CallCostVisibility costs)
     {
+        _costs = costs;
         _uow = uow;
         _clock = clock;
         _currentTenant = currentTenant;
@@ -99,7 +104,9 @@ public sealed class FeedbackCallService
         var survey = await _uow.Surveys.GetByIdAsync(surveyRequest.SurveyId, cancellationToken);
         var questions = await _uow.SurveyQuestions.GetForSurveyAsync(surveyRequest.SurveyId, cancellationToken);
 
-        return ToResponse(call, surveyRequest, survey?.Name ?? string.Empty, answered: 0, questions.Count);
+        return ToResponse(
+            call, surveyRequest, survey?.Name ?? string.Empty, answered: 0, questions.Count,
+            await _costs.ShowAsync(call.CostUsd, cancellationToken));
     }
 
     private async Task<Survey> RequireAskableSurveyAsync(int surveyId, CancellationToken cancellationToken)
@@ -456,6 +463,8 @@ public sealed class FeedbackCallService
             questionCounts[id] = (await _uow.SurveyQuestions.GetForSurveyAsync(id, cancellationToken)).Count;
         }
 
+        var showCosts = await _costs.IsAllowedAsync(cancellationToken);
+
         return calls
             .Where(c => requests.ContainsKey(c.SurveyRequestId))
             .Select(c =>
@@ -466,7 +475,8 @@ public sealed class FeedbackCallService
                     surveyRequest,
                     surveys.GetValueOrDefault(surveyRequest.SurveyId)?.Name ?? string.Empty,
                     answers.GetValueOrDefault(c.Id),
-                    questionCounts.GetValueOrDefault(surveyRequest.SurveyId));
+                    questionCounts.GetValueOrDefault(surveyRequest.SurveyId),
+                    showCosts ? c.CostUsd : null);
             })
             .ToList();
     }
@@ -483,9 +493,10 @@ public sealed class FeedbackCallService
 
         var surveys = (await _uow.Surveys.GetAllForCurrentTenantAsync(cancellationToken)).ToDictionary(s => s.Id);
         var calls = await _uow.FeedbackCalls.GetForRequestsAsync(requests.Select(r => r.Id).ToList(), cancellationToken);
+        var showCosts = await _costs.IsAllowedAsync(cancellationToken);
         var costByRequest = calls
             .GroupBy(c => c.SurveyRequestId)
-            .ToDictionary(g => g.Key, g => g.Sum(c => c.CostUsd));
+            .ToDictionary(g => g.Key, g => showCosts ? g.Sum(c => c.CostUsd) : (decimal?)null);
 
         return requests
             .Select(r => new SurveyRequestResponse(
@@ -536,7 +547,9 @@ public sealed class FeedbackCallService
             .ToList();
 
         return new FeedbackCallDetailResponse(
-            ToResponse(call, surveyRequest, survey?.Name ?? string.Empty, answers.Count, questions.Count),
+            ToResponse(
+                call, surveyRequest, survey?.Name ?? string.Empty, answers.Count, questions.Count,
+                await _costs.ShowAsync(call.CostUsd, cancellationToken)),
             detailed,
             call.Transcript);
     }
@@ -594,6 +607,7 @@ public sealed class FeedbackCallService
         var answers = await _uow.FeedbackAnswers.GetForCallsAsync(countedCalls, cancellationToken);
 
         var spoken = calls.Where(c => c.DurationSeconds > 0).ToList();
+        var showCosts = await _costs.IsAllowedAsync(cancellationToken);
 
         var coverage = new FeedbackCoverage(
             Requested: requests.Count,
@@ -603,7 +617,7 @@ public sealed class FeedbackCallService
             NeedsHuman: requests.Count(r => r.Outcome == SurveyRequestOutcome.NeedsHuman),
             Attempts: calls.Count,
             AverageDurationSeconds: spoken.Count == 0 ? 0 : (int)spoken.Average(c => c.DurationSeconds),
-            TotalCostUsd: calls.Sum(c => c.CostUsd));
+            TotalCostUsd: showCosts ? calls.Sum(c => c.CostUsd) : null);
 
         var byQuestion = answers.GroupBy(a => a.SurveyQuestionId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -702,11 +716,12 @@ public sealed class FeedbackCallService
            ?? throw new NotFoundException(nameof(SurveyRequest), requestId);
 
     private static FeedbackCallResponse ToResponse(
-        FeedbackCall call, SurveyRequest surveyRequest, string surveyName, int answered, int questionCount)
+        FeedbackCall call, SurveyRequest surveyRequest, string surveyName, int answered, int questionCount,
+        decimal? costUsd)
         => new(
             call.Id, surveyRequest.Id, surveyRequest.SurveyId, surveyName,
             surveyRequest.PersonName, surveyRequest.PhoneNumber, surveyRequest.AttemptCount,
             call.CallStatus, call.CreatedAtUtc, call.CompletedAt, call.DurationSeconds,
             call.TurnCount, call.CallerTurnCount, call.AgentModel, call.Pipeline, call.TokenUsage,
-            call.CostUsd, answered, questionCount);
+            costUsd, answered, questionCount);
 }

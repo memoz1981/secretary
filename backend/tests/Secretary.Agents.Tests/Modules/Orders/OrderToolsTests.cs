@@ -95,7 +95,7 @@ public sealed class OrderToolsTests
 
         _orderCalls = new OrderCallService(
             _uow.Object, clock.Object, tenant.Object,
-            new TokenPricebook(Options.Create(new ModelPricingOptions())));
+            new TokenPricebook(Options.Create(new ModelPricingOptions())), CostsVisible(_uow.Object));
 
         _sut = new OrderTools(
             identity, orderService, directory, _session, _escalation, NullLogger<OrderTools>.Instance);
@@ -506,4 +506,16 @@ public sealed class OrderToolsTests
         typeof(BaseEntity).GetProperty(nameof(BaseEntity.Id))!.SetValue(entity, id);
         return entity;
     }
+
+    /// <summary>Costs visible, so these tests are about the figures rather than about who may
+    /// see them. A caller with no tenant of their own is the platform admin, and the platform
+    /// admin sees everything — see CallCostVisibility, and CallCostVisibilityTests for the rule
+    /// itself.</summary>
+    private static CallCostVisibility CostsVisible(IUnitOfWork uow)
+    {
+        var platformAdmin = new Mock<ICurrentTenantProvider>();
+        platformAdmin.SetupGet(t => t.TenantId).Returns((int?)null);
+        return new CallCostVisibility(uow, platformAdmin.Object);
+    }
+
 }

@@ -1,3 +1,5 @@
+using Secretary.Application.Abstractions.Persistence;
+using Secretary.Application.Abstractions;
 using Secretary.Application.Dtos;
 using Secretary.Application.Pricing;
 using Secretary.Application.Services;
@@ -26,7 +28,7 @@ public sealed class CallServiceTests
 
     public CallServiceTests()
     {
-        _sut = new CallService(_uow.Object, new FakeClock(Now), new FakeCurrentTenantProvider(TenantId), Pricebook());
+        _sut = new CallService(_uow.Object, new FakeClock(Now), new FakeCurrentTenantProvider(TenantId), Pricebook(), CostsVisible(_uow.UnitOfWork.Object));
     }
 
     // The three models a chained V2 call bills, at their published rates.
@@ -118,7 +120,7 @@ public sealed class CallServiceTests
     [Fact]
     public async Task LogAsync_requires_a_tenant_scoped_caller()
     {
-        var sut = new CallService(_uow.Object, new FakeClock(Now), new FakeCurrentTenantProvider(null), Pricebook());
+        var sut = new CallService(_uow.Object, new FakeClock(Now), new FakeCurrentTenantProvider(null), Pricebook(), CostsVisible(_uow.UnitOfWork.Object));
 
         await Should.ThrowAsync<InvalidOperationException>(() => sut.LogAsync(Request(), default));
     }
@@ -273,4 +275,16 @@ public sealed class CallServiceTests
 
         result.Count.ShouldBe(1);
     }
+
+    /// <summary>Costs visible, so these tests are about the figures rather than about who may
+    /// see them. A caller with no tenant of their own is the platform admin, and the platform
+    /// admin sees everything — see CallCostVisibility, and CallCostVisibilityTests for the rule
+    /// itself.</summary>
+    private static CallCostVisibility CostsVisible(IUnitOfWork uow)
+    {
+        var platformAdmin = new Mock<ICurrentTenantProvider>();
+        platformAdmin.SetupGet(t => t.TenantId).Returns((int?)null);
+        return new CallCostVisibility(uow, platformAdmin.Object);
+    }
+
 }

@@ -13,7 +13,7 @@ public static class TestSeed
 
     public static Tenant AddTenant(AppDbContext context, string name = "Test Tenant")
     {
-        var tenant = Tenant.Create(name, "Asia/Baku", null, Now);
+        var tenant = Tenant.Create(name, "Asia/Baku", null, showCallCosts: false, Now);
         context.Tenants.Add(tenant);
         context.SaveChanges();
         return tenant;

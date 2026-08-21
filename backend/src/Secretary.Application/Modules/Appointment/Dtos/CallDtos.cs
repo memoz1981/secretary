@@ -22,17 +22,19 @@ public sealed record CallResponse(
     string AgentModel,
     CallPipeline Pipeline,
     TokenUsage TokenUsage,
-    decimal CostUsd)
+    decimal? CostUsd)
 {
     /// <summary>Null rather than zero for a call too short to divide by — a call that lasted no
     /// measurable time has no meaningful rate, and showing "$0.00/min" for it would drag the
     /// eye to a number that means nothing.</summary>
-    public decimal? CostPerMinuteUsd => DurationSeconds <= 0 ? null : CostUsd * 60m / DurationSeconds;
+    public decimal? CostPerMinuteUsd =>
+        CostUsd is not { } cost || DurationSeconds <= 0 ? null : cost * 60m / DurationSeconds;
 
     /// <summary>Cost per answer the agent gave. The more useful of the two rates in practice:
     /// minutes vary with how long the caller thinks, whereas every answer is a model round-trip
     /// billed the whole conversation so far, which is what actually drives the bill.</summary>
-    public decimal? CostPerAnswerUsd => TurnCount <= 0 ? null : CostUsd / TurnCount;
+    public decimal? CostPerAnswerUsd =>
+        CostUsd is not { } perAnswer || TurnCount <= 0 ? null : perAnswer / TurnCount;
 }
 
 public sealed record CallDetailResponse(CallResponse Call, string? Transcript);
