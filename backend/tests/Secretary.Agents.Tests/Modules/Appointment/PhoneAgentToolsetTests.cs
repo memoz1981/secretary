@@ -1,3 +1,4 @@
+using Secretary.Agents.Appointment;
 using Secretary.Agents.ServiceCatalog;
 using Secretary.Agents.Tools;
 using Secretary.Application.Abstractions;
@@ -29,7 +30,7 @@ public sealed class PhoneAgentToolsetTests
         var appointmentService = new AppointmentService(uow.Object, clock.Object, tenantProvider.Object, clientService);
         var escalationService = new EscalationService(uow.Object, clock.Object, tenantProvider.Object, clientService);
 
-        var clientTools = new ClientTools(clientService);
+        var clientTools = new ClientTools(clientService, new AppointmentCallSession());
         var serviceCatalogTools = new ServiceCatalogTools(catalog.Object);
         var businessHours = new BusinessHoursService(
             new Mock<IBusinessHoursRepository>().Object, uow.Object, clock.Object, tenantProvider.Object,

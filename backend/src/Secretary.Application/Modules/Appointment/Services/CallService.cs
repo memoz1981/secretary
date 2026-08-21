@@ -38,7 +38,13 @@ public sealed class CallService
         var tenantId = _currentTenant.TenantId
             ?? throw new InvalidOperationException("This operation requires a tenant-scoped caller.");
 
-        var client = await _uow.Clients.GetByPhoneNumberAsync(request.CallerPhoneNumber, cancellationToken);
+        // Who the agent identified, if it says so; the number it rang from otherwise. The
+        // lookup alone never matched a browser call, whose number is the literal string
+        // "local-device-call", so the log named nobody even when the agent had just booked an
+        // appointment for somebody by name.
+        var client = request.ClientId is { } identified
+            ? await _uow.Clients.GetByIdAsync(identified, cancellationToken)
+            : await _uow.Clients.GetByPhoneNumberAsync(request.CallerPhoneNumber, cancellationToken);
 
         // The one moment this call is ever priced. Everything downstream — Call Log, Call
         // Detail, the KPI dashboard's spend figures — reads the stored number, so correcting a

@@ -45,6 +45,13 @@ public sealed record CallDetailResponse(CallResponse Call, string? Transcript);
 /// <summary>Logged once, at the end of a call, by the Agent-role caller (or derived
 /// server-side for calls staff handle manually — see CallService).</summary>
 public sealed record LogCallRequest(
+    /// <summary>Who the agent identified, when it did.
+    ///
+    /// ⚠ Passed rather than looked up. The lookup is by phone number, and a browser call has no
+    /// phone number — every local call is logged against the literal "local-device-call", which
+    /// matches no client. So the log was blank for calls that had just booked an appointment for
+    /// somebody named.</summary>
+    int? ClientId,
     string CallerPhoneNumber,
     int? RelatedAppointmentId,
     CallClassification Classification,

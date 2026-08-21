@@ -26,6 +26,7 @@ public static class AgentsServiceCollectionExtensions
         // for latency, not load — the caller hears the round trip.
         services.AddScoped<ITenantOrderDirectory, Orders.TenantOrderDirectory>();
 
+        services.AddScoped<Appointment.AppointmentCallSession>();
         services.AddScoped<ClientTools>();
         services.AddScoped<ServiceCatalogTools>();
         services.AddScoped<AppointmentTools>();

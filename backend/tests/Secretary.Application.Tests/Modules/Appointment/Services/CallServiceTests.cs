@@ -84,7 +84,7 @@ public sealed class CallServiceTests
         int durationSeconds = 120, int turnCount = 5, int callerTurnCount = 4,
         CallClassification classification = CallClassification.NewAppointment)
         => new(
-            "+994000000", null, classification, CallOutcome.ResolvedByAgent,
+            ClientId: null, "+994000000", null, classification, CallOutcome.ResolvedByAgent,
             durationSeconds, turnCount, callerTurnCount, null, "url", null, Now, CallPipeline.OpenAiRealtime_2_1, usages);
 
     private static Call LoggedCall(int durationSeconds = 30, int turnCount = 2, string? transcript = null)
