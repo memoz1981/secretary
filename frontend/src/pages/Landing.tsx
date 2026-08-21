@@ -24,13 +24,18 @@ interface Item {
 }
 
 const STEPS: Item[] = [
-  { title: "landingStep1Title", text: "landingStep1Text", icon: "phoneIn", tone: 1 },
+  { title: "landingStep1Title", text: "landingStep1Text", icon: "phoneBoth", tone: 1 },
   { title: "landingStep2Title", text: "landingStep2Text", icon: "speak", tone: 2 },
   { title: "landingStep3Title", text: "landingStep3Text", icon: "calendarCheck", tone: 3 },
 ];
 
-/** `live` is a claim about working software, not a position on a roadmap. Only appointments
- *  ships today; everything else says so plainly and must keep saying so until it does not. */
+/** `live` is a claim about working software, not a position on a roadmap: a module is listed as
+ *  active when somebody could use it today, and as coming when it is a plan. Appointments, orders
+ *  and feedback have all taken real calls; the other three have not.
+ *
+ *  Sorted so the working ones come first. A visitor reading top to bottom should meet what exists
+ *  before what is promised — a grid that opens with two "soon" cards reads as a product that is
+ *  mostly intention. */
 const MODULES: (Item & { live: boolean })[] = [
   { title: "moduleAppointmentsTitle", text: "moduleAppointmentsText", icon: "calendarCheck", tone: 2, live: true },
   { title: "moduleInfoTitle", text: "moduleInfoText", icon: "info", tone: 1, live: false },
@@ -39,6 +44,10 @@ const MODULES: (Item & { live: boolean })[] = [
   { title: "moduleOrdersTitle", text: "moduleOrdersText", icon: "bag", tone: 4, live: true },
   { title: "moduleSurveysTitle", text: "moduleSurveysText", icon: "clipboard", tone: 5, live: false },
 ];
+
+/** Working modules first, each group keeping the order above — that order groups them by the kind
+ *  of work they do, and sorting is not a reason to lose it. */
+const LISTED_MODULES = [...MODULES].sort((a, b) => Number(b.live) - Number(a.live));
 
 const REASONS: Item[] = [
   { title: "landingWhy1Title", text: "landingWhy1Text", icon: "globe", tone: 1 },
@@ -89,7 +98,7 @@ export function LandingPage() {
           <h2>{t("landingModulesTitle")}</h2>
           <p className="lead">{t("landingModulesLead")}</p>
           <div className="card-grid">
-            {MODULES.map((module) => (
+            {LISTED_MODULES.map((module) => (
               <Card key={module.title} className="landing-card">
                 <div className="module-head">
                   <IconChip name={module.icon} tone={module.tone} />
