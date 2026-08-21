@@ -78,15 +78,16 @@ export function TenantListPage() {
             // opens what the account is actually doing.
             header: "",
             render: (tenant) => (
-              <button
-                className="link"
+              <Button
+                size="sm"
+                variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/admin/tenants/${tenant.id}/dashboard`);
                 }}
               >
                 {t("tenantDashboard")}
-              </button>
+              </Button>
             ),
           },
         ]}

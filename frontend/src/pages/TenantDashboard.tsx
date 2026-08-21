@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
+import { Button } from "@/shared/components/Button";
 import { Card } from "@/shared/components/Card";
 import { StatTile } from "@/shared/components/StatTile";
 import { ShareBars, type Share } from "@/shared/components/SharePie";
@@ -79,9 +80,9 @@ export function TenantDashboardPage() {
 
   return (
     <AppShell {...shell}>
-      <button className="link" onClick={() => navigate(`/admin/tenants/${tenantId}`)}>
-        ← {t("backToTenant")}
-      </button>
+      <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/tenants/${tenantId}`)}>
+        {t("backToTenant")}
+      </Button>
 
       <h1 className="page-title" style={{ marginTop: "var(--space-3)" }}>
         {data.tenantName}
