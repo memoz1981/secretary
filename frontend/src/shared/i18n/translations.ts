@@ -121,33 +121,33 @@ export const translations = {
   // customer yet. Module statuses are deliberately honest: "Tezliklə" means it does not
   // exist, and must stay that way until it does.
   landingMotto: {
-    az: "Siz dincəlin — biznesiniz işləsin.",
-    ru: "Вы отдыхаете — бизнес работает.",
-    en: "You rest — your business keeps working.",
+    az: "Zəngləriniz cavabsız qalmasın.",
+    ru: "Пусть ни один звонок не останется без ответа.",
+    en: "Never let a call go unanswered.",
   },
   landingHeroTitle: {
-    az: "Zənglərinizə süni intellekt agentləri cavab verir",
-    ru: "На ваши звонки отвечают ИИ-агенты",
-    en: "AI agents answer your calls",
+    az: "Süni intellekt agentləri zənglərə cavab verir və özləri zəng edir",
+    ru: "ИИ-агенты отвечают на звонки и звонят сами",
+    en: "AI agents answer your calls — and make them",
   },
   landingHeroLead: {
-    az: "Agentlər müştərilərinizin zənglərini 24/7 Azərbaycan, rus və ingilis dillərində qarşılayır, randevu yazır və nəticəni sisteminizə köçürür.",
-    ru: "Агенты круглосуточно принимают звонки ваших клиентов на азербайджанском, русском и английском, записывают на приём и переносят результат в вашу систему.",
-    en: "Agents take your customers' calls around the clock in Azerbaijani, Russian and English, book the appointment and write the result straight into your system.",
+    az: "Gələn zəngləri 24/7 Azərbaycan, rus və ingilis dillərində qarşılayır: randevu yazır, sifariş qəbul edir, sualı cavablandırır. Lazım olanda özü zəng edir — rəy soruşur, randevunu xatırladır. Nəticə isə birbaşa sisteminizə düşür.",
+    ru: "Круглосуточно принимают входящие на азербайджанском, русском и английском: записывают на приём, оформляют заказ, отвечают на вопрос. А когда нужно — звонят сами: спрашивают отзыв, напоминают о записи. Результат сразу попадает в вашу систему.",
+    en: "They take incoming calls around the clock in Azerbaijani, Russian and English — booking appointments, taking orders, answering questions. And when it matters they ring out: asking for feedback, reminding people of a booking. The result lands straight in your system.",
   },
 
   landingHowTitle: { az: "Necə işləyir", ru: "Как это работает", en: "How it works" },
-  landingStep1Title: { az: "Müştəri zəng edir", ru: "Клиент звонит", en: "A customer calls" },
+  landingStep1Title: { az: "Zəng başlayır", ru: "Звонок начинается", en: "A call begins" },
   landingStep1Text: {
-    az: "Xətt heç vaxt məşğul olmur — gecə, həftəsonu və bayram günlərində də.",
-    ru: "Линия никогда не занята — ночью, в выходные и в праздники тоже.",
-    en: "The line is never busy — nights, weekends and holidays included.",
+    az: "Müştəri özü zəng edir, ya da agent onu axtarır. Xətt heç vaxt məşğul olmur — gecə, həftəsonu və bayram günlərində də.",
+    ru: "Клиент звонит сам или агент набирает его. Линия никогда не занята — ночью, в выходные и в праздники тоже.",
+    en: "The customer rings, or the agent rings them. The line is never busy — nights, weekends and holidays included.",
   },
-  landingStep2Title: { az: "Agent cavab verir", ru: "Агент отвечает", en: "The agent answers" },
+  landingStep2Title: { az: "Agent danışır", ru: "Агент говорит", en: "The agent talks" },
   landingStep2Text: {
-    az: "Müştərinin dilində danışır, sualı başa düşür, boş vaxtları yoxlayır və razılaşır.",
-    ru: "Говорит на языке клиента, понимает вопрос, проверяет свободное время и договаривается.",
-    en: "Speaks the customer's language, understands the request, checks what is free and agrees a time.",
+    az: "Müştərinin dilində danışır, sualı başa düşür, boş vaxtı yoxlayır, sifarişi və ya cavabı yazır.",
+    ru: "Говорит на языке клиента, понимает вопрос, проверяет свободное время, оформляет заказ или записывает ответ.",
+    en: "Speaks the customer's language, understands the request, checks what is free, takes the order or records the answer.",
   },
   landingStep3Title: {
     az: "Nəticə sistemə düşür",
@@ -155,9 +155,9 @@ export const translations = {
     en: "The result lands in your system",
   },
   landingStep3Text: {
-    az: "Randevu təqvimə yazılır, zəng və danışığın mətni jurnalda saxlanılır.",
-    ru: "Запись попадает в календарь, звонок и текст разговора сохраняются в журнале.",
-    en: "The appointment goes into the calendar; the call and its transcript are kept in the log.",
+    az: "Randevu təqvimə, sifariş jurnala, rəy hesabata düşür. Zəng və danışığın mətni saxlanılır.",
+    ru: "Запись — в календарь, заказ — в журнал, отзыв — в отчёт. Звонок и текст разговора сохраняются.",
+    en: "The appointment goes to the calendar, the order to the log, the feedback to the report. The call and its transcript are kept.",
   },
 
   landingModulesTitle: { az: "Modullar", ru: "Модули", en: "Modules" },
@@ -251,9 +251,9 @@ export const translations = {
   },
   landingWhy6Title: { az: "Sistemə özü yazılır", ru: "Само попадает в систему", en: "Writes itself into your system" },
   landingWhy6Text: {
-    az: "Randevu təqvimə, müştəri bazaya, zəng jurnala düşür. Sonradan əl ilə köçürmək lazım deyil.",
-    ru: "Запись — в календарь, клиент — в базу, звонок — в журнал. Ничего не нужно потом переносить вручную.",
-    en: "Appointment to the calendar, customer to the database, call to the log. Nothing to copy over afterwards.",
+    az: "Randevu təqvimə, sifariş və rəy jurnala, müştəri bazaya düşür. Sonradan əl ilə köçürmək lazım deyil.",
+    ru: "Запись — в календарь, заказ и отзыв — в журнал, клиент — в базу. Ничего не нужно потом переносить вручную.",
+    en: "Appointment to the calendar, order and feedback to the log, customer to the database. Nothing to copy over afterwards.",
   },
 
   landingFooterTagline: {
