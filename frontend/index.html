@@ -7,19 +7,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <meta name="theme-color" content="#2f6e63" />
+    <!-- The default theme's accent, so the browser chrome matches the page it frames. -->
+    <meta name="theme-color" content="#e2b53f" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" />
     <title>sekretar.az</title>
     <script>
-      // Applies the saved theme before first paint, so a reload on a dark theme never
-      // flashes the light default. Kept in sync with theme/themes.ts.
+      // Applies the saved theme before first paint, so a first visit never flashes the wrong
+      // one. ⚠ The default is repeated here because this runs before any module loads and so
+      // cannot import DEFAULT_THEME — change both together or the flash comes back.
       (function () {
         try {
           var stored = localStorage.getItem("ai-appointment.theme");
           var known = ["ledger", "dark", "forest", "graphite", "ocean"];
-          document.documentElement.setAttribute("data-theme", known.indexOf(stored) >= 0 ? stored : "ledger");
+          document.documentElement.setAttribute("data-theme", known.indexOf(stored) >= 0 ? stored : "graphite");
         } catch (e) {
-          document.documentElement.setAttribute("data-theme", "ledger");
+          document.documentElement.setAttribute("data-theme", "graphite");
         }
       })();
     </script>
