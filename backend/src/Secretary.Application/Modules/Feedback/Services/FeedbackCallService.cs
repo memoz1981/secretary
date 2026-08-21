@@ -263,6 +263,34 @@ public sealed class FeedbackCallService
     /// this runs only after an exact match and a containment match have both failed. It also
     /// refuses a tie: two options that both look close is not a match, it is a question worth
     /// asking again.</summary>
+    /// <summary>An option the model says was chosen, accepted only if it is one of the stored
+    /// ones, character for character.
+    ///
+    /// ⚠ This is the one place the model is allowed near the choice, and it is here because code
+    /// provably cannot do it. A caller said "reception"; the option was typed "Resepshn". Those
+    /// are the same word in two orthographies and they differ at the third letter, so no prefix,
+    /// containment or edit-distance rule bridges them without matching things that are genuinely
+    /// different. The model crosses that gap without effort.
+    ///
+    /// The guarantee is kept by making it a closed set: it nominates, and a nomination that is
+    /// not one of the options on file is discarded. It cannot invent an answer, only point at
+    /// one — and it is asked only after every code-side rule has failed, so on a normal call it
+    /// is never consulted at all. The caller's own words are still recorded from the
+    /// transcription, never from the model.</summary>
+    public async Task<SurveyQuestionOption?> NominatedOptionAsync(
+        int questionId, string? chosenOption, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(chosenOption))
+        {
+            return null;
+        }
+
+        var question = await _uow.SurveyQuestions.GetWithOptionsAsync(questionId, cancellationToken);
+        var wanted = AddressText.Normalize(chosenOption);
+
+        return question?.Options.FirstOrDefault(o => AddressText.Normalize(o.Text) == wanted);
+    }
+
     private static SurveyQuestionOption? BySpelling(SurveyQuestion question, string spokenAnswer)
     {
         const int MinSharedPrefix = 5;
