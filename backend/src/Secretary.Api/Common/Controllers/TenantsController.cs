@@ -13,17 +13,20 @@ public sealed class TenantsController : ControllerBase
 {
     private readonly TenantService _tenantService;
     private readonly TenantModuleService _moduleService;
+    private readonly TenantInsightsService _insights;
     private readonly IValidator<CreateTenantRequest> _createValidator;
     private readonly IValidator<UpdateTenantRequest> _updateValidator;
 
     public TenantsController(
         TenantService tenantService,
         TenantModuleService moduleService,
+        TenantInsightsService insights,
         IValidator<CreateTenantRequest> createValidator,
         IValidator<UpdateTenantRequest> updateValidator)
     {
         _tenantService = tenantService;
         _moduleService = moduleService;
+        _insights = insights;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
     }
@@ -35,6 +38,13 @@ public sealed class TenantsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TenantResponse>> Get(int id, CancellationToken cancellationToken)
         => Ok(await _tenantService.GetAsync(id, cancellationToken));
+
+    /// <summary>What this tenant has used, across every module they hold — calls, minutes,
+    /// tokens and what it cost us. The whole class is PlatformAdmin, which is the only reason the
+    /// money can be unconditional here.</summary>
+    [HttpGet("{id:int}/insights")]
+    public async Task<ActionResult<TenantInsightsResponse>> GetInsights(int id, CancellationToken cancellationToken)
+        => Ok(await _insights.GetAsync(id, cancellationToken));
 
     [HttpGet("{id:int}/owner-accounts")]
     public async Task<ActionResult<IReadOnlyList<AccountResponse>>> GetOwnerAccounts(int id, CancellationToken cancellationToken)

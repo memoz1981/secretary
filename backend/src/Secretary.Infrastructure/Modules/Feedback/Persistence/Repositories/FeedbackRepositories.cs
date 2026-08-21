@@ -173,6 +173,12 @@ internal sealed class FeedbackCallRepository : IFeedbackCallRepository
                 .Where(c => requestIds.Contains(c.SurveyRequestId))
                 .OrderBy(c => c.CreatedAtUtc)
                 .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<FeedbackCall>> GetForTenantAsync(int tenantId, CancellationToken cancellationToken)
+        => await _db.FeedbackCalls
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
 }
 
 internal sealed class FeedbackAnswerRepository : IFeedbackAnswerRepository

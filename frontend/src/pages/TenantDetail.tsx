@@ -120,6 +120,16 @@ export function TenantDetailPage() {
             <Pill variant={tenant.status === "Active" ? "success" : "neutral"}>
               {tenant.status === "Active" ? t("statusActive") : t("statusInactive")}
             </Pill>
+            {/* Beside the name rather than buried below the module switches: what an account is
+                doing is the first thing anybody opening it wants, and configuring it is the
+                second. */}
+            <button
+              className="link"
+              style={{ marginLeft: "auto", fontSize: "var(--text-base)" }}
+              onClick={() => navigate(`/admin/tenants/${tenantId}/dashboard`)}
+            >
+              {t("tenantDashboard")} →
+            </button>
           </h1>
           <Card>
             <form onSubmit={handleSave}>

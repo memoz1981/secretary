@@ -74,4 +74,10 @@ internal sealed class CallRepository : ICallRepository
 
         return await query.OrderByDescending(c => c.StartedAt).ToListAsync(cancellationToken);
     }
+    public async Task<IReadOnlyList<Call>> GetForTenantAsync(int tenantId, CancellationToken cancellationToken)
+        => await _db.Calls
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
 }
