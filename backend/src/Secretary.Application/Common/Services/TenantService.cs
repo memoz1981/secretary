@@ -163,8 +163,21 @@ public sealed class TenantService
     }
 
     /// <summary>Tenant self-service: an Owner updates their own business's name/phone/timezone.</summary>
-    public async Task<TenantResponse> UpdateCurrentAsync(UpdateTenantRequest request, CancellationToken cancellationToken)
-        => await UpdateAsync(RequireTenant(), request, cancellationToken);
+    /// <summary>⚠ Keeps ShowCallCosts exactly as it was. A tenant editing their own name and
+    /// timezone does not get to decide whether they may see our costs, and the way to guarantee
+    /// that is to carry the stored value across rather than to trust a field not to arrive.</summary>
+    public async Task<TenantResponse> UpdateCurrentAsync(
+        UpdateOwnTenantRequest request, CancellationToken cancellationToken)
+    {
+        var tenantId = RequireTenant();
+        var tenant = await _uow.Tenants.GetByIdAsync(tenantId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Tenant), tenantId);
+
+        return await UpdateAsync(
+            tenantId,
+            new UpdateTenantRequest(request.Name, request.Timezone, request.PhoneLine, tenant.ShowCallCosts),
+            cancellationToken);
+    }
 
     public async Task DeactivateAsync(int id, CancellationToken cancellationToken)
     {

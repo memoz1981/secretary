@@ -100,10 +100,32 @@ public sealed class TenantServiceTests
         var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: false, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(CurrentTenantId, default)).ReturnsAsync(tenant);
 
-        var result = await _sut.UpdateCurrentAsync(new UpdateTenantRequest("New Name", "Asia/Baku", null, ShowCallCosts: false), default);
+        var result = await _sut.UpdateCurrentAsync(
+            new UpdateOwnTenantRequest("New Name", "Asia/Baku", null), default);
 
         result.Name.ShouldBe("New Name");
         _uow.UnitOfWork.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    /// <summary>⚠ A tenant editing their own details does not get to decide whether they may see
+    /// what our calls cost.
+    ///
+    /// Both edit screens shared one request type, so the moment ShowCallCosts joined it an Owner
+    /// could have posted it to their own settings endpoint and switched on the figures the
+    /// platform had withheld — no UI change needed, just the field being there. The self-update
+    /// takes a type without it and carries the stored value across; this pins that the value
+    /// survives an update rather than being reset by one.</summary>
+    [Fact]
+    public async Task UpdateCurrentAsync_cannot_change_whether_the_tenant_sees_call_costs()
+    {
+        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: true, Now);
+        _uow.Tenants.Setup(t => t.GetByIdAsync(CurrentTenantId, default)).ReturnsAsync(tenant);
+
+        var result = await _sut.UpdateCurrentAsync(
+            new UpdateOwnTenantRequest("New Name", "Asia/Baku", null), default);
+
+        result.ShowCallCosts.ShouldBeTrue();
+        tenant.ShowCallCosts.ShouldBeTrue();
     }
 
     [Fact]

@@ -7,7 +7,7 @@ import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { searchOrderCalls } from "@/modules/orders/api/calls";
-import type { CallOutcome } from "@/shared/api/types";
+import type { CallOutcome, OrderCallResponse } from "@/shared/api/types";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
@@ -39,6 +39,11 @@ export function OrderCallLogPage() {
   );
 
   const rows = state.status === "success" ? state.data : [];
+
+  // Whether this caller may be shown call costs, read off the data rather than off the session:
+  // the server already decided, and a second copy of that decision on the client is a second
+  // thing that can disagree with it. See CallCostVisibility.
+  const showsCosts = rows.some((c) => c.costUsd !== null);
 
   return (
     <AppShell {...shell}>
@@ -93,8 +98,22 @@ export function OrderCallLogPage() {
             header: t("colAgent"),
             render: (c) => <span title={c.agentModel}>{pipelineLabel(c.pipeline)}</span>,
           },
-          { header: t("colCost"), render: (c) => formatUsd(c.costUsd), className: "mono" },
-          { header: t("colCostPerMinute"), render: (c) => formatUsd(c.costPerMinuteUsd), className: "mono" },
+          // See CallCostVisibility — absent means withheld, and a column of dashes reads as
+          // data that failed to load.
+          ...(showsCosts
+            ? [
+                {
+                  header: t("colCost"),
+                  render: (c: OrderCallResponse) => formatUsd(c.costUsd),
+                  className: "mono",
+                },
+                {
+                  header: t("colCostPerMinute"),
+                  render: (c: OrderCallResponse) => formatUsd(c.costPerMinuteUsd),
+                  className: "mono",
+                },
+              ]
+            : []),
         ]}
       />
     </AppShell>

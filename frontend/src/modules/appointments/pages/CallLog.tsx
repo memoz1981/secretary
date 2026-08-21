@@ -1,3 +1,4 @@
+import type { CallResponse } from "@/shared/api/types";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
@@ -59,6 +60,11 @@ export function CallLogPage() {
   // one log every other figure on the row is unreadable without knowing which produced it.
   // Hidden rather than shown as a row of dashes.
   const rows = state.status === "success" ? state.data.filter((c) => c.pipeline !== "Unknown") : [];
+
+  // Whether this caller may be shown call costs, read off the data rather than off the session:
+  // the server already decided, and a second copy of that decision on the client is a second
+  // thing that can disagree with it. See CallCostVisibility.
+  const showsCosts = rows.some((c) => c.costUsd !== null);
 
   return (
     <AppShell {...shell}>
@@ -125,8 +131,18 @@ export function CallLogPage() {
             render: (c) => `${c.callerTurnCount}/${c.turnCount}`,
             className: "mono",
           },
-          { header: t("colCost"), render: (c) => formatUsd(c.costUsd), className: "mono" },
-          { header: t("colCostPerMinute"), render: (c) => formatUsd(c.costPerMinuteUsd), className: "mono" },
+          // Dropped entirely rather than filled with dashes when this tenant may not see
+          // costs — a column of "—" reads as data we failed to load. See CallCostVisibility.
+          ...(showsCosts
+            ? [
+                { header: t("colCost"), render: (c: CallResponse) => formatUsd(c.costUsd), className: "mono" },
+                {
+                  header: t("colCostPerMinute"),
+                  render: (c: CallResponse) => formatUsd(c.costPerMinuteUsd),
+                  className: "mono",
+                },
+              ]
+            : []),
         ]}
       />
       <div className="note">{t("rowClickToCallDetail")}</div>

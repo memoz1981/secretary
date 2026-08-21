@@ -80,6 +80,9 @@ export interface TenantResponse {
   name: string;
   timezone: string;
   phoneLine: string | null;
+  /** Whether this tenant may be shown what their AI calls cost. The platform's switch, off by
+   *  default — the margin between what a call costs and what they pay is readable from it. */
+  showCallCosts: boolean;
   status: EntityStatus;
   createdAt: string;
 }
@@ -87,6 +90,7 @@ export interface CreateTenantRequest {
   name: string;
   timezone: string;
   phoneLine: string | null;
+  showCallCosts: boolean;
   ownerName: string;
   ownerEmail: string;
   ownerPassword: string;
@@ -98,6 +102,16 @@ export interface CreateTenantResult {
   agentApiKey: string;
 }
 export interface UpdateTenantRequest {
+  name: string;
+  timezone: string;
+  phoneLine: string | null;
+  showCallCosts: boolean;
+}
+
+/** What a tenant may change about themselves — the same details minus the one that is not
+ *  theirs. A request type is the list of things a caller is allowed to say, and leaving a field
+ *  on it is permission. */
+export interface UpdateOwnTenantRequest {
   name: string;
   timezone: string;
   phoneLine: string | null;
@@ -259,7 +273,8 @@ export interface CallResponse {
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
   /** Priced when the call was logged, at the rates in force then — never recalculated. */
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   /** Null when the call was too short (or had too few answers) for a rate to mean anything. */
   costPerMinuteUsd: number | null;
   costPerAnswerUsd: number | null;
@@ -284,7 +299,8 @@ export interface OrderCallResponse {
   agentModel: string;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   costPerMinuteUsd: number | null;
   costPerAnswerUsd: number | null;
   resolvedByAgent: boolean;
@@ -323,11 +339,11 @@ export interface DashboardSummaryResponse {
   averageTurnsToResolution: number;
   appointmentVolume: number;
   reminderNoAnswerRate: number;
-  totalCostUsd: number;
-  averageCostPerCallUsd: number;
+  totalCostUsd: number | null;
+  averageCostPerCallUsd: number | null;
   /** Weighted by call length, not an average of each call's own rate. */
-  averageCostPerMinuteUsd: number;
-  averageCostPerAnswerUsd: number;
+  averageCostPerMinuteUsd: number | null;
+  averageCostPerAnswerUsd: number | null;
   totalTokens: number;
   /** One row per pipeline that actually served a call in the range. Pipelines nobody dialled
    *  are omitted — a "$0.00 over 0 calls" row reads as free rather than unused. */
@@ -336,9 +352,9 @@ export interface DashboardSummaryResponse {
 export interface PipelineSpend {
   pipeline: CallPipeline;
   calls: number;
-  totalCostUsd: number;
-  averageCostPerCallUsd: number;
-  averageCostPerMinuteUsd: number;
+  totalCostUsd: number | null;
+  averageCostPerCallUsd: number | null;
+  averageCostPerMinuteUsd: number | null;
   averageCallDurationSeconds: number;
   /** The models actually billed — the pipeline name gives the architecture, this the receipt. */
   models: string;
@@ -526,7 +542,7 @@ export interface SurveyRequestResponse {
   /** Somebody a person still has to deal with — a breakdown, or a number that never answered
    *  and has run out of retries. A refusal needs nobody. */
   needsFollowUp: boolean;
-  totalCostUsd: number;
+  totalCostUsd: number | null;
 }
 
 export interface FeedbackCallResponse {
@@ -547,7 +563,8 @@ export interface FeedbackCallResponse {
   agentModel: string;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
-  costUsd: number;
+  /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
+  costUsd: number | null;
   answeredCount: number;
   questionCount: number;
   isCompleted: boolean;
@@ -583,7 +600,7 @@ export interface FeedbackCoverage {
   needsHuman: number;
   attempts: number;
   averageDurationSeconds: number;
-  totalCostUsd: number;
+  totalCostUsd: number | null;
   /** People who picked up and engaged. */
   reached: number;
   /** Completed ÷ reached. Never ÷ requested — a wrong phone number is not the agent failing at

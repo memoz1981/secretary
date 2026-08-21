@@ -53,16 +53,27 @@ export function TenantDetailPage() {
     ? serverModules.filter((m) => moduleDraft[m.module] !== m.enabled)
     : [];
 
-  const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
+  const [form, setForm] =
+    useState<{ name: string; timezone: string; phoneLine: string; showCallCosts: boolean } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
   if (tenant && !form) {
-    setForm({ name: tenant.name, timezone: tenant.timezone, phoneLine: tenant.phoneLine ?? "" });
+    setForm({
+      name: tenant.name,
+      timezone: tenant.timezone,
+      phoneLine: tenant.phoneLine ?? "",
+      showCallCosts: tenant.showCallCosts,
+    });
   }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     if (!form) return;
-    await updateTenant(token!, tenantId, { name: form.name, timezone: form.timezone, phoneLine: form.phoneLine || null });
+    await updateTenant(token!, tenantId, {
+      name: form.name,
+      timezone: form.timezone,
+      phoneLine: form.phoneLine || null,
+      showCallCosts: form.showCallCosts,
+    });
     setRefreshKey((k) => k + 1);
   }
 
@@ -120,6 +131,15 @@ export function TenantDetailPage() {
                 options={[{ value: "Asia/Baku", label: "Asia/Baku" }]}
               />
               <TextField label={t("phoneLine")} value={form.phoneLine} onChange={(e) => setForm({ ...form, phoneLine: e.target.value })} />
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={form.showCallCosts}
+                  onChange={(e) => setForm({ ...form, showCallCosts: e.target.checked })}
+                />
+                <span>{t("showCallCosts")}</span>
+              </label>
+              <div className="note">{t("showCallCostsExplain")}</div>
               <div className="actions">
                 <Button type="submit">{t("saveChanges")}</Button>
                 <Button type="button" variant="danger" onClick={handleToggleStatus}>

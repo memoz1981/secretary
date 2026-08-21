@@ -17,13 +17,13 @@ public sealed class TenantSelfController : ControllerBase
     private readonly TenantService _tenantService;
     private readonly TenantModuleService _moduleService;
     private readonly ICurrentTenantProvider _currentTenant;
-    private readonly IValidator<UpdateTenantRequest> _updateValidator;
+    private readonly IValidator<UpdateOwnTenantRequest> _updateValidator;
 
     public TenantSelfController(
         TenantService tenantService,
         TenantModuleService moduleService,
         ICurrentTenantProvider currentTenant,
-        IValidator<UpdateTenantRequest> updateValidator)
+        IValidator<UpdateOwnTenantRequest> updateValidator)
     {
         _tenantService = tenantService;
         _moduleService = moduleService;
@@ -57,7 +57,8 @@ public sealed class TenantSelfController : ControllerBase
 
     [HttpPut]
     [Authorize(Roles = "Owner")]
-    public async Task<ActionResult<TenantResponse>> Update(UpdateTenantRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TenantResponse>> Update(
+        UpdateOwnTenantRequest request, CancellationToken cancellationToken)
     {
         await _updateValidator.ValidateAndThrowAsync(request, cancellationToken);
         return Ok(await _tenantService.UpdateCurrentAsync(request, cancellationToken));

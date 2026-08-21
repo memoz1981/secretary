@@ -52,18 +52,25 @@ function CallCostCard({ call }: { call: CallResponse }) {
     <Card>
       <h2>{t("callCost")}</h2>
       <div className="field-grid">
-        <div className="field">
-          <label>{t("callCost")}</label>
-          <div className="value mono">{formatUsd(call.costUsd)}</div>
-        </div>
-        <div className="field">
-          <label>{t("costPerMinute")}</label>
-          <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
-        </div>
-        <div className="field">
-          <label>{t("costPerAnswer")}</label>
-          <div className="value mono">{formatUsd(call.costPerAnswerUsd)}</div>
-        </div>
+        {/* Only the money goes when this tenant may not see costs — see CallCostVisibility.
+            The pipeline, the model and the token counts are theirs either way, and a field
+            reading "—" would look like a figure we failed to compute rather than one withheld. */}
+        {call.costUsd !== null && (
+          <>
+            <div className="field">
+              <label>{t("callCost")}</label>
+              <div className="value mono">{formatUsd(call.costUsd)}</div>
+            </div>
+            <div className="field">
+              <label>{t("costPerMinute")}</label>
+              <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
+            </div>
+            <div className="field">
+              <label>{t("costPerAnswer")}</label>
+              <div className="value mono">{formatUsd(call.costPerAnswerUsd)}</div>
+            </div>
+          </>
+        )}
         <div className="field">
           <label>{t("colPipeline")}</label>
           <div className="value">{pipelineLabel(call.pipeline)}</div>

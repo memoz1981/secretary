@@ -426,6 +426,12 @@ export const translations = {
   },
   timezone: { az: "Saat qurşağı", ru: "Часовой пояс", en: "Time zone" },
   phoneLine: { az: "Telefon xətti", ru: "Телефонная линия", en: "Phone line" },
+  showCallCosts: { az: "Zəng xərclərini göstər", ru: "Показывать стоимость звонков", en: "Show call costs" },
+  showCallCostsExplain: {
+    az: "Söndürülübsə, icarəçi zənglərin qiymətini görmür. Yalnız demo hesablar üçün.",
+    ru: "Если выключено, арендатор не видит стоимость звонков. Только для демо-аккаунтов.",
+    en: "Off, and the tenant never sees what a call cost. Demonstration accounts only.",
+  },
   phoneLinePlaceholder: {
     az: "Təyin edilməyib — sonra qoşulacaq",
     ru: "Не назначено — подключим позже",

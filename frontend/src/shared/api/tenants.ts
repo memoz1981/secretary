@@ -6,6 +6,7 @@ import type {
   Module,
   TenantModuleResponse,
   TenantResponse,
+  UpdateOwnTenantRequest,
   UpdateTenantRequest,
 } from "@/shared/api/types";
 
@@ -63,6 +64,6 @@ export function getCurrentTenant(token: string) {
   return apiFetch<TenantResponse>("/api/tenant", { token });
 }
 
-export function updateCurrentTenant(token: string, request: UpdateTenantRequest) {
+export function updateCurrentTenant(token: string, request: UpdateOwnTenantRequest) {
   return apiFetch<TenantResponse>("/api/tenant", { method: "PUT", body: request, token });
 }

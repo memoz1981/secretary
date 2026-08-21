@@ -11,7 +11,7 @@ import { formatDayMonthTime } from "@/shared/lib/dates";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { getSurveys, searchFeedbackCalls } from "@/modules/feedback/api/feedback";
 import { maskAzPhone, revealAzPhone } from "@/modules/feedback/api/phone";
-import type { FeedbackCallStatus } from "@/shared/api/types";
+import type { FeedbackCallResponse, FeedbackCallStatus } from "@/shared/api/types";
 
 /** Every status a finished or in-flight dial can be in, in the order they happen. */
 const CALL_STATUSES: FeedbackCallStatus[] = [
@@ -56,6 +56,11 @@ export function FeedbackCallsPage() {
   // questionnaire, and a round trip to hide four rows is a round trip for nothing.
   const all = state.status === "success" ? state.data : [];
   const rows = status === "" ? all : all.filter((c) => c.status === status);
+
+  // Whether this caller may be shown call costs, read off the data rather than off the session:
+  // the server already decided, and a second copy of that decision on the client is a second
+  // thing that can disagree with it. See CallCostVisibility.
+  const showsCosts = rows.some((c) => c.costUsd !== null);
 
   return (
     <AppShell {...shell}>
@@ -123,7 +128,16 @@ export function FeedbackCallsPage() {
             className: "mono",
           },
           { header: t("colDurationShort"), render: (c) => formatDuration(c.durationSeconds), className: "mono" },
-          { header: t("colCost"), render: (c) => formatUsd(c.costUsd), className: "mono" },
+          // See CallCostVisibility — absent means withheld, not unknown.
+          ...(showsCosts
+            ? [
+                {
+                  header: t("colCost"),
+                  render: (c: FeedbackCallResponse) => formatUsd(c.costUsd),
+                  className: "mono",
+                },
+              ]
+            : []),
         ]}
       />
       <div className="note">{t("rowClickToCallDetail")}</div>

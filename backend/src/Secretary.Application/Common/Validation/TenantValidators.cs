@@ -23,3 +23,12 @@ public sealed class UpdateTenantRequestValidator : AbstractValidator<UpdateTenan
         RuleFor(x => x.Timezone).NotEmpty();
     }
 }
+
+public sealed class UpdateOwnTenantRequestValidator : AbstractValidator<UpdateOwnTenantRequest>
+{
+    public UpdateOwnTenantRequestValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.Timezone).NotEmpty();
+    }
+}

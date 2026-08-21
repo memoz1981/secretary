@@ -107,14 +107,19 @@ export function FeedbackCallDetailPage() {
               {pipelineLabel(call.pipeline)}
             </div>
           </div>
-          <div>
-            <div className="label">{t("colCost")}</div>
-            <div className="value mono">{formatUsd(call.costUsd)}</div>
-          </div>
-          <div>
-            <div className="label">{t("colCostPerMinute")}</div>
-            <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
-          </div>
+          {/* See CallCostVisibility — absent means withheld, not unknown. */}
+          {call.costUsd !== null && (
+            <>
+              <div>
+                <div className="label">{t("colCost")}</div>
+                <div className="value mono">{formatUsd(call.costUsd)}</div>
+              </div>
+              <div>
+                <div className="label">{t("colCostPerMinute")}</div>
+                <div className="value mono">{formatUsd(call.costPerMinuteUsd)}</div>
+              </div>
+            </>
+          )}
         </div>
       </Card>
 
