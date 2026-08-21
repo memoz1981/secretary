@@ -205,7 +205,7 @@ public sealed class FeedbackCallService
         // caller answered "hə", was refused twice, and the call ended — on the question type that
         // should be the hardest to get wrong. Matching the label alone is matching the written
         // word against the spoken one.
-        if (question.QuestionType == FeedbackQuestionType.YesNo && YesNoWords.Read(spokenAnswer) is { } saidYes)
+        if (question.QuestionType == FeedbackQuestionType.YesNo && YesNoWords.Read(spokenAnswer, question.Text) is { } saidYes)
         {
             var wanted = saidYes ? SurveyQuestion.Yes : SurveyQuestion.No;
             return question.Options.FirstOrDefault(o => o.Text == wanted);
