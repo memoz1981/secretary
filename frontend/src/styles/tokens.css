@@ -82,6 +82,24 @@
   --provider-6-border: hsl(335, 60%, 46%); --provider-6-bg: hsl(335, 60%, 94%);
   --provider-7-border: hsl(80, 45%, 34%);  --provider-7-bg: hsl(80, 45%, 90%);
   --provider-8-border: hsl(20, 40%, 40%);  --provider-8-bg: hsl(20, 40%, 92%);
+
+  /* ---- Chart colours ----
+     Three, in this order, and not eight. They were not chosen by eye: each pair was run
+     through a colour-vision-deficiency check against every theme's surface, and the pair
+     below is the first that separates cleanly for deuteranopes and protanopes on all five.
+     The obvious green/red for yes/no fails it outright — ΔE 5.6 against a floor of 8 — which
+     is the whole reason this is a blue and an orange.
+
+     A fourth would not pass, which is why a pie here is capped at three slices and anything
+     wider is drawn as bars. Do not add --chart-4. */
+  --chart-1: #256cd0;
+  --chart-2: #d07011;
+  --chart-3: #278657;
+
+  /* One hue for a single series: a distribution's meaning is in the bar heights and their
+     order, so colouring each bar differently would encode nothing twice. */
+  --chart-bar: #3f7d92;
+  --chart-track: var(--color-surface-sunken);
 }
 
 /* ============================================================================

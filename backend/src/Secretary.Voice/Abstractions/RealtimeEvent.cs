@@ -25,6 +25,14 @@ public abstract record RealtimeEvent
     /// catching the agent's own voice.</summary>
     public sealed record CallerTranscript(string? Text) : RealtimeEvent;
 
+    /// <summary>What the agent said, transcribed from its own audio.
+    ///
+    /// ⚠ Added after four rounds of debugging one module from one side of the conversation. Every
+    /// report — "it repeated Digər twice", "it interrupted me", "it asked a question that is not
+    /// in my questionnaire" — was about audio no log contained, and the only honest answer was to
+    /// ask the person who heard it.</summary>
+    public sealed record AgentTranscript(string? Text) : RealtimeEvent;
+
     /// <summary>Not fatal: the model still has the audio. Worth knowing, because losing the
     /// transcript is what weakens its grip on the language.</summary>
     public sealed record CallerTranscriptFailed(string? Message) : RealtimeEvent;

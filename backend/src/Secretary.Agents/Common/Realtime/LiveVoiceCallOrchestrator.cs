@@ -90,6 +90,88 @@ public sealed class LiveVoiceCallOrchestrator
         _callerTurnCount++;
     }
 
+    /// <summary>The conversation, both sides, in the order it happened.
+    ///
+    /// ⚠ It was the caller's side alone until four rounds of debugging one module proved that
+    /// useless. Every report — "it repeated Digər twice", "it interrupted me", "it asked a
+    /// question that is not in my questionnaire" — was about words no log contained, and the
+    /// honest answer each time was to ask the person who had heard them.
+    ///
+    /// The column itself existed for months before that, written null on every call in every
+    /// module, because the value was hardcoded at the one place it is constructed. An unwritten
+    /// nullable column looks exactly like a call where nobody spoke.</summary>
+    private readonly List<string> _callerLines = [];
+
+    /// <summary>When the call started, so a line can say how far into it the caller spoke. A field
+    /// rather than the local RunAsync already has, because the event loop is where the words
+    /// arrive.</summary>
+    private Instant _startedAt;
+
+    private void RecordCallerLine(string? text)
+    {
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            // The agent's turn is over the moment the caller is heard, so whatever it had been
+            // saying becomes a finished line and the two stay in the order they happened.
+            FlushAgentLine();
+            _callerLines.Add(TranscriptLine(_clock.GetCurrentInstant(), Caller, text));
+        }
+    }
+
+    /// <summary>The agent's words arrive in fragments — a few syllables per message — so they are
+    /// gathered into one line per turn rather than one line per fragment. A transcript of
+    /// forty-word slivers is not readable, which defeats the point of having one.</summary>
+    private readonly System.Text.StringBuilder _agentSaid = new();
+    private Instant? _agentStartedSpeakingAt;
+
+    private void RecordAgentFragment(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        _agentStartedSpeakingAt ??= _clock.GetCurrentInstant();
+        if (_agentSaid.Length > 0 && !char.IsWhiteSpace(_agentSaid[^1]) && !char.IsWhiteSpace(text[0]))
+        {
+            _agentSaid.Append(' ');
+        }
+
+        _agentSaid.Append(text.Trim());
+    }
+
+    private void FlushAgentLine()
+    {
+        if (_agentSaid.Length == 0)
+        {
+            return;
+        }
+
+        var said = _agentSaid.ToString();
+        _callerLines.Add(TranscriptLine(_agentStartedSpeakingAt ?? _clock.GetCurrentInstant(), Agent, said));
+        _logger.LogInformation("Lamiya said: {Transcript}", said);
+        _agentSaid.Clear();
+        _agentStartedSpeakingAt = null;
+    }
+
+    private const string Caller = "Müştəri";
+    private const string Agent = "Lamiya";
+
+    /// <summary>One line: the clock time, who was speaking, and what they said.
+    ///
+    /// ⚠ Wall clock, not seconds into the call. It read "[00:14]" before, which looks exactly
+    /// like a time of day and is not one — and with nothing else on the page saying when the call
+    /// happened, a transcript was a list of unplaceable fragments. Azerbaijan local time, like
+    /// every other time this product shows anybody.</summary>
+    internal static string TranscriptLine(Instant at, string speaker, string text)
+        => $"[{at.InZone(AzerbaijanTime.Zone).LocalDateTime:HH:mm:ss}] {speaker}: {text.Trim()}";
+
+    private string? Transcript()
+    {
+        FlushAgentLine();
+        return _callerLines.Count == 0 ? null : string.Join("\n", _callerLines);
+    }
+
     // ---- Turn state ----
     // A response.create is only legal once the previous response has finished. OpenAI emits
     // response.function_call_arguments.done BEFORE response.done, so asking for the follow-up
@@ -174,7 +256,7 @@ public sealed class LiveVoiceCallOrchestrator
         WebSocket clientSocket, Module module, CallPipeline pipeline, string? modelOverride,
         CancellationToken cancellationToken)
     {
-        var startedAt = _clock.GetCurrentInstant();
+        var startedAt = _startedAt = _clock.GetCurrentInstant();
         var outcome = CallOutcome.ResolvedByAgent;
 
         // The module check the HTTP layer cannot do for us.
@@ -211,11 +293,19 @@ public sealed class LiveVoiceCallOrchestrator
 
         try
         {
+            // Whatever this particular call needs known up front — a survey's subject, say —
+            // rides in the instructions rather than costing a tool round trip to fetch.
+            var callContext = await agentModule.BuildCallContextAsync(cancellationToken);
+            var instructions = await _instructionContext.BuildPhoneAgentInstructionsAsync(
+                agentModule.InstructionName, _realtimeSession.ProviderKey, cancellationToken);
+
             await _realtimeSession.ConnectAsync(
-                _instructionContext.BuildPhoneAgentInstructions(
-                    agentModule.InstructionName, _realtimeSession.ProviderKey),
+                string.IsNullOrWhiteSpace(callContext)
+                    ? instructions
+                    : instructions + Environment.NewLine + Environment.NewLine + callContext,
                 tools,
                 modelOverride,
+                agentModule.RequiresCallerTranscription,
                 cancellationToken);
 
             var toOpenAi = RelayClientAudioToOpenAiAsync(clientSocket, cancellationToken);
@@ -295,7 +385,7 @@ public sealed class LiveVoiceCallOrchestrator
                     new CallLogEntry(
                         LocalDeviceCallerIdentifier, _classification, outcome,
                         durationSeconds, _answerCount, _callerTurnCount,
-                        "local-device-call (no recording stored)", null, startedAt, pipeline,
+                        "local-device-call (no recording stored)", Transcript(), startedAt, pipeline,
                         // One model does everything on this path — that is what the realtime
                         // API is. The chained pipelines report three entries here instead.
                         // Taken from the session, not from configuration, so a mini call is
@@ -593,17 +683,25 @@ public sealed class LiveVoiceCallOrchestrator
                     responseStarted.Restart();
                     break;
 
-                // Only logged, never acted on: the transcript is what makes a recorded call
-                // reviewable afterwards, and it is how we can tell a real caller turn from the
-                // microphone tripping over background noise or the agent's own voice.
+                // The transcript is what makes a recorded call reviewable afterwards, and it is
+                // how we can tell a real caller turn from the microphone tripping over background
+                // noise or the agent's own voice.
                 case RealtimeEvent.CallerTranscript transcription:
                     _logger.LogInformation("Caller said: {Transcript}", transcription.Text);
+                    RecordCallerLine(transcription.Text);
 
                     // Also a question, and on Gemini it is usually the only sign of one. Gemini
                     // reports speech starting only when the caller talks OVER the agent, so a
                     // caller who waits their turn was never counted: seven questions logged as
                     // one, and every cost-per-question figure wrong with it.
                     CreditCallerTurn();
+                    break;
+
+                // Buffered rather than logged per fragment — they arrive a few syllables at a
+                // time, and a log of syllables is not a log. The whole turn is logged when it
+                // ends, beside the caller's reply to it.
+                case RealtimeEvent.AgentTranscript spoken:
+                    RecordAgentFragment(spoken.Text);
                     break;
 
                 case RealtimeEvent.CallerTranscriptFailed transcriptionFailure:
@@ -667,6 +765,11 @@ public sealed class LiveVoiceCallOrchestrator
                     break;
 
                 case RealtimeEvent.ResponseFinished responseDone:
+                    // The turn is over, so what it said is a finished line — logged here rather
+                    // than waiting for the caller to reply, because a turn nobody replies to is
+                    // exactly the one worth reading afterwards.
+                    FlushAgentLine();
+
                     _turn.EndResponse();
                     var status = responseDone.Outcome;
                     var statusReason = responseDone.Reason;

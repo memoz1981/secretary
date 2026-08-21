@@ -35,8 +35,8 @@ const MODULES: (Item & { live: boolean })[] = [
   { title: "moduleAppointmentsTitle", text: "moduleAppointmentsText", icon: "calendarCheck", tone: 2, live: true },
   { title: "moduleInfoTitle", text: "moduleInfoText", icon: "info", tone: 1, live: false },
   { title: "moduleRemindersTitle", text: "moduleRemindersText", icon: "bell", tone: 3, live: false },
-  { title: "moduleFeedbackTitle", text: "moduleFeedbackText", icon: "star", tone: 6, live: false },
-  { title: "moduleOrdersTitle", text: "moduleOrdersText", icon: "bag", tone: 4, live: false },
+  { title: "moduleFeedbackTitle", text: "moduleFeedbackText", icon: "star", tone: 6, live: true },
+  { title: "moduleOrdersTitle", text: "moduleOrdersText", icon: "bag", tone: 4, live: true },
   { title: "moduleSurveysTitle", text: "moduleSurveysText", icon: "clipboard", tone: 5, live: false },
 ];
 

@@ -83,6 +83,10 @@ export class LiveVoiceCall {
     /** Which line is being dialled. One line answers as one module, so this decides the agent's
      *  tools and instructions — the stand-in for the inbound number a real phone call carries. */
     private readonly module: Module = "Appointment",
+    /** The queued call this conversation is, for a module whose subject is known before it
+     *  dials. Feedback is the only one so far: the row exists before the call, and the agent is
+     *  handed its id rather than working out who it is talking to. */
+    private readonly callId: number | null = null,
   ) {
     this.profile = PIPELINES[pipeline];
   }
@@ -109,6 +113,7 @@ export class LiveVoiceCall {
     // WebSocket connects, and the backend's auth middleware reads access_token for /voice paths.
     const socket = new WebSocket(
       `${wsBaseUrl}/voice/live-call?pipeline=${this.pipeline}&module=${this.module}` +
+        (this.callId === null ? "" : `&callId=${this.callId}`) +
         `&access_token=${encodeURIComponent(this.token)}`,
     );
     socket.binaryType = "arraybuffer";

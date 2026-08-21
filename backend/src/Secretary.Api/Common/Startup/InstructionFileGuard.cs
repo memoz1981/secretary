@@ -1,4 +1,5 @@
 using Secretary.Api.Voice;
+using Secretary.Domain.Enums;
 
 namespace Secretary.Api.Startup;
 
@@ -19,20 +20,28 @@ public static class InstructionFileGuard
     /// <summary>Every dialable pipeline × every module that can answer a phone. Both axes matter:
     /// a module with no file for the provider a caller picks fails exactly as badly as a missing
     /// provider file did, and there is no sensible fallback in either direction.</summary>
-    public static void EnsureEveryDialablePipelineHasInstructions(IEnumerable<string> instructionNames)
+    /// <param name="modules">Each module's instruction name and the pipelines it may be dialled
+    /// on — null meaning any. A module restricted to one provider is not missing the others'
+    /// files, it refuses those calls, so demanding them would be demanding files that must never
+    /// be used.</param>
+    public static void EnsureEveryDialablePipelineHasInstructions(
+        IEnumerable<(string InstructionName, IReadOnlyCollection<CallPipeline>? SupportedPipelines)> modules)
     {
         var directory = Path.Combine(AppContext.BaseDirectory, "Instructions");
 
         var missing = VoicePipelineCatalog.All
             .Where(entry => entry.Enabled)
             .SelectMany(
-                _ => instructionNames,
-                (entry, name) => new
+                _ => modules,
+                (entry, module) => new
                 {
                     entry.Pipeline,
                     entry.ProviderKey,
-                    Path = Path.Combine(directory, $"{name}.{entry.ProviderKey}.md"),
+                    module.SupportedPipelines,
+                    Path = Path.Combine(directory, $"{module.InstructionName}.{entry.ProviderKey}.md"),
                 })
+            .Where(candidate =>
+                candidate.SupportedPipelines is null || candidate.SupportedPipelines.Contains(candidate.Pipeline))
             .Where(candidate => !File.Exists(candidate.Path))
             .ToList();
 

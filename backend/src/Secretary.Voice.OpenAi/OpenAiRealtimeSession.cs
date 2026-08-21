@@ -51,7 +51,8 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
     public bool ContinuesTurnAfterToolResult => false;
 
     public async Task ConnectAsync(
-        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken)
+        string instructions, IList<AITool> tools, string? modelOverride, bool transcribeCaller,
+        CancellationToken cancellationToken)
     {
         Model = string.IsNullOrWhiteSpace(modelOverride) ? _options.Model : modelOverride;
         _functions = tools.OfType<AIFunction>().ToList();
@@ -90,6 +91,10 @@ public sealed class OpenAiRealtimeSession : IRealtimeSession
                     // infer language from, and after a barge-in — a half-second of clipped
                     // speech — it kept guessing English ("How can I help you today?"). It also
                     // makes calls debuggable: the logs finally show what the caller said.
+                    //
+                    // Left on regardless of the module's own answer: on this provider it is not
+                    // only a recording, it is what keeps the model in Azerbaijani. The flag can
+                    // ask for it, never turn it off here.
                     AudioTranscriptionOptions = new RealtimeAudioTranscriptionOptions
                     {
                         Model = "whisper-1",

@@ -169,7 +169,7 @@ using (var instructionScope = app.Services.CreateScope())
 {
     InstructionFileGuard.EnsureEveryDialablePipelineHasInstructions(
         instructionScope.ServiceProvider.GetRequiredService<AgentModuleRegistry>()
-            .All.Select(m => m.InstructionName));
+            .All.Select(m => (m.InstructionName, m.SupportedPipelines)));
 }
 
 if (app.Environment.IsDevelopment())
@@ -245,6 +245,37 @@ app.MapMethods("/voice/live-call", new[] { HttpMethods.Get, HttpMethods.Connect 
     if (!await tenantModules.HasAsync(module, context.RequestAborted))
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+
+    // A survey call is queued before it is dialled — the form (later the scheduler) creates the
+    // row and the id arrives here. Everything else about this module follows from the subject
+    // being known before anybody speaks, so a missing id is a refusal rather than a default:
+    // answers filed against no call, or the wrong one, would appear under another person's name.
+    if (module == Module.Feedback)
+    {
+        if (!int.TryParse(context.Request.Query["callId"], out var feedbackCallId) || feedbackCallId <= 0)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("A feedback call must be queued first — callId is required.");
+            return;
+        }
+
+        context.RequestServices.GetRequiredService<Secretary.Agents.Feedback.FeedbackCallSession>()
+            .For(feedbackCallId);
+    }
+
+    // A module written for one provider refuses the others rather than trusting the picker —
+    // the instruction files are not interchangeable. Read from the module itself so the rule
+    // lives in one place: the startup guard reads the same property.
+    var supported = context.RequestServices.GetRequiredService<AgentModuleRegistry>()
+        .For(module).SupportedPipelines;
+
+    if (supported is not null && !supported.Contains(requested.Pipeline))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync(
+            $"The {module} line runs on {string.Join(", ", supported)} only.");
         return;
     }
 

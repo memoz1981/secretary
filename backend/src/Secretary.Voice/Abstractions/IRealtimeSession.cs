@@ -39,8 +39,16 @@ public interface IRealtimeSession : IAsyncDisposable
     /// they are per-call configuration in exactly the way the instructions beside them are: which
     /// tools exist depends on whose line was dialled, and that is not known until the call
     /// starts.</summary>
+    /// <param name="transcribeCaller">Whether the caller's words are transcribed.
+    ///
+    /// Per call, because it is a property of the module rather than a preference. A feedback
+    /// survey records open answers verbatim and is worthless without it; an order line already
+    /// has everything it needs in the tool arguments and pays latency for nothing. It is not
+    /// free — transcription sits on the critical path between the caller finishing and the agent
+    /// starting.</param>
     Task ConnectAsync(
-        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken);
+        string instructions, IList<AITool> tools, string? modelOverride, bool transcribeCaller,
+        CancellationToken cancellationToken);
 
     /// <summary>PCM16 captured from the caller's microphone. Both providers accept the browser's
     /// 24 kHz: OpenAI natively, Gemini by resampling server-side from the declared rate.</summary>

@@ -74,7 +74,8 @@ public sealed class GeminiLiveSession : IRealtimeSession
     public bool ContinuesTurnAfterToolResult => true;
 
     public async Task ConnectAsync(
-        string instructions, IList<AITool> tools, string? modelOverride, CancellationToken cancellationToken)
+        string instructions, IList<AITool> tools, string? modelOverride, bool transcribeCaller,
+        CancellationToken cancellationToken)
     {
         Model = string.IsNullOrWhiteSpace(modelOverride) ? _options.Model : modelOverride;
         _functions = tools.OfType<AIFunction>().ToList();
@@ -104,13 +105,28 @@ public sealed class GeminiLiveSession : IRealtimeSession
 
             // Transcribing the caller pins each of their turns into the conversation as text,
             // which on the OpenAI side is what stops the model drifting out of Azerbaijani after
-            // a clipped barge-in — and it is what makes a call reviewable. Currently off while
-            // we find out whether it is also what a short answer is waiting on. See the option.
+            // a clipped barge-in — and it is what makes a call reviewable. It also costs latency
+            // on the critical path, which is why it is now the module's decision rather than one
+            // switch for the whole deployment: a feedback survey cannot work without it and an
+            // order line pays for nothing. The configured value is the default a module inherits
+            // when it has no opinion.
             //
             // Language pinned rather than auto-detected when it is on, for the same reason the
             // OpenAI session pins whisper to "az": left to guess on half a second of speech,
             // recognisers reach for English.
-            InputAudioTranscription = _options.TranscribeCaller
+            InputAudioTranscription = transcribeCaller || _options.TranscribeCaller
+                ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
+                : null,
+
+            // ⚠ The agent's own words, and it took four rounds of debugging this module to admit
+            // they were needed. Every call was diagnosed from one side of the conversation: the
+            // caller's answers and the tool calls, with a ten-second turn of agent speech in the
+            // middle that nobody could read. "It repeated Digər twice" and "it interrupted me"
+            // were both reports about audio no log contained.
+            //
+            // Tied to the same switch as the caller's, because a module that wants a reviewable
+            // call wants both halves of it — half a transcript is how you end up guessing.
+            OutputAudioTranscription = transcribeCaller || _options.TranscribeCaller
                 ? new AudioTranscriptionConfig { LanguageCodes = [_options.LanguageCode] }
                 : null,
 
@@ -290,6 +306,11 @@ public sealed class GeminiLiveSession : IRealtimeSession
             if (content.InputTranscription?.Text is { Length: > 0 } heard)
             {
                 yield return new RealtimeEvent.CallerTranscript(heard.Trim());
+            }
+
+            if (content.OutputTranscription?.Text is { Length: > 0 } said)
+            {
+                yield return new RealtimeEvent.AgentTranscript(said.Trim());
             }
 
             if (content.Interrupted == true)
