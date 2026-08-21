@@ -371,7 +371,13 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
    Budgeted to fit one screen without scrolling: identity in the top-left corner, controls
    centred on the page, legend directly underneath. Stacks on narrow viewports, where
    scrolling is expected anyway. */
-.call-layout { position: relative; display: flex; justify-content: center; margin-bottom: var(--space-5); }
+/* Padded down the page rather than sitting against the title. With the pipeline legend gone
+   there is room, and the button was hard against the heading with the whole card empty beneath
+   it — the one control on the page belongs nearer the middle of it than the top. */
+.call-layout {
+  position: relative; display: flex; justify-content: center;
+  padding: var(--space-7) 0 var(--space-6); margin-bottom: var(--space-5);
+}
 /* Pinned to the corner rather than sitting in the flex flow: as a flex item it would push the
    controls off-centre by half its own width, since they would then centre on the space it
    left over rather than on the page. */
@@ -379,7 +385,7 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
   position: absolute; left: 0; top: 0;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
-.agent-avatar { width: 88px; height: 88px; display: block; border-radius: 50%; box-shadow: var(--shadow-md); }
+.agent-avatar { width: 108px; height: 108px; display: block; border-radius: 50%; box-shadow: var(--shadow-md); }
 .agent-name { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); margin-top: var(--space-2); }
 .agent-role {
   font-size: 11px; color: var(--color-muted); text-transform: uppercase;

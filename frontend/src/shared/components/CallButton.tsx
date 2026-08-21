@@ -41,8 +41,8 @@ export function CallButton({
       disabled={connecting || disabled}
       aria-label={active ? hangUpLabel : dialLabel}
       style={{
-        width: 76,
-        height: 76,
+        width: 92,
+        height: 92,
         borderRadius: "50%",
         border: "none",
         cursor: connecting ? "wait" : disabled ? "not-allowed" : "pointer",
@@ -56,7 +56,7 @@ export function CallButton({
         transition: "background 0.2s, transform 0.2s",
       }}
     >
-      <PhoneIcon size={28} />
+      <PhoneIcon size={34} />
     </button>
   );
 }
