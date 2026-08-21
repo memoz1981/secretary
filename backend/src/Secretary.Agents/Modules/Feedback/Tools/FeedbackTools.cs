@@ -42,11 +42,19 @@ public sealed class FeedbackTools
         _escalation = escalation;
     }
 
-    [Description("The next question to ask. Call it once, ask what it returns, then record the answer before "
-                 + "calling it again.")]
+    [Description("The next question to ask. Only needed to start, or if you have lost your place — recording an "
+                 + "answer already hands you the one after it.")]
     public async Task<string> GetNextQuestion()
     {
-        var question = await _calls.GetNextQuestionAsync(_session.Require(), default);
+        return await Describe(await _calls.GetNextQuestionAsync(_session.Require(), default));
+    }
+
+    /// <summary>One question, in the shape the agent is meant to ask it — and the bookkeeping
+    /// that goes with handing it over.</summary>
+    private async Task<string> Describe(FeedbackQuestionForAgent? question)
+    {
+        await Task.CompletedTask;
+
         if (question is null)
         {
             return "SURVEY_DONE.";
@@ -128,7 +136,7 @@ public sealed class FeedbackTools
         if (question.QuestionType == FeedbackQuestionType.Open)
         {
             await _calls.RecordOpenAsync(callId, question.QuestionId, said, default);
-            return "RECORDED.";
+            return await RecordedAndNext(callId);
         }
 
         var option = await _calls.MatchOptionAsync(question.QuestionId, said, default);
@@ -146,11 +154,11 @@ public sealed class FeedbackTools
             if (option.IsOther)
             {
                 await _calls.RecordOtherAsync(callId, question.QuestionId, option.Id, said, default);
-                return "RECORDED.";
+                return await RecordedAndNext(callId);
             }
 
             await _calls.RecordChoiceAsync(callId, question.QuestionId, option.Id, default);
-            return $"RECORDED. {option.Text}";
+            return await RecordedAndNext(callId, option.Text);
         }
 
         // A question that allows "Digər" has no unmatchable answer — that is what allowing it
@@ -159,7 +167,7 @@ public sealed class FeedbackTools
         if (question.Options.FirstOrDefault(o => o.IsOther) is { } other)
         {
             await _calls.RecordOtherAsync(callId, question.QuestionId, other.Id, said, default);
-            return "RECORDED.";
+            return await RecordedAndNext(callId);
         }
 
         // Not an answer we can file. Saying so is the whole point — the alternative is the model
@@ -176,8 +184,24 @@ public sealed class FeedbackTools
         }
 
         return question.QuestionType == FeedbackQuestionType.Choice
-            ? "NO_MATCH. Variantlar: " + string.Join("; ", question.Options.Select(o => o.Text))
+            ? "NO_MATCH. OPTIONS: " + string.Join("; ", question.Options.Where(o => !o.IsOther).Select(o => o.Text))
             : "NO_MATCH.";
+    }
+
+    /// <summary>Confirms the answer and hands over the next question in one result.
+    ///
+    /// ⚠ This is a latency fix and a cost fix, and they are the same fix. Recording an answer and
+    /// fetching the next question were two tool calls, and on this provider a tool call is a
+    /// whole model invocation carrying the entire prompt — about 4,900 text tokens of
+    /// instructions, every time. Measured on a real call, the second round trip added ~1.5 s to
+    /// every question and there were eight of them.
+    ///
+    /// The order line learned the same thing: one PlaceOrder with everything in it, rather than a
+    /// ladder of calls each costing a turn.</summary>
+    private async Task<string> RecordedAndNext(int callId, string? optionText = null)
+    {
+        var recorded = optionText is null ? "RECORDED." : $"RECORDED. {optionText}";
+        return $"{recorded} NEXT — {await Describe(await _calls.GetNextQuestionAsync(callId, default))}";
     }
 
     [Description("Records that the caller would rather not answer this question. Only after they have made that "
