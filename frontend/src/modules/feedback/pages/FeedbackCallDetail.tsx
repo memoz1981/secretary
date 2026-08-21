@@ -103,7 +103,7 @@ export function FeedbackCallDetailPage() {
           </div>
           <div>
             <div className="label">{t("colAgent")}</div>
-            <div className="value" title={call.agentModel}>
+            <div className="value" title={call.agentModel ?? undefined}>
               {pipelineLabel(call.pipeline)}
             </div>
           </div>

@@ -121,6 +121,7 @@ public sealed class OrderCallService
     private static OrderCallResponse ToResponse(OrderCall call, string? customerName, decimal? costUsd)
         => new(
             call.Id, call.CustomerId, customerName, call.CallerPhoneNumber, call.RelatedOrderId, call.Outcome,
-            call.DurationSeconds, call.TurnCount, call.CallerTurnCount, call.StartedAt, call.AgentModel,
+            call.DurationSeconds, call.TurnCount, call.CallerTurnCount, call.StartedAt,
+            costUsd is null ? null : call.AgentModel,
             call.Pipeline, call.TokenUsage, costUsd);
 }

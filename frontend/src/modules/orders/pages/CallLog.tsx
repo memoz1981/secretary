@@ -96,7 +96,7 @@ export function OrderCallLogPage() {
           // a model swap is when a jump in the cost column needs explaining.
           {
             header: t("colAgent"),
-            render: (c) => <span title={c.agentModel}>{pipelineLabel(c.pipeline)}</span>,
+            render: (c) => <span title={c.agentModel ?? undefined}>{pipelineLabel(c.pipeline)}</span>,
           },
           // See CallCostVisibility — absent means withheld, and a column of dashes reads as
           // data that failed to load.

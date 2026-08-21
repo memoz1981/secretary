@@ -722,6 +722,7 @@ public sealed class FeedbackCallService
             call.Id, surveyRequest.Id, surveyRequest.SurveyId, surveyName,
             surveyRequest.PersonName, surveyRequest.PhoneNumber, surveyRequest.AttemptCount,
             call.CallStatus, call.CreatedAtUtc, call.CompletedAt, call.DurationSeconds,
-            call.TurnCount, call.CallerTurnCount, call.AgentModel, call.Pipeline, call.TokenUsage,
+            call.TurnCount, call.CallerTurnCount, costUsd is null ? null : call.AgentModel,
+            call.Pipeline, call.TokenUsage,
             costUsd, answered, questionCount);
 }

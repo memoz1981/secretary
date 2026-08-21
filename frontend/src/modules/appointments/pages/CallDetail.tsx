@@ -75,10 +75,14 @@ function CallCostCard({ call }: { call: CallResponse }) {
           <label>{t("colPipeline")}</label>
           <div className="value">{pipelineLabel(call.pipeline)}</div>
         </div>
-        <div className="field">
-          <label>{t("agentModel")}</label>
-          <div className="value mono">{call.agentModel || "—"}</div>
-        </div>
+        {/* Withheld with the costs — see CallCostVisibility. Which model answered is the same
+            commercial fact, because the rates are published. */}
+        {call.agentModel !== null && (
+          <div className="field">
+            <label>{t("agentModel")}</label>
+            <div className="value mono">{call.agentModel || "—"}</div>
+          </div>
+        )}
         <div className="field">
           <label>{t("totalTokens")}</label>
           <div className="value mono">{formatTokens(usage.totalTokens)}</div>

@@ -97,7 +97,10 @@ public sealed record FeedbackCallResponse(
     int DurationSeconds,
     int TurnCount,
     int CallerTurnCount,
-    string AgentModel,
+    /// <summary>Null when this caller may not be shown call costs. Which model answered is
+    /// the same commercial fact as what it cost — the rates are published — so the two are
+    /// withheld together. See CallCostVisibility.</summary>
+    string? AgentModel,
     CallPipeline Pipeline,
     TokenUsage TokenUsage,
     decimal? CostUsd,

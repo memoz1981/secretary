@@ -119,6 +119,7 @@ public sealed class CallService
         => new(
             call.Id, call.ClientId, call.CallerPhoneNumber, client?.Name, call.RelatedAppointmentId,
             call.Classification, call.Outcome, call.DurationSeconds, call.TurnCount, call.CallerTurnCount,
-            call.WaitTimeSeconds, call.RecordingUrl, call.StartedAt, call.AgentModel, call.Pipeline,
+            call.WaitTimeSeconds, call.RecordingUrl, call.StartedAt,
+            costUsd is null ? null : call.AgentModel, call.Pipeline,
             call.TokenUsage, costUsd);
 }
