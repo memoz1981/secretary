@@ -88,15 +88,18 @@ export function CallLogPage() {
             </option>
           ))}
         </select>
-        {/* The filter that makes the four comparable: one architecture at a time, same range. */}
-        <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
-          <option value="">{t("allPipelines")}</option>
-          {CALL_PIPELINES.map((p) => (
-            <option key={p} value={p}>
-              {PIPELINE_INFO[p].short}
-            </option>
-          ))}
-        </select>
+        {/* The filter that made the architectures comparable, one at a time. Absent while there
+            is only one to pick — see CALL_PIPELINES. */}
+        {CALL_PIPELINES.length > 1 && (
+          <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
+            <option value="">{t("allPipelines")}</option>
+            {CALL_PIPELINES.map((p) => (
+              <option key={p} value={p}>
+                {PIPELINE_INFO[p].short}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadCalls")}</div>}
       <DataTable

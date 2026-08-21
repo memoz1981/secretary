@@ -116,7 +116,7 @@ export function DashboardPage() {
           {/* Per mode, because a blended average across architectures that differ tenfold in
               cost describes none of them. All four are listed whether or not they were dialled
               in this range — the gaps are part of the comparison. */}
-          {state.data.spendByPipeline.length > 0 && (
+          {state.data.spendByPipeline.length > 0 && CALL_PIPELINES.length > 1 && (
           <Card style={{ marginTop: "var(--space-4)" }}>
             <h2>{t("spendByPipeline")}</h2>
             <div className="table-scroll">

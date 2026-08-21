@@ -29,13 +29,17 @@ export type CallPipeline =
   | "OpenAiRealtime_2_1"
   | "GeminiLive_3_1";
 
-/** Everything the Dashboard breaks spend down by, including options not yet dialable — a
- *  missing row reads as "no data", when the useful fact is "not built yet". Whether one can
- *  actually be dialled is PIPELINE_INFO[x].enabled. */
-export const CALL_PIPELINES: CallPipeline[] = [
-  "OpenAiRealtime_2_1",
-  "GeminiLive_3_1",
-];
+/** The pipelines this front end offers and reports on.
+ *
+ * ⚠ Gemini only. OpenAI realtime is still built, still priced, still dialable by the API and
+ * still recorded on every call that used it — this list is the front end's opinion, not the
+ * product's capability. It came out because it is not going to be used: a picker with one real
+ * option and one nobody chooses is a decision presented as a question, and a spend table
+ * comparing one provider against an empty column says nothing.
+ *
+ * Putting it back is this array. Nothing in the backend was touched, so historical OpenAI calls
+ * keep their pipeline, their model name and their cost, and reappear the moment it returns. */
+export const CALL_PIPELINES: CallPipeline[] = ["GeminiLive_3_1"];
 
 // ---- Auth ----
 export interface LoginRequest {
@@ -306,7 +310,9 @@ export interface CallResponse {
   waitTimeSeconds: number | null;
   recordingUrl: string;
   startedAt: string;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
   /** Priced when the call was logged, at the rates in force then — never recalculated. */
@@ -333,7 +339,9 @@ export interface OrderCallResponse {
   /** Questions the caller asked. */
   callerTurnCount: number;
   startedAt: string;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
   /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */
@@ -597,7 +605,9 @@ export interface FeedbackCallResponse {
   durationSeconds: number;
   turnCount: number;
   callerTurnCount: number;
-  agentModel: string;
+  /** Null when this caller may not be shown call costs — which model answered is the same
+   *  commercial fact, since the rates are published. */
+  agentModel: string | null;
   pipeline: CallPipeline;
   tokenUsage: TokenUsage;
   /** Null when this caller may not be shown call costs — see the tenant's showCallCosts. */

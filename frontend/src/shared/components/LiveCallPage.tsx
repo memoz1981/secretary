@@ -85,6 +85,11 @@ export function LiveCallPage({ module }: { module: Module }) {
     error: micDenied ? t("callMicDenied") : t("callFailed"),
   };
 
+  // One pipeline is not a choice. Everything that exists to compare them — the picker here, the
+  // legend below, the filter on the call log, the spend breakdown on the dashboard — is hidden
+  // while there is only one, and comes back on its own if CALL_PIPELINES grows again.
+  const comparingPipelines = CALL_PIPELINES.length > 1;
+
   return (
     <AppShell {...shell}>
       {/* Identity left, controls right — a single band across the top rather than a centred
@@ -101,7 +106,11 @@ export function LiveCallPage({ module }: { module: Module }) {
         <div className="call-controls">
           {/* Which pipeline answers. Locked while a call is up — the sample rate is fixed when
               the audio context opens, so switching mid-call would send the wrong rate and the
-              agent would still transcribe *something*, which is worse than failing outright. */}
+              agent would still transcribe *something*, which is worse than failing outright.
+
+              Absent entirely while there is only one: a picker with a single option is a
+              decision presented as a question. */}
+          {comparingPipelines && (
           <div className="view-toggle" aria-label={t("callPipeline")}>
             {CALL_PIPELINES.map((option) => {
               // Locked while a call is up, and permanently for an option the server will
@@ -120,6 +129,7 @@ export function LiveCallPage({ module }: { module: Module }) {
               );
             })}
           </div>
+          )}
 
           <CallButton
             inCall={inCall}
@@ -138,8 +148,9 @@ export function LiveCallPage({ module }: { module: Module }) {
       </div>
 
       {/* The legend. Here rather than in a wiki because the trade-off has to be visible at the
-          moment of choosing — these four differ by roughly tenfold in cost and several times in
-          latency and language accuracy, and none of that is guessable from a toggle label. */}
+          moment of choosing — and gone when there is no choosing to do: a comparison table with
+          one row compares nothing. */}
+      {comparingPipelines && (
       <Card>
         <h2>{t("callPipelineLegend")}</h2>
         <div className="table-scroll">
@@ -173,6 +184,7 @@ export function LiveCallPage({ module }: { module: Module }) {
           {t("callPipelineNote")}
         </div>
       </Card>
+      )}
     </AppShell>
   );
 }
