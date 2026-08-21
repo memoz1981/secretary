@@ -428,7 +428,7 @@ export const translations = {
   phoneLine: { az: "Telefon xətti", ru: "Телефонная линия", en: "Phone line" },
   showCallCosts: { az: "Zəng xərclərini göstər", ru: "Показывать стоимость звонков", en: "Show call costs" },
   showCallCostsExplain: {
-    az: "Söndürülübsə, icarəçi zənglərin qiymətini görmür. Yalnız demo hesablar üçün.",
+    az: "Söndürülübsə, müştəri zənglərin qiymətini görmür. Yalnız demo hesablar üçün.",
     ru: "Если выключено, арендатор не видит стоимость звонков. Только для демо-аккаунтов.",
     en: "Off, and the tenant never sees what a call cost. Demonstration accounts only.",
   },
@@ -906,13 +906,19 @@ export const translations = {
   categoryForwarded: { az: "Operatora ötürüldü", ru: "Передан оператору", en: "Forwarded to a person" },
   categoryUnfinished: { az: "Yarımçıq", ru: "Не завершён", en: "Unfinished" },
   categoryNotAnswered: { az: "Cavab verilmədi", ru: "Не ответили", en: "Not answered" },
-  tenantDashboard: { az: "İcarəçi paneli", ru: "Панель арендатора", en: "Tenant dashboard" },
+  // "İcarəçi" is a lessee — a tenant of a building. Right for the code, wrong on screen:
+  // these are customers who bought the product, and nobody in the business calls them
+  // that out loud.
+  tenantDashboard: { az: "Müştəri paneli", ru: "Панель клиента", en: "Customer dashboard" },
+  tenantDetailsSaved: { az: "Yadda saxlanıldı.", ru: "Сохранено.", en: "Saved." },
   tenantDashboardSubtitle: {
     az: "Bütün modullar üzrə zənglər və xərclər.",
     ru: "Звонки и расходы по всем модулям.",
     en: "Calls and cost across every module they hold.",
   },
-  backToTenant: { az: "← İcarəçiyə qayıt", ru: "← К арендатору", en: "← Back to tenant" },
+  // No arrow in the string. The one place it is rendered draws its own, and having both
+  // produced "← ← ...".
+  backToTenant: { az: "Əsas səhifəyə qayıt", ru: "Вернуться на главную", en: "Back to the main page" },
   couldNotLoad: { az: "Yüklənmədi.", ru: "Не удалось загрузить.", en: "Couldn't load." },
   resolvedByAgent: {
     az: "Süni intellekt tərəfindən həll edilib",
