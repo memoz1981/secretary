@@ -231,13 +231,70 @@ public sealed class FeedbackCallService
             }
         }
 
-        return question.Options.FirstOrDefault(o =>
+        // ⚠ All of them, not the first. "Servis bölməsi" and "Servis mərkəzi" both contain
+        // "servis", and taking whichever came first filed a real answer on a coin toss. Two
+        // options that both fit is not a match; it is a question worth asking again.
+        var contained = question.Options.Where(o =>
         {
             var option = AddressText.Normalize(o.Text);
             return option.Length > 0
                    && (said.Contains(option, StringComparison.Ordinal)
                        || option.Contains(said, StringComparison.Ordinal));
-        });
+        }).ToList();
+
+        if (contained.Count == 1)
+        {
+            return contained[0];
+        }
+
+        return contained.Count > 1 ? null : BySpelling(question, spokenAnswer);
+    }
+
+    /// <summary>Last resort: the option as somebody typed it and the word as somebody says it are
+    /// often the same word spelled differently.
+    ///
+    /// ⚠ A caller said "resepshn", exactly as the option was typed, and was filed under "Digər".
+    /// The transcriber had written it down as "resepsiyon" — it spells what it hears in full,
+    /// while the owner had typed the short form. Neither of them was wrong and the two strings
+    /// still did not match, which is the whole problem: the word survives the round trip, the
+    /// spelling does not.
+    ///
+    /// A shared opening of five letters is long enough not to be coincidence in Azerbaijani, and
+    /// this runs only after an exact match and a containment match have both failed. It also
+    /// refuses a tie: two options that both look close is not a match, it is a question worth
+    /// asking again.</summary>
+    private static SurveyQuestionOption? BySpelling(SurveyQuestion question, string spokenAnswer)
+    {
+        const int MinSharedPrefix = 5;
+
+        var words = SpokenWords.Fold(spokenAnswer);
+        if (words.Count == 0)
+        {
+            return null;
+        }
+
+        var ranked = question.Options
+            .Select(option => (
+                Option: option,
+                Shared: words.Max(word => SharedPrefix(word, string.Concat(SpokenWords.Fold(option.Text))))))
+            .Where(match => match.Shared >= MinSharedPrefix)
+            .OrderByDescending(match => match.Shared)
+            .ToList();
+
+        return ranked.Count == 1 || (ranked.Count > 1 && ranked[0].Shared > ranked[1].Shared)
+            ? ranked[0].Option
+            : null;
+    }
+
+    private static int SharedPrefix(string left, string right)
+    {
+        var shared = 0;
+        while (shared < left.Length && shared < right.Length && left[shared] == right[shared])
+        {
+            shared++;
+        }
+
+        return shared;
     }
 
     public async Task RecordChoiceAsync(

@@ -165,6 +165,44 @@ public sealed class OptionMatchingTests
         (await _sut.MatchOptionAsync(10, spoken, default)).ShouldBeNull();
     }
 
+    /// <summary>⚠ A caller said "resepshn" — exactly the option as typed — and was filed under
+    /// "Digər". The transcriber wrote it down as "resepsiyon", spelling in full what it heard,
+    /// and the two strings did not match. Nobody was wrong; the word survives the round trip and
+    /// the spelling does not.</summary>
+    [Theory]
+    [InlineData("resepsiyon")]
+    [InlineData("Resepsiya")]
+    [InlineData("resepşn")]
+    public async Task An_option_typed_short_still_matches_the_whole_word(string spoken)
+    {
+        GivenChoice("Resepshn", "Xidmet emekdasi");
+
+        var match = await _sut.MatchOptionAsync(10, spoken, default);
+
+        match.ShouldNotBeNull();
+        match!.Text.ShouldBe("Resepshn");
+    }
+
+    /// <summary>Two options that both look close is not a match — it is a question worth asking
+    /// again. Picking the first would file an answer on a coin toss.</summary>
+    [Fact]
+    public async Task Two_options_spelled_alike_match_neither()
+    {
+        GivenChoice("Servis bölməsi", "Servis mərkəzi");
+
+        (await _sut.MatchOptionAsync(10, "servis", default)).ShouldBeNull();
+    }
+
+    /// <summary>Five letters is long enough not to be coincidence. Three is not — "bir" and
+    /// "birinci" are different answers.</summary>
+    [Fact]
+    public async Task A_short_coincidence_is_not_a_match()
+    {
+        GivenChoice("Təmir", "Satış");
+
+        (await _sut.MatchOptionAsync(10, "təmiz deyildi", default)).ShouldBeNull();
+    }
+
     /// <summary>People answer in sentences, not single words.</summary>
     [Fact]
     public async Task An_option_inside_a_sentence_still_matches()
