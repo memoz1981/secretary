@@ -425,9 +425,15 @@ table.data.striped tbody tr.unused td { color: var(--color-muted); }
 .hero { text-align: center; padding: var(--space-9) 0; }
 /* Not uppercased, deliberately: `text-transform: uppercase` on Azerbaijani under lang="en"
    turns i into I rather than İ, so "işləsin" would come out misspelled. */
-.hero-motto { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); color: var(--color-accent); margin: 0 0 var(--space-3); }
+.hero-motto {
+  font-family: var(--font-display); font-weight: 700; font-size: var(--text-xl);
+  color: var(--color-motto); margin: 0 0 var(--space-3);
+}
 .hero h1 { font-size: 40px; line-height: var(--leading-tight); max-width: 22ch; margin: 0 auto var(--space-4); }
-.hero p { font-size: var(--text-md); color: var(--color-muted); max-width: 64ch; margin: 0 auto; }
+/* ⚠ There was a `.hero p` rule here for the lead paragraph, and it quietly beat `.hero-motto`:
+   a class plus an element selector outranks a class on its own, so the motto has been rendering
+   in muted grey rather than the colour it asks for, since the day it was written. The paragraph
+   is gone, so the rule is too — and the motto now gets the colour it declares. */
 
 /* One grid for every section. Cards are grid items, so a row's boxes are the same height by
    construction rather than by matching the copy length -- but only once the stacked-card

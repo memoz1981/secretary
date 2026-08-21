@@ -120,20 +120,16 @@ export const translations = {
   // Marketing copy, and the only place in the app that speaks to someone who is not a
   // customer yet. Module statuses are deliberately honest: "Tezliklə" means it does not
   // exist, and must stay that way until it does.
+  // No full stop. It is a line on a poster, not a sentence in a paragraph.
   landingMotto: {
-    az: "Zəngləriniz cavabsız qalmasın.",
-    ru: "Пусть ни один звонок не останется без ответа.",
-    en: "Never let a call go unanswered.",
+    az: "Zəngləriniz cavabsız qalmasın",
+    ru: "Пусть ни один звонок не останется без ответа",
+    en: "Never let a call go unanswered",
   },
   landingHeroTitle: {
     az: "Süni intellekt agentləri zənglərə cavab verir və özləri zəng edir",
     ru: "ИИ-агенты отвечают на звонки и звонят сами",
     en: "AI agents answer your calls — and make them",
-  },
-  landingHeroLead: {
-    az: "Gələn zəngləri 24/7 Azərbaycan, rus və ingilis dillərində qarşılayır: randevu yazır, sifariş qəbul edir, sualı cavablandırır. Lazım olanda özü zəng edir — rəy soruşur, randevunu xatırladır. Nəticə isə birbaşa sisteminizə düşür.",
-    ru: "Круглосуточно принимают входящие на азербайджанском, русском и английском: записывают на приём, оформляют заказ, отвечают на вопрос. А когда нужно — звонят сами: спрашивают отзыв, напоминают о записи. Результат сразу попадает в вашу систему.",
-    en: "They take incoming calls around the clock in Azerbaijani, Russian and English — booking appointments, taking orders, answering questions. And when it matters they ring out: asking for feedback, reminding people of a booking. The result lands straight in your system.",
   },
 
   landingHowTitle: { az: "Necə işləyir", ru: "Как это работает", en: "How it works" },

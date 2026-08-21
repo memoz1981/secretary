@@ -78,7 +78,6 @@ export function LandingPage() {
         <section className="hero">
           <p className="hero-motto">{t("landingMotto")}</p>
           <h1>{t("landingHeroTitle")}</h1>
-          <p>{t("landingHeroLead")}</p>
         </section>
 
         <section className="landing-section">
