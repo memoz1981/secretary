@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { Card } from "@/shared/components/Card";
 import { StatTile } from "@/shared/components/StatTile";
@@ -40,6 +41,7 @@ export function FeedbackDashboardPage() {
   const { token } = useAuth();
   const { t } = useLanguage();
   const shell = useBusinessShell();
+  const navigate = useNavigate();
 
   const [surveyId, setSurveyId] = useState<number | null>(null);
   const [range, setRange] = useState<Range>("month");
@@ -62,6 +64,24 @@ export function FeedbackDashboardPage() {
         : getFeedbackDashboard(token!, surveyId, { from: since(range) }),
     [token, surveyId, range],
   );
+
+  /** Through to the dials behind a number, carrying the questionnaire, the range and — where the
+   *  tile names one — the status it counted. A number you cannot open is a number you have to
+   *  take on trust, and coverage is exactly where somebody wants to see the rows. */
+  function openCalls(status?: string) {
+    const query = new URLSearchParams();
+    if (surveyId !== null) query.set("surveyId", String(surveyId));
+
+    const from = since(range);
+    if (from) {
+      // The calls page speaks yyyy-MM-dd in its date boxes, not an instant.
+      query.set("from", from.slice(0, 10));
+      query.set("to", new Date().toISOString().slice(0, 10));
+    }
+
+    if (status) query.set("status", status);
+    navigate(`/feedback/calls?${query.toString()}`);
+  }
 
   const data = state.status === "success" ? state.data : null;
   const trend =
@@ -121,14 +141,29 @@ export function FeedbackDashboardPage() {
               read as four surveys attempted. */}
           <Card>
             <h2>{t("coverage")}</h2>
+            {/* ⚠ Only the counts open. A rate is not a set of rows — clicking "72%" would have to
+                invent which calls it meant — so the two percentages stay inert rather than
+                guessing, and look inert because they have no hover. */}
             <div className="stat-row">
-              <StatTile label={t("peopleRequested")} value={String(data.coverage.requested)} />
-              <StatTile label={t("peopleReached")} value={String(data.coverage.reached)} />
-              <StatTile label={t("surveysCompleted")} value={String(data.coverage.completed)} />
+              <StatTile label={t("peopleRequested")} value={String(data.coverage.requested)} onClick={() => openCalls()} />
+              <StatTile label={t("peopleReached")} value={String(data.coverage.reached)} onClick={() => openCalls()} />
+              <StatTile
+                label={t("surveysCompleted")}
+                value={String(data.coverage.completed)}
+                onClick={() => openCalls("Completed")}
+              />
               <StatTile label={t("responseRate")} value={percent(data.coverage.responseRate)} />
               <StatTile label={t("completionRate")} value={percent(data.coverage.completionRate)} />
-              <StatTile label={t("notReached")} value={String(data.coverage.notReached)} />
-              <StatTile label={t("needsAPerson")} value={String(data.coverage.needsHuman)} />
+              <StatTile
+                label={t("notReached")}
+                value={String(data.coverage.notReached)}
+                onClick={() => openCalls("Abandoned")}
+              />
+              <StatTile
+                label={t("needsAPerson")}
+                value={String(data.coverage.needsHuman)}
+                onClick={() => openCalls("NeedsHuman")}
+              />
             </div>
             <div className="note">{t("coverageExplain")}</div>
           </Card>
