@@ -142,6 +142,9 @@ export interface TenantModuleUsage {
   durationSeconds: number;
   tokens: number;
   costUsd: number;
+  /** What a minute on this line costs. Null when nothing has been dialled — a module with no
+   *  calls has no rate, and 0.00 would read as a line that runs free. */
+  costPerMinuteUsd: number | null;
 }
 
 export interface TenantCategoryUsage {
@@ -160,8 +163,12 @@ export interface TenantInsightsResponse {
   totalCostUsd: number;
   byModule: TenantModuleUsage[];
   byCategory: TenantCategoryUsage[];
+  /** What the tenant is allowed to use, as opposed to what they have used. */
+  enabledModules: Module[];
   /** Null when nothing has been dialled — an average over no calls is not zero. */
   averageCostPerCallUsd: number | null;
+  /** The blended rate across every module this tenant runs. Null on no calls. */
+  averageCostPerMinuteUsd: number | null;
   averageDurationSeconds: number | null;
 }
 

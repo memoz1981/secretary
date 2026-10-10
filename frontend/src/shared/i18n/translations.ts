@@ -913,9 +913,15 @@ export const translations = {
   // "İcarəçi" is a lessee — a tenant of a building. Right for the code, wrong on screen:
   // these are customers who bought the product, and nobody in the business calls them
   // that out loud.
-  tenantDashboard: { az: "Müştəri paneli", ru: "Панель клиента", en: "Customer dashboard" },
+  // Renamed from "Müştəri paneli". That read as the panel a customer uses — which is what the
+  // tenant's own admin page is — when it is the platform's read on how an account is doing.
+  tenantDashboard: { az: "Göstəricilər", ru: "Показатели", en: "Metrics" },
   businessType: { az: "Fəaliyyət sahəsi", ru: "Сфера деятельности", en: "Business type" },
   businessTypeNotSet: { az: "Təyin edilməyib", ru: "Не указано", en: "Not set" },
+  filterByModules: { az: "Modullara görə", ru: "По модулям", en: "By module" },
+  clearFilters: { az: "Filtrləri təmizlə", ru: "Сбросить фильтры", en: "Clear filters" },
+  matchingTenants: { az: "Cəm: {n}", ru: "Всего: {n}", en: "Sum: {n}" },
+  avgCostPerMinute: { az: "Orta dəqiqə dəyəri", ru: "Средняя цена минуты", en: "Average cost per minute" },
   colDay: { az: "Gün", ru: "День", en: "Day" },
   openingTime: { az: "Açılış", ru: "Открытие", en: "Opens" },
   closingTime: { az: "Bağlanış", ru: "Закрытие", en: "Closes" },

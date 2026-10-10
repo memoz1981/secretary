@@ -8,10 +8,14 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { Pill } from "@/shared/components/Pill";
+import { Breadcrumbs } from "@/shared/components/Breadcrumbs";
 import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
 import { getTenantInsights } from "@/shared/api/tenants";
 import { CALL_CATEGORIES } from "@/shared/api/types";
 import type { Module } from "@/shared/api/types";
+import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
+import { MODULE_PRESENTATION } from "@/modules/presentation";
 import type { TranslationKey } from "@/shared/i18n/translations";
 
 /** The module titles this page can show. Mapped rather than built from the name, so a module
@@ -47,7 +51,7 @@ export function TenantDashboardPage() {
   const { id } = useParams<{ id: string }>();
   const tenantId = Number(id);
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
 
   const state = useApiData(() => getTenantInsights(token!, tenantId), [token, id]);
@@ -80,12 +84,28 @@ export function TenantDashboardPage() {
 
   return (
     <AppShell {...shell}>
-      <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/tenants/${tenantId}`)}>
-        {t("backToTenant")}
-      </Button>
+      <Breadcrumbs
+        items={[
+          { label: t("tenants"), to: "/admin/tenants" },
+          { label: data.tenantName, to: `/admin/tenants/${tenantId}` },
+          { label: t("tenantDashboard") },
+        ]}
+      />
 
-      <h1 className="page-title" style={{ marginTop: "var(--space-3)" }}>
+      <h1
+        className="page-title"
+        style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}
+      >
         {data.tenantName}
+        {/* What they hold, beside the name. The usage table below only lists modules that have
+            taken a call, so a module sold and never dialled was invisible on the one page meant
+            to say how an account is doing. */}
+        {data.enabledModules.map((module) => (
+          <Pill key={module} tone={MODULE_PRESENTATION[module].tone}>
+            {translateEnum(moduleLabels, module, language)}
+          </Pill>
+        ))}
+        {data.enabledModules.length === 0 && <span className="sub">{t("noModules")}</span>}
       </h1>
       <div className="subtitle">{t("tenantDashboardSubtitle")}</div>
 
@@ -95,6 +115,7 @@ export function TenantDashboardPage() {
           <StatTile label={t("totalCalls")} value={String(data.totalCalls)} />
           <StatTile label={t("totalSpend")} value={formatUsd(data.totalCostUsd)} />
           <StatTile label={t("avgCostPerCall")} value={formatUsd(data.averageCostPerCallUsd)} />
+          <StatTile label={t("avgCostPerMinute")} value={formatUsd(data.averageCostPerMinuteUsd)} />
           <StatTile label={t("totalMinutes")} value={formatDuration(data.totalDurationSeconds)} />
           <StatTile
             label={t("avgDuration")}
@@ -127,6 +148,7 @@ export function TenantDashboardPage() {
                   <th className="mono">{t("totalMinutes")}</th>
                   <th className="mono">{t("totalTokens")}</th>
                   <th className="mono">{t("totalSpend")}</th>
+                  <th className="mono">{t("costPerMinute")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -137,6 +159,7 @@ export function TenantDashboardPage() {
                     <td className="mono">{formatDuration(m.durationSeconds)}</td>
                     <td className="mono">{formatTokens(m.tokens)}</td>
                     <td className="mono">{formatUsd(m.costUsd)}</td>
+                    <td className="mono">{formatUsd(m.costPerMinuteUsd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -144,6 +167,15 @@ export function TenantDashboardPage() {
           </div>
         )}
       </Card>
+
+      <div className="actions">
+        <Button variant="secondary" onClick={() => navigate(`/admin/tenants/${tenantId}`)}>
+          {t("backToTenant")}
+        </Button>
+        <Button variant="secondary" onClick={() => navigate("/admin/tenants")}>
+          {t("backToList")}
+        </Button>
+      </div>
     </AppShell>
   );
 }

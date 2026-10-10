@@ -107,7 +107,11 @@
   --chart-3: #278657;
 
   /* One hue for a single series: a distribution's meaning is in the bar heights and their
-     order, so colouring each bar differently would encode nothing twice. */
+     order, so colouring each bar differently would encode nothing twice.
+
+     Restated by every theme below. This sat only here for a while, which meant the dark themes
+     drew a mid-teal bar against a near-black track — technically present, practically invisible,
+     and the bar chart is how "how did calls end" is read. */
   --chart-bar: #3f7d92;
   --chart-track: var(--color-surface-sunken);
 }
@@ -139,6 +143,7 @@
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #e3ebe8;
   --color-motto: #9c4a24;
+  --chart-bar: #3f7d92;
   --color-success: #3f8a4f;
   --color-success-bg: #e5f0e6;
   --color-warning: #b3872f;
@@ -163,6 +168,7 @@
   --color-accent-ink: #12211d;
   --color-accent-subtle: #223531;
   --color-motto: #e0a94a;
+  --chart-bar: #e0a94a;
   --color-success: #6ab476;
   --color-success-bg: #223224;
   --color-warning: #d1a052;
@@ -199,6 +205,7 @@
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #c3ddca;
   --color-motto: #7d2a4a;
+  --chart-bar: #2f7d52;
   --color-success: #1f6b3d;
   --color-success-bg: #c8e2d0;
   --color-warning: #8a6718;
@@ -223,6 +230,7 @@
   --color-accent-ink: #1a1508;
   --color-accent-subtle: #322b16;
   --color-motto: #6fcede;
+  --chart-bar: #e2b53f;
   --color-success: #62b877;
   --color-success-bg: #1e2f23;
   --color-warning: #e59355;
@@ -259,6 +267,7 @@
   --color-accent-ink: #ffffff;
   --color-accent-subtle: #bcd6ec;
   --color-motto: #a34220;
+  --chart-bar: #2f6ea8;
   --color-success: #1f6b4a;
   --color-success-bg: #c6e0d5;
   --color-warning: #8a6718;
