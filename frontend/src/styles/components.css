@@ -785,6 +785,69 @@ button.link.danger { color: var(--color-critical); }
 }
 .filter-count { font-size: var(--text-xs); font-style: italic; color: var(--color-muted); }
 
+/* A save confirmation, under the button that caused it.
+   Red and italic because that is what was asked for, and it earns it: this is the one line on
+   an admin form that says the thing on screen is now the thing on the server, and it has to be
+   findable without hunting. It sits below the row rather than inside it so that appearing never
+   moves a button. */
+.save-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-critical);
+}
+
+/* The outcome tiles at the top of the appointment dashboard.
+   A button, not a div: every one of them opens the calls it counted, and a number you cannot
+   open is a number you have to take on trust. The coloured top edge carries the reading — see
+   modules/appointments/lib/outcomes.ts, where that judgement lives once. */
+/* A figure that opens the rows behind it. Only tiles given somewhere to go get this — see
+   StatTile, where a tile that looks pressable and does nothing teaches a reader that numbers on
+   the page do not open, so they stop trying the ones that do. */
+.stat.clickable {
+  cursor: pointer; text-align: left; width: 100%; font-family: var(--font-body);
+}
+.stat.clickable:hover { background: var(--color-surface-raised); border-color: var(--color-accent); }
+
+.outcome-grid {
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.outcome-tile {
+  position: relative; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4); font-family: var(--font-body);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.outcome-tile:hover:not(:disabled) { background: var(--color-surface-raised); }
+.outcome-tile:disabled { cursor: default; }
+/* Top right, as its own line in the corner rather than beside the count: the share and the count
+   are two readings of one thing, and side by side they get read as a ratio. */
+.outcome-share { position: absolute; top: var(--space-3); right: var(--space-3); font-size: var(--text-xs); }
+.outcome-label { color: var(--color-muted); font-size: var(--text-sm); padding-right: var(--space-6); }
+.outcome-count { font-size: 30px; font-family: var(--font-display); line-height: 1.1; }
+
+/* A day the business is shut.
+   Drawn, not removed: hiding the column would make the week change shape from tenant to tenant,
+   and an appointment that somehow exists on a closed day has to stay visible — it is exactly the
+   one somebody needs to find and move. The stripes say "not bookable" without hiding anything
+   sitting on top of them. */
+.day-col.closed, .month-cell.closed {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-surface-sunken),
+    var(--color-surface-sunken) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  cursor: not-allowed;
+}
+.month-cell.closed:hover { background-color: transparent; }
+.week-grid .head.closed { color: var(--color-muted); }
+
 .share-label { color: var(--color-ink); }
 .share-legend .share-label { flex: 1; }
 .share-value { color: var(--color-muted); font-size: var(--text-xs); white-space: nowrap; }

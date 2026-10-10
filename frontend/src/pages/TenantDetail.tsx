@@ -18,11 +18,11 @@ import {
   updateTenant,
 } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountStatusLabels, businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
+import { accountRoleLabels, accountStatusLabels, businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
 import { BUSINESS_TYPES, type BusinessType } from "@/shared/api/types";
+import { Breadcrumbs } from "@/shared/components/Breadcrumbs";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 import { ModuleToggle } from "@/shared/components/ModuleToggle";
-import { Breadcrumbs } from "@/shared/components/Breadcrumbs";
 
 export function TenantDetailPage() {
   const { token } = useAuth();
@@ -32,15 +32,21 @@ export function TenantDetailPage() {
   const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [refreshKey, setRefreshKey] = useState(0);
-  const state = useApiData(() => getTenant(token!, tenantId), [token, id, refreshKey]);
-  const ownerAccountsState = useApiData(() => getTenantOwnerAccounts(token!, tenantId), [token, id, refreshKey]);
-  const modulesState = useApiData(() => getTenantModules(token!, tenantId), [token, id, refreshKey]);
+  // All three keep what they have while they refetch. Saving bumps refreshKey, which re-runs
+  // every one of them; the page body is gated on the tenant, so without this a save emptied the
+  // whole screen for the length of a round trip and the scroll went to the top with it.
+  const keep = { keepPrevious: true };
+  const state = useApiData(() => getTenant(token!, tenantId), [token, id, refreshKey], keep);
+  const ownerAccountsState = useApiData(
+    () => getTenantOwnerAccounts(token!, tenantId), [token, id, refreshKey], keep);
+  const modulesState = useApiData(() => getTenantModules(token!, tenantId), [token, id, refreshKey], keep);
 
   // Staged, not live. Toggling used to save on the spot, which meant idly clicking through the
   // switches to see what was there silently changed what a paying client could use. Nothing
   // leaves the page until Save.
   const [moduleDraft, setModuleDraft] = useState<Record<string, boolean> | null>(null);
   const [savingModules, setSavingModules] = useState(false);
+
 
   /// Saving modules changes nothing visible — the toggles already show what you chose — so
   /// without a word confirming it, the only way to know it worked was to leave and come back.
@@ -68,14 +74,13 @@ export function TenantDetailPage() {
     ? serverModules.filter((m) => moduleDraft[m.module] !== m.enabled)
     : [];
 
-  const [form, setForm] =
-    useState<{
-      name: string;
-      timezone: string;
-      phoneLine: string;
-      showCallCosts: boolean;
-      businessType: BusinessType | "";
-    } | null>(null);
+  const [form, setForm] = useState<{
+    name: string;
+    timezone: string;
+    phoneLine: string;
+    showCallCosts: boolean;
+    businessType: BusinessType | "";
+  } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
   if (tenant && !form) {
     setForm({
@@ -118,7 +123,6 @@ export function TenantDetailPage() {
       // disables itself because there is nothing left to change.
       setRefreshKey((k) => k + 1);
       setJustSaved(true);
-      window.setTimeout(() => setJustSaved(false), 3000);
     } finally {
       setSavingModules(false);
     }
@@ -154,9 +158,14 @@ export function TenantDetailPage() {
           {/* Above the settings rather than squeezed into the heading beside the name: what an
               account is doing is the first thing anybody opening it wants, and configuring it is
               the second. A real button, because it goes somewhere. */}
-          <div style={{ marginBottom: "var(--space-4)" }}>
+          {/* Both destinations at the top, and the way back repeated at the foot of the page:
+              this page is long enough that scrolling to the bottom to leave is a real journey. */}
+          <div className="actions" style={{ marginBottom: "var(--space-4)" }}>
             <Button type="button" onClick={() => navigate(`/admin/tenants/${tenantId}/dashboard`)}>
               {t("tenantDashboard")}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => navigate("/admin/tenants")}>
+              {t("backToList")}
             </Button>
           </div>
           <Card>
@@ -193,15 +202,16 @@ export function TenantDetailPage() {
                 <span>{t("showCallCosts")}</span>
               </label>
               <div className="note">{t("showCallCostsExplain")}</div>
+              {/* Beneath the buttons, not between them. Sitting inline, the confirmation pushed
+                  Deactivate sideways the instant a save landed: the destructive button moving
+                  under the cursor of somebody who had just clicked next to it. */}
               <div className="actions">
                 <Button type="submit">{t("saveChanges")}</Button>
-                {detailsSaved && (
-                  <span className="sub" style={{ alignSelf: "center" }}>{t("tenantDetailsSaved")}</span>
-                )}
                 <Button type="button" variant="danger" onClick={handleToggleStatus}>
                   {tenant.status === "Active" ? t("deactivateTenant") : t("reactivateTenant")}
                 </Button>
               </div>
+              {detailsSaved && <div className="save-note">{t("tenantDetailsSaved")}</div>}
             </form>
           </Card>
           <Card>
@@ -215,6 +225,14 @@ export function TenantDetailPage() {
               columns={[
                 { header: t("colName"), render: (a) => a.name },
                 { header: t("colEmail"), render: (a) => a.email },
+                {
+                  // Added with the rows. The card listed owners only, so a staff account created
+                  // on the tenant's own page was missing here and the two screens looked out of
+                  // step; showing every account without saying which is which would only move
+                  // the confusion.
+                  header: t("colRole"),
+                  render: (a) => translateEnum(accountRoleLabels, a.role, language),
+                },
                 {
                   header: t("colStatus"),
                   render: (a) => (
@@ -241,7 +259,11 @@ export function TenantDetailPage() {
                     // Functional update, not a spread of the captured draft: two toggles clicked
                     // before a re-render both read the same stale object and the second undoes
                     // the first, which is the selections appearing to flip.
-                    onChange={(next) => setModuleDraft((current) => ({ ...current, [row.module]: next }))}
+                    onChange={(next) => {
+                      // Any change makes the confirmation stale: it described the save before it.
+                      setJustSaved(false);
+                      setModuleDraft((current) => ({ ...current, [row.module]: next }));
+                    }}
                   />
                 ))}
                 <div className="actions" style={{ marginTop: "var(--space-3)" }}>
@@ -253,10 +275,12 @@ export function TenantDetailPage() {
                       {t("cancel")}
                     </Button>
                   )}
-                  {justSaved && moduleChanges.length === 0 && (
-                    <span className="sub" style={{ alignSelf: "center" }}>{t("modulesSaved")}</span>
-                  )}
                 </div>
+                {/* Stays put until something changes. It used to clear itself after three
+                    seconds, so the text vanished out from under anybody who moved to read it. */}
+                {justSaved && moduleChanges.length === 0 && (
+                  <div className="save-note">{t("modulesSaved")}</div>
+                )}
               </>
             )}
           </Card>

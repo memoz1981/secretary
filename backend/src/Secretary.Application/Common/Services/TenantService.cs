@@ -136,9 +136,20 @@ public sealed class TenantService
             throw new NotFoundException(nameof(Tenant), id);
         }
 
+        // ⚠ Every person, not only the owners. It filtered to Owner, so a staff account added
+        // on the tenant's own Administration page never appeared on the platform's view of that
+        // tenant — the two screens listed different things under the same idea, and the obvious
+        // reading of that was that they were not synchronised at all. They always were; one of
+        // them was hiding rows.
+        //
+        // Agent stays out. It is the voice agent's own API identity, not somebody who logs in:
+        // it has no name a human chose and no inbox, and listing it among the staff invites
+        // somebody to reset its password and take the phone line down.
         var accounts = await _uow.Accounts.GetByTenantAsync(id, cancellationToken);
         return accounts
-            .Where(a => a.Role == AccountRole.Owner)
+            .Where(a => a.Role != AccountRole.Agent)
+            .OrderByDescending(a => a.Role == AccountRole.Owner)
+            .ThenBy(a => a.Name)
             .Select(a => new AccountResponse(a.Id, a.Name, a.Email, a.Role, a.Status))
             .ToList();
     }
