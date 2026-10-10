@@ -1294,6 +1294,9 @@ namespace Secretary.Infrastructure.Common.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BusinessType")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1321,6 +1324,8 @@ namespace Secretary.Infrastructure.Common.Persistence.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BusinessType");
 
                     b.ToTable("Tenants");
                 });

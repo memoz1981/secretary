@@ -6,7 +6,8 @@ import { Button } from "@/shared/components/Button";
 import { TextField, SelectField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { createTenant, setTenantModule } from "@/shared/api/tenants";
-import { MODULES, type Module } from "@/shared/api/types";
+import { BUSINESS_TYPES, MODULES, type BusinessType, type Module } from "@/shared/api/types";
+import { businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
@@ -15,11 +16,16 @@ import { ModuleToggle } from "@/shared/components/ModuleToggle";
 export function CreateTenantPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("Asia/Baku");
   const [phoneLine, setPhoneLine] = useState("");
+
+  // Asked for, and required, on the way in. It is nullable in the database because the accounts
+  // that predate the column are genuinely unknown; that is not a reason to let new ones start
+  // out unknown too, when the person filling this in is talking to the business.
+  const [businessType, setBusinessType] = useState<BusinessType | "">("");
 
   // Off unless somebody deliberately turns it on. See the tenant entity: this is the
   // platform's switch, and the expectation is demonstration tenants only.
@@ -38,6 +44,7 @@ export function CreateTenantPage() {
     e.preventDefault();
     const nextErrors: Record<string, string> = {};
     if (!isRequired(name)) nextErrors.name = t("businessNameRequired");
+    if (businessType === "") nextErrors.businessType = t("businessTypeRequired");
     if (!isRequired(ownerName)) nextErrors.ownerName = t("ownerNameRequired");
     if (!isValidEmail(ownerEmail)) nextErrors.ownerEmail = t("enterValidEmail");
     if (!isMinLength(ownerPassword, 8)) nextErrors.ownerPassword = t("atLeast8Characters");
@@ -51,6 +58,7 @@ export function CreateTenantPage() {
         timezone,
         phoneLine: phoneLine || null,
         showCallCosts,
+        businessType: businessType === "" ? null : businessType,
         ownerName,
         ownerEmail,
         ownerPassword,
@@ -94,6 +102,19 @@ export function CreateTenantPage() {
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
             options={[{ value: "Asia/Baku", label: "Asia/Baku" }]}
+          />
+          <SelectField
+            label={t("businessType")}
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value as BusinessType | "")}
+            error={errors.businessType}
+            options={[
+              { value: "", label: t("chooseBusinessType") },
+              ...BUSINESS_TYPES.map((type) => ({
+                value: type,
+                label: translateEnum(businessTypeLabels, type, language),
+              })),
+            ]}
           />
           <TextField
             label={t("phoneLine")}

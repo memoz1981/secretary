@@ -21,7 +21,7 @@ import { BusinessHoursCard } from "@/shared/components/BusinessHoursCard";
 import { DeliverySettingsCard } from "@/modules/orders/components/DeliverySettingsCard";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountRoleLabels, translateEnum } from "@/shared/i18n/translations";
+import { accountRoleLabels, businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
 
 export function AdminPage() {
   const { token, role, me } = useAuth();
@@ -68,6 +68,18 @@ export function AdminPage() {
         {form && (
           <form onSubmit={handleSaveTenant}>
             <TextField label={t("businessName")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            {/* Shown, never edited: the platform sets it, and the server carries it across from
+                storage on save rather than reading it from this form. */}
+            <TextField
+              label={t("businessType")}
+              value={
+                tenant?.businessType == null
+                  ? t("businessTypeNotSet")
+                  : translateEnum(businessTypeLabels, tenant.businessType, language)
+              }
+              disabled
+              onChange={() => {}}
+            />
             <SelectField
               label={t("timezone")}
               value={form.timezone}

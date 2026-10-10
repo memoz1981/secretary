@@ -18,7 +18,8 @@ import {
   updateTenant,
 } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { accountStatusLabels, translateEnum } from "@/shared/i18n/translations";
+import { accountStatusLabels, businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
+import { BUSINESS_TYPES, type BusinessType } from "@/shared/api/types";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 import { ModuleToggle } from "@/shared/components/ModuleToggle";
 
@@ -67,7 +68,13 @@ export function TenantDetailPage() {
     : [];
 
   const [form, setForm] =
-    useState<{ name: string; timezone: string; phoneLine: string; showCallCosts: boolean } | null>(null);
+    useState<{
+      name: string;
+      timezone: string;
+      phoneLine: string;
+      showCallCosts: boolean;
+      businessType: BusinessType | "";
+    } | null>(null);
   const tenant = state.status === "success" ? state.data : null;
   if (tenant && !form) {
     setForm({
@@ -75,6 +82,7 @@ export function TenantDetailPage() {
       timezone: tenant.timezone,
       phoneLine: tenant.phoneLine ?? "",
       showCallCosts: tenant.showCallCosts,
+      businessType: tenant.businessType ?? "",
     });
   }
 
@@ -86,6 +94,7 @@ export function TenantDetailPage() {
       timezone: form.timezone,
       phoneLine: form.phoneLine || null,
       showCallCosts: form.showCallCosts,
+      businessType: form.businessType === "" ? null : form.businessType,
     });
     setDetailsSaved(true);
     setRefreshKey((k) => k + 1);
@@ -154,6 +163,21 @@ export function TenantDetailPage() {
                 options={[{ value: "Asia/Baku", label: "Asia/Baku" }]}
               />
               <TextField label={t("phoneLine")} value={form.phoneLine} onChange={(e) => edit({ phoneLine: e.target.value })} />
+              <SelectField
+                label={t("businessType")}
+                value={form.businessType}
+                onChange={(e) => edit({ businessType: e.target.value as BusinessType | "" })}
+                options={[
+                  // "Not set" stays reachable rather than disappearing once a type is picked: an
+                  // admin who chose the wrong one should be able to take it back, and unset is
+                  // the honest value for an account nobody has classified.
+                  { value: "", label: t("businessTypeNotSet") },
+                  ...BUSINESS_TYPES.map((type) => ({
+                    value: type,
+                    label: translateEnum(businessTypeLabels, type, language),
+                  })),
+                ]}
+              />
               <label className="checkbox-row">
                 <input
                   type="checkbox"

@@ -87,6 +87,9 @@ export interface TenantResponse {
   /** Whether this tenant may be shown what their AI calls cost. The platform's switch, off by
    *  default — the margin between what a call costs and what they pay is readable from it. */
   showCallCosts: boolean;
+  /** What kind of business this is. Null means nobody has said — an account created before the
+   *  field existed, not a business that is "other". */
+  businessType: BusinessType | null;
   status: EntityStatus;
   createdAt: string;
 }
@@ -97,6 +100,30 @@ export type CallCategory = "NotAnswered" | "Answered" | "Forwarded" | "Unfinishe
 /** The order a reader wants them: what worked, what needed us, what went wrong, and who we
  *  never got hold of. */
 export const CALL_CATEGORIES: CallCategory[] = ["Answered", "Forwarded", "Unfinished", "NotAnswered"];
+
+/** What kind of business a tenant runs — see Domain/Common/Enums/BusinessType.cs.
+ *
+ *  The array is the source the pickers and filters iterate, so a new type is one line here and
+ *  one translation, and the union is derived from it rather than repeated beside it. */
+export const BUSINESS_TYPES = [
+  "Clinic",
+  "DentalClinic",
+  "VetClinic",
+  "Hospital",
+  "Pharmacy",
+  "BeautySalon",
+  "Barbershop",
+  "AutoService",
+  "AutoDealer",
+  "Shop",
+  "Restaurant",
+  "WaterDelivery",
+  "Courier",
+  "InternationalCargo",
+  "Other",
+] as const;
+
+export type BusinessType = (typeof BUSINESS_TYPES)[number];
 
 export interface TenantModuleUsage {
   module: Module;
@@ -132,6 +159,7 @@ export interface CreateTenantRequest {
   timezone: string;
   phoneLine: string | null;
   showCallCosts: boolean;
+  businessType: BusinessType | null;
   ownerName: string;
   ownerEmail: string;
   ownerPassword: string;
@@ -147,6 +175,7 @@ export interface UpdateTenantRequest {
   timezone: string;
   phoneLine: string | null;
   showCallCosts: boolean;
+  businessType: BusinessType | null;
 }
 
 /** What a tenant may change about themselves — the same details minus the one that is not

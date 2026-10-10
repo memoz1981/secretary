@@ -8,7 +8,8 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { getTenants } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
-import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
+import { businessTypeLabels, moduleLabels, translateEnum } from "@/shared/i18n/translations";
+import { BUSINESS_TYPES, type BusinessType } from "@/shared/api/types";
 import { MODULE_PRESENTATION } from "@/modules/presentation";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 
@@ -19,6 +20,12 @@ export function TenantListPage() {
   const shell = usePlatformAdminShell();
   const [search, setSearch] = useState("");
   const state = useApiData(() => getTenants(token!, search || undefined), [token, search]);
+
+  // Filtered here rather than on the server: the search box is already a round trip, and the
+  // list is small enough that narrowing what came back is cheaper than asking again.
+  const [businessType, setBusinessType] = useState<BusinessType | "">("");
+  const all = state.status === "success" ? state.data : [];
+  const rows = businessType === "" ? all : all.filter((tenant) => tenant.businessType === businessType);
 
   return (
     <AppShell {...shell}>
@@ -34,18 +41,39 @@ export function TenantListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 240 }}
           />
+          <select
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value as BusinessType | "")}
+            style={{ width: "auto" }}
+          >
+            <option value="">{t("allBusinessTypes")}</option>
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {translateEnum(businessTypeLabels, type, language)}
+              </option>
+            ))}
+          </select>
         </div>
         <Button onClick={() => navigate("/admin/tenants/new")}>{t("createTenant")}</Button>
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadTenants")}</div>}
       <DataTable
         loading={state.status === "loading"}
-        rows={state.status === "success" ? state.data : []}
+        rows={rows}
         rowKey={(tenant) => tenant.id}
         onRowClick={(tenant) => navigate(`/admin/tenants/${tenant.id}`)}
         emptyMessage={t("noTenantsYet")}
         columns={[
           { header: t("colName"), render: (tenant) => tenant.name },
+          {
+            header: t("businessType"),
+            render: (tenant) =>
+              tenant.businessType === null ? (
+                <span className="sub">{t("businessTypeNotSet")}</span>
+              ) : (
+                translateEnum(businessTypeLabels, tenant.businessType, language)
+              ),
+          },
           {
             // What the admin is really managing. The list showed everything except this, so
             // finding out what a client had bought meant opening them one at a time.
