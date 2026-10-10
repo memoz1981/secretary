@@ -1,7 +1,7 @@
 import { Pill } from "@/shared/components/Pill";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { moduleLabels, translateEnum } from "@/shared/i18n/translations";
-import { findModule } from "@/modules/registry";
+import { findModule, WITHDRAWN_MODULES } from "@/modules/registry";
 import type { Module } from "@/shared/api/types";
 
 /** One module, on or off. Used by both admin screens so a grant looks and behaves the same
@@ -25,7 +25,12 @@ export function ModuleToggle({
   // A module the front end cannot render yet would drop the tenant into a picker holding a tile
   // that goes nowhere. The row stays — the grant is a real record — but it cannot be set here.
   const built = findModule(module) !== undefined;
-  const locked = disabled || !built;
+
+  // ⚠ Withdrawn locks the switch in one direction only. A tenant who already holds Information
+  // keeps working, and an admin can still take it off them; what cannot happen is granting it
+  // again. Locking it both ways would trap the grant on every account that has one.
+  const withdrawn = WITHDRAWN_MODULES.includes(module);
+  const locked = disabled || !built || (withdrawn && !checked);
 
   return (
     <label
@@ -51,7 +56,9 @@ export function ModuleToggle({
       <span style={{ flex: 1, fontWeight: checked ? 600 : 400 }}>
         {translateEnum(moduleLabels, module, language)}
       </span>
-      {!built && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
+      {/* Withdrawn reads exactly like the modules that are not offered yet: the reader's question
+          is "can I give this to a tenant", and the answer is the same no for both. */}
+      {(!built || withdrawn) && <Pill variant="neutral">{t("moduleNotBuiltYet")}</Pill>}
     </label>
   );
 }

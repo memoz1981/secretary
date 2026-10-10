@@ -58,6 +58,26 @@ export function findModule(key: Module): ModuleManifest | undefined
   return MODULE_REGISTRY.find((m) => m.key === key);
 }
 
+/** Modules that exist and work, but are no longer offered to new tenants.
+ *
+ * ⚠ Not the same as "not built", and the difference is the whole point. Information has a page,
+ * routes and a manifest, and a tenant holding it can still use it — it was switched on back when
+ * Appointment was the only real module, so that the multi-module paths (the picker, the sidebar
+ * switcher) had a second tile to be reachable with. Three real modules exist now and it is not
+ * one of them.
+ *
+ * So the pages stay and the grant stays honoured. Only the granting stops: see ModuleToggle,
+ * where a withdrawn module can be switched off but not back on. Taking the manifest out of
+ * MODULE_REGISTRY instead would break the app for whoever still holds it — their nav would point
+ * at routes that no longer exist. */
+export const WITHDRAWN_MODULES: Module[] = ["Information"];
+
+/** Whether an admin may switch this module ON for a tenant. Off is always allowed: a grant that
+ *  cannot be revoked is a worse problem than one that cannot be made. */
+export function isGrantable(key: Module): boolean {
+  return findModule(key) !== undefined && !WITHDRAWN_MODULES.includes(key);
+}
+
 /** The tenant's modules that are actually usable — granted AND built. */
 export function usableModules(enabled: Module[]): ModuleManifest[] {
   return enabled.map(findModule).filter((m): m is ModuleManifest => m !== undefined);

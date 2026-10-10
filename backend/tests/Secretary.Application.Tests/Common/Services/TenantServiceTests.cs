@@ -153,20 +153,32 @@ public sealed class TenantServiceTests
         result[0].Name.ShouldBe("Baku Barbershop");
     }
 
+    /// <summary>⚠ Every person on the tenant, owners first — and never the agent.
+    ///
+    /// This filtered to Owner, so a staff account created on the tenant's own Administration
+    /// page was missing from the platform's view of the same tenant. Two screens listing
+    /// different things under one idea reads as two screens that are not synchronised.
+    ///
+    /// The agent account is excluded for the opposite reason: it is the voice agent's API
+    /// identity rather than somebody who logs in, and offering it in a list of staff invites
+    /// a password reset that takes the phone line down.</summary>
     [Fact]
-    public async Task GetOwnerAccountsAsync_returns_only_owner_role_accounts_for_the_tenant()
+    public async Task GetOwnerAccountsAsync_returns_every_person_on_the_tenant_owners_first()
     {
         var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(tenant.Id, default)).ReturnsAsync(tenant);
 
         var owner = Account.CreateOwner(tenant.Id, "Elvin Mammadov", "elvin@business.az", "hash", Now);
+        var staff = Account.AddStaff(tenant.Id, "Aygun", "aygun@business.az", "hash", Now);
         var agent = Account.CreateAgent(tenant.Id, "hash", Now);
-        _uow.Accounts.Setup(a => a.GetByTenantAsync(tenant.Id, default)).ReturnsAsync([owner, agent]);
+        _uow.Accounts.Setup(a => a.GetByTenantAsync(tenant.Id, default)).ReturnsAsync([staff, agent, owner]);
 
         var result = await _sut.GetOwnerAccountsAsync(tenant.Id, default);
 
-        result.Count.ShouldBe(1);
+        result.Count.ShouldBe(2);
         result[0].Email.ShouldBe("elvin@business.az");
+        result[1].Email.ShouldBe("aygun@business.az");
+        result.ShouldNotContain(a => a.Role == AccountRole.Agent);
     }
 
     [Fact]

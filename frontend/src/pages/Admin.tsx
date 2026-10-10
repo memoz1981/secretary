@@ -3,7 +3,7 @@ import { AppShell } from "@/shared/components/AppShell";
 import { Card } from "@/shared/components/Card";
 import { Button } from "@/shared/components/Button";
 import { DataTable } from "@/shared/components/DataTable";
-import { TextField, SelectField } from "@/shared/components/FormControls";
+import { TextField } from "@/shared/components/FormControls";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
@@ -16,23 +16,28 @@ import {
   updateStaffAccount,
 } from "@/shared/api/accounts";
 import type { AccountResponse } from "@/shared/api/types";
-import { ThemePicker } from "@/shared/components/ThemeSelect";
 import { BusinessHoursCard } from "@/shared/components/BusinessHoursCard";
 import { DeliverySettingsCard } from "@/modules/orders/components/DeliverySettingsCard";
 import { isRequired, isValidEmail, isMinLength } from "@/shared/lib/validation";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { accountRoleLabels, businessTypeLabels, translateEnum } from "@/shared/i18n/translations";
+import { useActiveModule } from "@/modules/useActiveModule";
 
 export function AdminPage() {
-  const { token, role, me } = useAuth();
+  const { token, role } = useAuth();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
+  const activeModule = useActiveModule();
   const [refreshKey, setRefreshKey] = useState(0);
   const tenantState = useApiData(() => getCurrentTenant(token!), [token, refreshKey]);
   const accountsState = useApiData(() => getStaffAccounts(token!), [token, refreshKey]);
 
   const [form, setForm] = useState<{ name: string; timezone: string; phoneLine: string } | null>(null);
   const [savingTenant, setSavingTenant] = useState(false);
+
+  // Same reasoning as the platform admin's copy of this form: saving changes nothing on screen,
+  // so without a word confirming it the only way to know was to leave and come back.
+  const [tenantSaved, setTenantSaved] = useState(false);
   const [addingStaff, setAddingStaff] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountResponse | null>(null);
   const [resettingAccount, setResettingAccount] = useState<AccountResponse | null>(null);
@@ -50,6 +55,7 @@ export function AdminPage() {
     setSavingTenant(true);
     try {
       await updateCurrentTenant(token!, { name: form.name, timezone: form.timezone, phoneLine: form.phoneLine || null });
+      setTenantSaved(true);
       setRefreshKey((k) => k + 1);
     } finally {
       setSavingTenant(false);
@@ -67,9 +73,11 @@ export function AdminPage() {
         {tenantState.status === "error" && <div className="field-error">{t("failedToLoadTenant")}</div>}
         {form && (
           <form onSubmit={handleSaveTenant}>
-            <TextField label={t("businessName")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            {/* Shown, never edited: the platform sets it, and the server carries it across from
-                storage on save rather than reading it from this form. */}
+            {/* Read-only, both of them. Neither has ever been the tenant's to change — the
+                name is how the platform identifies the account and the type is how it segments
+                the customer base — and an editable field that the server carries across from
+                storage on save is a control that lies about what it does. */}
+            <TextField label={t("businessName")} value={form.name} disabled onChange={() => {}} />
             <TextField
               label={t("businessType")}
               value={
@@ -80,28 +88,34 @@ export function AdminPage() {
               disabled
               onChange={() => {}}
             />
-            <SelectField
-              label={t("timezone")}
-              value={form.timezone}
-              onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-              options={[{ value: "Asia/Baku", label: "Asia/Baku" }]}
+            {/* No timezone control. It offered exactly one option, so it was a decision the
+                reader could not make, presented as one they had to. It is still sent on save —
+                from state, unchanged — because the tenant's stored value is what it must stay. */}
+            <TextField
+              label={t("phoneLine")}
+              value={form.phoneLine}
+              onChange={(e) => {
+                setTenantSaved(false);
+                setForm({ ...form, phoneLine: e.target.value });
+              }}
             />
-            <TextField label={t("phoneLine")} value={form.phoneLine} onChange={(e) => setForm({ ...form, phoneLine: e.target.value })} />
             <div className="actions">
               <Button type="submit" loading={savingTenant}>
                 {t("saveChanges")}
               </Button>
             </div>
+            {tenantSaved && <div className="save-note">{t("savedNote")}</div>}
           </form>
         )}
       </Card>
 
       <BusinessHoursCard canEdit={role === "Owner"} />
 
-      {/* The one module setting on the shared page, and only for a tenant that holds the module.
-          It belongs beside opening hours because it is made of them — the promise counts working
-          days — rather than above a list of today's orders. */}
-      {me?.enabledModules.includes("Order") && <DeliverySettingsCard canEdit={role === "Owner"} />}
+      {/* ⚠ Gated on the module you are working in, not merely on holding it. This page is
+          shared by every module, so a tenant with both Randevu and Sifariş met the delivery
+          promise while administering their appointment line — a setting from somewhere else,
+          on a page that gives no clue it belongs to somewhere else. */}
+      {activeModule?.key === "Order" && <DeliverySettingsCard canEdit={role === "Owner"} />}
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
@@ -146,11 +160,6 @@ export function AdminPage() {
             },
           ]}
         />
-      </Card>
-
-      <Card>
-        <h2 style={{ marginBottom: "var(--space-3)" }}>{t("appearance")}</h2>
-        <ThemePicker />
       </Card>
 
       {addingStaff && (
