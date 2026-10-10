@@ -69,6 +69,7 @@ public sealed class TenantInsightsService
             byModule.Sum(m => m.Tokens),
             byModule.Sum(m => m.CostUsd),
             byModule,
-            byCategory);
+            byCategory,
+            await _uow.TenantModules.GetEnabledModulesAsync(tenantId, cancellationToken));
     }
 }

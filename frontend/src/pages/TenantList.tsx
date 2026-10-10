@@ -9,9 +9,10 @@ import { useApiData } from "@/shared/lib/useApiData";
 import { getTenants } from "@/shared/api/tenants";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { businessTypeLabels, moduleLabels, translateEnum } from "@/shared/i18n/translations";
-import { BUSINESS_TYPES, type BusinessType } from "@/shared/api/types";
 import { MODULE_PRESENTATION } from "@/modules/presentation";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
+import { BUSINESS_TYPES, type BusinessType, type Module } from "@/shared/api/types";
+import { MODULE_REGISTRY } from "@/modules/registry";
 
 export function TenantListPage() {
   const { token } = useAuth();
@@ -19,13 +20,32 @@ export function TenantListPage() {
   const { language, t } = useLanguage();
   const shell = usePlatformAdminShell();
   const [search, setSearch] = useState("");
+
+  // Filtering happens here rather than on the server. The search box is already a round trip;
+  // these three narrow what came back, and the list is small enough that a request per checkbox
+  // would be slower than the filtering it replaces.
+  const [status, setStatus] = useState<"" | "Active" | "Inactive">("");
+  const [businessType, setBusinessType] = useState<BusinessType | "">("");
+  const [modules, setModules] = useState<Module[]>([]);
+
   const state = useApiData(() => getTenants(token!, search || undefined), [token, search]);
 
-  // Filtered here rather than on the server: the search box is already a round trip, and the
-  // list is small enough that narrowing what came back is cheaper than asking again.
-  const [businessType, setBusinessType] = useState<BusinessType | "">("");
   const all = state.status === "success" ? state.data : [];
-  const rows = businessType === "" ? all : all.filter((tenant) => tenant.businessType === businessType);
+  const rows = all.filter((tenant) => {
+    if (status !== "" && tenant.status !== status) return false;
+    if (businessType !== "" && tenant.businessType !== businessType) return false;
+    // Every module ticked, not any: ticking two asks for tenants holding both, which is the
+    // question worth asking of a grant list. Any-of would just be a longer way to say "some".
+    return modules.every((module) => tenant.enabledModules.includes(module));
+  });
+
+  const filtered = status !== "" || businessType !== "" || modules.length > 0;
+
+  function toggleModule(module: Module) {
+    setModules((current) =>
+      current.includes(module) ? current.filter((m) => m !== module) : [...current, module],
+    );
+  }
 
   return (
     <AppShell {...shell}>
@@ -33,18 +53,22 @@ export function TenantListPage() {
         {t("tenants")}
       </h1>
       <div className="toolbar">
-        <div className="filters" style={{ display: "flex", gap: "var(--space-3)" }}>
+        <div className="filter-bar">
           <input
             type="text"
             placeholder={t("searchTenants")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 240 }}
+            style={{ minWidth: 240 }}
           />
+          <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+            <option value="">{t("allStatuses")}</option>
+            <option value="Active">{t("statusActive")}</option>
+            <option value="Inactive">{t("statusInactive")}</option>
+          </select>
           <select
             value={businessType}
             onChange={(e) => setBusinessType(e.target.value as BusinessType | "")}
-            style={{ width: "auto" }}
           >
             <option value="">{t("allBusinessTypes")}</option>
             {BUSINESS_TYPES.map((type) => (
@@ -55,6 +79,41 @@ export function TenantListPage() {
           </select>
         </div>
         <Button onClick={() => navigate("/admin/tenants/new")}>{t("createTenant")}</Button>
+      </div>
+
+      {/* Checkboxes rather than a multi-select control: there are four of them, and a listbox
+          you have to ctrl-click hides which ones are on behind a scroll. */}
+      <div className="filter-bar" style={{ marginBottom: "var(--space-3)" }}>
+        <span className="sub">{t("filterByModules")}</span>
+        {MODULE_REGISTRY.map((manifest) => (
+          <label key={manifest.key} className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={modules.includes(manifest.key)}
+              onChange={() => toggleModule(manifest.key)}
+            />
+            <span>{translateEnum(moduleLabels, manifest.key, language)}</span>
+          </label>
+        ))}
+        {/* Pushed to the right-hand end, above the table it describes. Small and italic so it
+            reads as a note about the result rather than as another filter to set. */}
+        {filtered && (
+          <span className="filter-result">
+            <span className="filter-count">
+              {t("matchingTenants").replace("{n}", String(rows.length))}
+            </span>
+            <button
+              className="link"
+              onClick={() => {
+                setStatus("");
+                setBusinessType("");
+                setModules([]);
+              }}
+            >
+              {t("clearFilters")}
+            </button>
+          </span>
+        )}
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadTenants")}</div>}
       <DataTable
@@ -106,9 +165,10 @@ export function TenantListPage() {
             // opens what the account is actually doing.
             header: "",
             render: (tenant) => (
+              // Not secondary. This is the second thing anybody comes to this list to do, and
+              // in a grey outline on a dark theme it was nearly invisible.
               <Button
                 size="sm"
-                variant="secondary"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/admin/tenants/${tenant.id}/dashboard`);
