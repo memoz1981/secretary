@@ -691,6 +691,13 @@ export const translations = {
     ru: "Варианты не зачитываются. У вопроса «Долго ждали?» хороший ответ — Нет.",
     en: "The options are not read out. \"Was the wait long?\" is a question whose good answer is No.",
   },
+  /** The one question type where the options ARE read aloud, which is the only reason the other
+   *  two explanations say they are not. */
+  choiceExplain: {
+    az: "Variantlar zəngdə səsləndirilir — müştəri onları eşidir. Qısa və aydın yazın.",
+    ru: "Варианты зачитываются в звонке — клиент их слышит. Пишите коротко и ясно.",
+    en: "The options are read out on the call — the caller hears them. Keep them short and clear.",
+  },
   scaleTop: { az: "Şkala", ru: "Шкала", en: "Scale" },
   scaleExplain: {
     az: "Variantlar səsləndirilmir. 1 — 0%, ən yüksək bal — 100%.",

@@ -80,43 +80,54 @@ export function CallLogPage() {
         {t("callLog")}
       </h1>
       <div className="filter-bar" style={{ marginBottom: "var(--space-4)" }}>
-        <select value={classification} onChange={(e) => setClassification(e.target.value as CallClassification | "")}>
+        {/* Every filter carries its caption, so every box sits on the same line. Two of the
+            five having one was what made the row look broken. */}
+        <label className="filter-field">
+          <span className="label">{t("colClassification")}</span>
+          <select value={classification} onChange={(e) => setClassification(e.target.value as CallClassification | "")}>
           <option value="">{t("allClassifications")}</option>
           {CLASSIFICATIONS.map((c) => (
             <option key={c} value={c}>
               {translateEnum(callClassificationLabels, c, language)}
             </option>
           ))}
-        </select>
-        <select value={outcome} onChange={(e) => setOutcome(e.target.value as AppointmentCallOutcome | "")}>
+          </select>
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("colOutcome")}</span>
+          <select value={outcome} onChange={(e) => setOutcome(e.target.value as AppointmentCallOutcome | "")}>
           <option value="">{t("allOutcomes")}</option>
           {APPOINTMENT_CALL_OUTCOMES.map((o) => (
             <option key={o} value={o}>
               {translateEnum(appointmentCallOutcomeLabels, o, language)}
             </option>
           ))}
-        </select>
+          </select>
+        </label>
         {/* Handed over by the dashboard tiles along with the outcome, so a number you clicked
             opens the calls it was counting rather than the calls from some other week. */}
-        <label className="field" style={{ margin: 0 }}>
+        <label className="filter-field">
           <span className="label">{t("dateFrom")}</span>
           <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
         </label>
-        <label className="field" style={{ margin: 0 }}>
+        <label className="filter-field">
           <span className="label">{t("dateTo")}</span>
           <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </label>
         {/* The filter that made the architectures comparable, one at a time. Absent while there
             is only one to pick — see CALL_PIPELINES. */}
         {CALL_PIPELINES.length > 1 && (
-          <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
+          <label className="filter-field">
+            <span className="label">{t("colPipeline")}</span>
+            <select value={pipeline} onChange={(e) => setPipeline(e.target.value as CallPipeline | "")}>
             <option value="">{t("allPipelines")}</option>
             {CALL_PIPELINES.map((p) => (
               <option key={p} value={p}>
                 {PIPELINE_INFO[p].short}
               </option>
             ))}
-          </select>
+            </select>
+          </label>
         )}
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadCalls")}</div>}

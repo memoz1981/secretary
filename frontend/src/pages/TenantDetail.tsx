@@ -22,6 +22,7 @@ import { accountStatusLabels, businessTypeLabels, translateEnum } from "@/shared
 import { BUSINESS_TYPES, type BusinessType } from "@/shared/api/types";
 import { usePlatformAdminShell } from "@/shared/lib/appShellProps";
 import { ModuleToggle } from "@/shared/components/ModuleToggle";
+import { Breadcrumbs } from "@/shared/components/Breadcrumbs";
 
 export function TenantDetailPage() {
   const { token } = useAuth();
@@ -135,7 +136,12 @@ export function TenantDetailPage() {
 
   return (
     <AppShell {...shell}>
-      <div className="breadcrumb">{t("tenants")} / {tenant?.name ?? "…"}</div>
+      <Breadcrumbs
+        items={[
+          { label: t("tenants"), to: "/admin/tenants" },
+          { label: tenant?.name ?? "…" },
+        ]}
+      />
       {tenant && form && (
         <>
           <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>

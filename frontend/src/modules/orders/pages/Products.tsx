@@ -169,11 +169,11 @@ function ProductEditor({
           <TextField label={t("priceAzn")} value={price} onChange={(e) => setPrice(e.target.value)} error={errors.price} />
           <TextAreaField
             label={t("colAliases")}
+            hint={t("aliasesHelp")}
             value={aliases}
             rows={2}
             onChange={(e) => setAliases(e.target.value)}
           />
-          <div className="sub" style={{ marginTop: "calc(var(--space-2) * -1)" }}>{t("aliasesHelp")}</div>
           <TextField
             label={t("maxOrderQuantity")}
             value={maxQuantity}

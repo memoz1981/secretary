@@ -64,11 +64,11 @@ export function DashboardPage() {
       <div className="toolbar">
         <h1 className="page-title">{t("kpiDashboard")}</h1>
         <div className="filter-bar">
-          <label className="field" style={{ margin: 0 }}>
+          <label className="filter-field">
             <span className="label">{t("dateFrom")}</span>
             <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
           </label>
-          <label className="field" style={{ margin: 0 }}>
+          <label className="filter-field">
             <span className="label">{t("dateTo")}</span>
             <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
           </label>

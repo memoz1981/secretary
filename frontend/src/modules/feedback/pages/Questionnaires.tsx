@@ -475,6 +475,7 @@ function QuestionEditor({
         {type === "Choice" && (
           <>
             <div className="section-label">{t("colOptions")}</div>
+            <div className="note">{t("choiceExplain")}</div>
             {labels.map((option, index) => (
               <div key={index} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
                 <TextField
