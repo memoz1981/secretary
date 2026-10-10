@@ -33,7 +33,7 @@ public sealed class TenantServiceTests
     public async Task CreateAsync_creates_tenant_owner_and_agent_accounts()
     {
         var request = new CreateTenantRequest(
-            "Baku Barbershop", "Asia/Baku", null, ShowCallCosts: false,
+            "Baku Barbershop", "Asia/Baku", null, ShowCallCosts: false, BusinessType: Domain.Enums.BusinessType.Barbershop,
             "Elvin", "elvin@business.az", "ownerpw");
 
         var result = await _sut.CreateAsync(request, default);
@@ -56,7 +56,7 @@ public sealed class TenantServiceTests
         _uow.Accounts.Setup(a => a.GetByEmailAsync("elvin@business.az", default)).ReturnsAsync(existing);
 
         var request = new CreateTenantRequest(
-            "Baku Barbershop", "Asia/Baku", null, ShowCallCosts: false,
+            "Baku Barbershop", "Asia/Baku", null, ShowCallCosts: false, BusinessType: Domain.Enums.BusinessType.Barbershop,
             "Elvin", "elvin@business.az", "ownerpw");
 
         await Should.ThrowAsync<EmailAlreadyInUseException>(() => _sut.CreateAsync(request, default));
@@ -74,10 +74,10 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task UpdateAsync_updates_and_returns_tenant()
     {
-        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(tenant.Id, default)).ReturnsAsync(tenant);
 
-        var result = await _sut.UpdateAsync(tenant.Id, new UpdateTenantRequest("New Name", "Asia/Baku", "+994111", ShowCallCosts: false), default);
+        var result = await _sut.UpdateAsync(tenant.Id, new UpdateTenantRequest("New Name", "Asia/Baku", "+994111", ShowCallCosts: false, BusinessType: Domain.Enums.BusinessType.Clinic), default);
 
         result.Name.ShouldBe("New Name");
         result.PhoneLine.ShouldBe("+994111");
@@ -86,7 +86,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task GetCurrentAsync_reads_the_callers_own_tenant()
     {
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(CurrentTenantId, default)).ReturnsAsync(tenant);
 
         var result = await _sut.GetCurrentAsync(default);
@@ -97,7 +97,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task UpdateCurrentAsync_updates_the_callers_own_tenant()
     {
-        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(CurrentTenantId, default)).ReturnsAsync(tenant);
 
         var result = await _sut.UpdateCurrentAsync(
@@ -118,7 +118,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task UpdateCurrentAsync_cannot_change_whether_the_tenant_sees_call_costs()
     {
-        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: true, Now);
+        var tenant = Tenant.Create("Old Name", "Asia/Baku", null, showCallCosts: true, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(CurrentTenantId, default)).ReturnsAsync(tenant);
 
         var result = await _sut.UpdateCurrentAsync(
@@ -131,7 +131,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task DeactivateAsync_then_ReactivateAsync_round_trips()
     {
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(tenant.Id, default)).ReturnsAsync(tenant);
 
         await _sut.DeactivateAsync(tenant.Id, default);
@@ -144,7 +144,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task ListAsync_delegates_to_repository_search()
     {
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.SearchAsync("Baku", default)).ReturnsAsync([tenant]);
 
         var result = await _sut.ListAsync("Baku", default);
@@ -156,7 +156,7 @@ public sealed class TenantServiceTests
     [Fact]
     public async Task GetOwnerAccountsAsync_returns_only_owner_role_accounts_for_the_tenant()
     {
-        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, Now);
+        var tenant = Tenant.Create("Baku Barbershop", "Asia/Baku", null, showCallCosts: false, businessType: null, Now);
         _uow.Tenants.Setup(t => t.GetByIdAsync(tenant.Id, default)).ReturnsAsync(tenant);
 
         var owner = Account.CreateOwner(tenant.Id, "Elvin Mammadov", "elvin@business.az", "hash", Now);

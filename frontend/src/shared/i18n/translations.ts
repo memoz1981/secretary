@@ -907,6 +907,15 @@ export const translations = {
   // these are customers who bought the product, and nobody in the business calls them
   // that out loud.
   tenantDashboard: { az: "Müştəri paneli", ru: "Панель клиента", en: "Customer dashboard" },
+  businessType: { az: "Fəaliyyət sahəsi", ru: "Сфера деятельности", en: "Business type" },
+  businessTypeNotSet: { az: "Təyin edilməyib", ru: "Не указано", en: "Not set" },
+  chooseBusinessType: { az: "Sahəni seçin", ru: "Выберите сферу", en: "Choose a type" },
+  businessTypeRequired: {
+    az: "Fəaliyyət sahəsini seçin",
+    ru: "Укажите сферу деятельности",
+    en: "Choose a business type",
+  },
+  allBusinessTypes: { az: "Bütün sahələr", ru: "Все сферы", en: "All types" },
   tenantDetailsSaved: { az: "Yadda saxlanıldı.", ru: "Сохранено.", en: "Saved." },
   tenantDashboardSubtitle: {
     az: "Bütün modullar üzrə zənglər və xərclər.",
@@ -1045,6 +1054,27 @@ export const moduleLabels: Record<string, Dict> = {
   Feedback: { az: "Rəy və məmnuniyyət", ru: "Отзывы и удовлетворённость", en: "Feedback" },
   Order: { az: "Sifariş qəbulu", ru: "Приём заказов", en: "Order taking" },
   Survey: { az: "Sorğu və araşdırma", ru: "Опросы и исследования", en: "Surveys" },
+};
+
+/** ⚠ Every member of BUSINESS_TYPES needs a line here. The map is keyed loosely, so a missing
+ *  one shows the raw enum name in the picker rather than failing the build — the list is short
+ *  enough to check by eye, and businessTypeLabelsAreComplete in the tests does it properly. */
+export const businessTypeLabels: Record<string, Dict> = {
+  Clinic: { az: "Klinika", ru: "Клиника", en: "Clinic" },
+  DentalClinic: { az: "Stomatologiya", ru: "Стоматология", en: "Dental clinic" },
+  VetClinic: { az: "Baytarlıq klinikası", ru: "Ветклиника", en: "Vet clinic" },
+  Hospital: { az: "Xəstəxana", ru: "Больница", en: "Hospital" },
+  Pharmacy: { az: "Aptek", ru: "Аптека", en: "Pharmacy" },
+  BeautySalon: { az: "Gözəllik salonu", ru: "Салон красоты", en: "Beauty salon" },
+  Barbershop: { az: "Bərbərxana", ru: "Барбершоп", en: "Barbershop" },
+  AutoService: { az: "Avtoservis", ru: "Автосервис", en: "Auto service" },
+  AutoDealer: { az: "Avtosalon", ru: "Автосалон", en: "Auto dealer" },
+  Shop: { az: "Mağaza", ru: "Магазин", en: "Shop" },
+  Restaurant: { az: "Restoran", ru: "Ресторан", en: "Restaurant" },
+  WaterDelivery: { az: "Su çatdırılması", ru: "Доставка воды", en: "Water delivery" },
+  Courier: { az: "Kuryer xidməti", ru: "Курьерская служба", en: "Courier" },
+  InternationalCargo: { az: "Beynəlxalq kargo", ru: "Доставка из-за рубежа", en: "International cargo" },
+  Other: { az: "Digər", ru: "Другое", en: "Other" },
 };
 
 export const accountRoleLabels: Record<string, Dict> = {

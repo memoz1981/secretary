@@ -47,7 +47,8 @@ public sealed class TenantService
 
         var now = _clock.GetCurrentInstant();
         var tenant = Tenant.Create(
-            request.Name, request.Timezone, request.PhoneLine, request.ShowCallCosts, now);
+            request.Name, request.Timezone, request.PhoneLine, request.ShowCallCosts,
+            request.BusinessType, now);
         await _uow.Tenants.AddAsync(tenant, cancellationToken);
 
         // The tenant's identity Id only exists after the first save — the owner/agent
@@ -149,7 +150,7 @@ public sealed class TenantService
 
         tenant.UpdateDetails(
             request.Name, request.Timezone, request.PhoneLine, request.ShowCallCosts,
-            _clock.GetCurrentInstant());
+            request.BusinessType, _clock.GetCurrentInstant());
         await _uow.SaveChangesAsync(cancellationToken);
         return ToResponse(tenant, await _uow.TenantModules.GetEnabledModulesAsync(id, cancellationToken));
     }
@@ -175,7 +176,13 @@ public sealed class TenantService
 
         return await UpdateAsync(
             tenantId,
-            new UpdateTenantRequest(request.Name, request.Timezone, request.PhoneLine, tenant.ShowCallCosts),
+            // ⚠ Both withheld fields carried across from storage, not taken from the request.
+            // Neither is on UpdateOwnTenantRequest, so neither can arrive — and passing the
+            // stored value means that stays true even if somebody adds a field to that record
+            // without reading why it is short.
+            new UpdateTenantRequest(
+                request.Name, request.Timezone, request.PhoneLine,
+                tenant.ShowCallCosts, tenant.BusinessType),
             cancellationToken);
     }
 
@@ -204,5 +211,5 @@ public sealed class TenantService
     /// query for all their grants instead of one per row.</summary>
     private static TenantResponse ToResponse(Tenant tenant, IReadOnlyList<Module> enabledModules)
         => new(tenant.Id, tenant.Name, tenant.Timezone, tenant.PhoneLine, tenant.ShowCallCosts,
-            tenant.Status, tenant.CreatedAt, enabledModules);
+            tenant.BusinessType, tenant.Status, tenant.CreatedAt, enabledModules);
 }

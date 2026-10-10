@@ -12,5 +12,10 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.Name).HasMaxLength(200).IsRequired();
         builder.Property(t => t.Timezone).HasMaxLength(100).IsRequired();
         builder.Property(t => t.PhoneLine).HasMaxLength(50);
+
+        // Stored as its number, like every other enum here. Indexed because the tenant list
+        // filters on it, and that list is the one screen the platform admin lives in.
+        builder.Property(t => t.BusinessType).HasConversion<int?>();
+        builder.HasIndex(t => t.BusinessType);
     }
 }

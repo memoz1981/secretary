@@ -1,4 +1,5 @@
 using Secretary.Domain.Abstractions;
+using Secretary.Domain.Enums;
 using NodaTime;
 
 namespace Secretary.Domain.Entities;
@@ -22,11 +23,21 @@ public sealed class Tenant : BaseEntity
     /// network tab.</summary>
     public bool ShowCallCosts { get; private set; }
 
-    private Tenant(string name, string timezone, string? phoneLine, Instant now)
+    /// <summary>What kind of business this is — a clinic, a car dealer, a water delivery service.
+    ///
+    /// ⚠ Nullable, and null means nobody has said. The accounts that existed before this column
+    /// did are genuinely unknown, and filling them in with a guess would put wrong answers into
+    /// the one field whose whole job is segmenting the customer base. The create screen asks for
+    /// it, so new accounts arrive with an answer; the old ones read "not set" until somebody who
+    /// knows opens them.</summary>
+    public BusinessType? BusinessType { get; private set; }
+
+    private Tenant(string name, string timezone, string? phoneLine, BusinessType? businessType, Instant now)
     {
         Name = name;
         Timezone = timezone;
         PhoneLine = phoneLine;
+        BusinessType = businessType;
         InitBase(now);
     }
 
@@ -38,25 +49,36 @@ public sealed class Tenant : BaseEntity
     }
 
     public static Tenant Create(
-        string name, string timezone, string? phoneLine, bool showCallCosts, Instant now)
+        string name, string timezone, string? phoneLine, bool showCallCosts,
+        BusinessType? businessType, Instant now)
     {
-        ValidateDetails(name, timezone);
-        return new Tenant(name, timezone, phoneLine, now) { ShowCallCosts = showCallCosts };
+        ValidateDetails(name, timezone, businessType);
+        return new Tenant(name, timezone, phoneLine, businessType, now) { ShowCallCosts = showCallCosts };
     }
 
     public void UpdateDetails(
-        string name, string timezone, string? phoneLine, bool showCallCosts, Instant now)
+        string name, string timezone, string? phoneLine, bool showCallCosts,
+        BusinessType? businessType, Instant now)
     {
-        ValidateDetails(name, timezone);
+        ValidateDetails(name, timezone, businessType);
         Name = name;
         Timezone = timezone;
         PhoneLine = phoneLine;
         ShowCallCosts = showCallCosts;
+        BusinessType = businessType;
         Touch(now);
     }
 
-    private static void ValidateDetails(string name, string timezone)
+    private static void ValidateDetails(string name, string timezone, BusinessType? businessType)
     {
+        // ⚠ A value outside the enum. C# will cast any int to an enum type without complaint, so
+        // a client posting businessType: 47 stores 47 and every screen that reads it falls
+        // through its lookup to a blank. Refused at the door instead.
+        if (businessType is { } type && !Enum.IsDefined(type))
+        {
+            throw new ArgumentException($"Unknown business type: {(int)type}.", nameof(businessType));
+        }
+
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Tenant name is required.", nameof(name));

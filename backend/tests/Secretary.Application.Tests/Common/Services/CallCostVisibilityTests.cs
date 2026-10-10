@@ -35,7 +35,7 @@ public sealed class CallCostVisibilityTests
     }
 
     private static Tenant Tenant(bool showCallCosts)
-        => Secretary.Domain.Entities.Tenant.Create("Salon Demo", "Asia/Baku", null, showCallCosts, Now);
+        => Secretary.Domain.Entities.Tenant.Create("Salon Demo", "Asia/Baku", null, showCallCosts, businessType: null, Now);
 
     /// <summary>The platform admin has no tenant of their own, and that absence is the signal.</summary>
     [Fact]
