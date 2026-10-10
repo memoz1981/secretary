@@ -2,14 +2,22 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
 
 interface FieldWrapperProps {
   label: string;
+  /** What the field wants, in a line, under its name.
+   *
+   * ⚠ A slot rather than a div the caller puts after the control. That is how it was done — a
+   * sibling `.sub` with a negative top margin to drag it back up against the box — and it left
+   * the explanation *below* the thing it was explaining, at the same size as the label it was
+   * subordinate to. A reader met the box before the sentence telling them what to type in it. */
+  hint?: string;
   error?: string;
   children: ReactNode;
 }
 
-function FieldWrapper({ label, error, children }: FieldWrapperProps) {
+function FieldWrapper({ label, hint, error, children }: FieldWrapperProps) {
   return (
     <div className="form-row">
       <label>{label}</label>
+      {hint && <div className="hint">{hint}</div>}
       {children}
       {error && <div className="field-error">{error}</div>}
     </div>
@@ -18,12 +26,13 @@ function FieldWrapper({ label, error, children }: FieldWrapperProps) {
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
+  hint?: string;
   error?: string;
 }
 
-export function TextField({ label, error, className, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, className, ...rest }: TextFieldProps) {
   return (
-    <FieldWrapper label={label} error={error}>
+    <FieldWrapper label={label} hint={hint} error={error}>
       <input className={[error ? "error" : "", className ?? ""].filter(Boolean).join(" ")} {...rest} />
     </FieldWrapper>
   );
@@ -31,12 +40,13 @@ export function TextField({ label, error, className, ...rest }: TextFieldProps) 
 
 interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
+  hint?: string;
   error?: string;
 }
 
-export function TextAreaField({ label, error, className, ...rest }: TextAreaFieldProps) {
+export function TextAreaField({ label, hint, error, className, ...rest }: TextAreaFieldProps) {
   return (
-    <FieldWrapper label={label} error={error}>
+    <FieldWrapper label={label} hint={hint} error={error}>
       <textarea className={[error ? "error" : "", className ?? ""].filter(Boolean).join(" ")} {...rest} />
     </FieldWrapper>
   );
