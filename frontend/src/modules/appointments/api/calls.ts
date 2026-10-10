@@ -1,11 +1,17 @@
 import { apiFetch, toQueryString } from "@/shared/api/client";
-import type { CallClassification, CallDetailResponse, CallOutcome, CallPipeline, CallResponse } from "@/shared/api/types";
+import type {
+  AppointmentCallOutcome,
+  CallClassification,
+  CallDetailResponse,
+  CallPipeline,
+  CallResponse,
+} from "@/shared/api/types";
 
 export interface CallSearchParams {
   from?: string;
   to?: string;
   classification?: CallClassification;
-  outcome?: CallOutcome;
+  outcome?: AppointmentCallOutcome;
   providerId?: number;
   pipeline?: CallPipeline;
 }

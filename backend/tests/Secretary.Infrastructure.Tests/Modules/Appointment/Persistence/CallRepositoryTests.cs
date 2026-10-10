@@ -18,7 +18,7 @@ public sealed class CallRepositoryTests
     /// still has to round-trip, which is why one call below carries a real usage/price.</summary>
     private static Call LogCall(
         int tenantId, string phoneNumber, int? appointmentId, CallClassification classification,
-        CallOutcome outcome, Instant startedAt, TokenUsage? usage = null, decimal costUsd = 0m)
+        AppointmentCallOutcome outcome, Instant startedAt, TokenUsage? usage = null, decimal costUsd = 0m)
         => Call.Log(
             tenantId, null, phoneNumber, appointmentId, classification, outcome, 60, 3, 3, null, "url", null,
             startedAt, "gpt-realtime-2.1", CallPipeline.OpenAiRealtime_2_1, usage ?? TokenUsage.Zero, costUsd, Now);
@@ -53,9 +53,9 @@ public sealed class CallRepositoryTests
         context.Appointments.AddRange(appointmentForA, appointmentForB);
         await context.SaveChangesAsync();
 
-        var callForA = LogCall(graph.TenantId, "+994111", appointmentForA.Id, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, Now);
-        var callForB = LogCall(graph.TenantId, "+994222", appointmentForB.Id, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, Now);
-        var callWithNoAppointment = LogCall(graph.TenantId, "+994333", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, Now);
+        var callForA = LogCall(graph.TenantId, "+994111", appointmentForA.Id, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, Now);
+        var callForB = LogCall(graph.TenantId, "+994222", appointmentForB.Id, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, Now);
+        var callWithNoAppointment = LogCall(graph.TenantId, "+994333", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, Now);
         context.Calls.AddRange(callForA, callForB, callWithNoAppointment);
         await context.SaveChangesAsync();
 
@@ -78,14 +78,14 @@ public sealed class CallRepositoryTests
 
         using var context = factory.CreateContext(tenantId);
 
-        var match = LogCall(tenantId, "+994111", null, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, Now);
-        var wrongClassification = LogCall(tenantId, "+994222", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, Now);
-        var wrongOutcome = LogCall(tenantId, "+994333", null, CallClassification.NewAppointment, CallOutcome.FailedNoAvailability, Now);
+        var match = LogCall(tenantId, "+994111", null, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, Now);
+        var wrongClassification = LogCall(tenantId, "+994222", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, Now);
+        var wrongOutcome = LogCall(tenantId, "+994333", null, CallClassification.NewAppointment, AppointmentCallOutcome.NoAvailability, Now);
         context.Calls.AddRange(match, wrongClassification, wrongOutcome);
         await context.SaveChangesAsync();
 
         var repository = new CallRepository(context);
-        var results = await repository.SearchAsync(null, null, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, null, null, default);
+        var results = await repository.SearchAsync(null, null, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, null, null, default);
 
         results.Count.ShouldBe(1);
         results[0].Id.ShouldBe(match.Id);
@@ -103,8 +103,8 @@ public sealed class CallRepositoryTests
 
         using var context = factory.CreateContext(tenantId);
 
-        var earlier = LogCall(tenantId, "+994111", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, Now);
-        var later = LogCall(tenantId, "+994222", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, Now + Duration.FromHours(1));
+        var earlier = LogCall(tenantId, "+994111", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, Now);
+        var later = LogCall(tenantId, "+994222", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, Now + Duration.FromHours(1));
         context.Calls.AddRange(earlier, later);
         await context.SaveChangesAsync();
 
@@ -136,7 +136,7 @@ public sealed class CallRepositoryTests
             // Eight decimal places: the stored price has to come back exactly, not rounded to
             // the cent, or a month of calls drifts away from the provider's invoice.
             var call = LogCall(
-                tenantId, "+994111", null, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent,
+                tenantId, "+994111", null, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved,
                 Now, usage, 3.45678901m);
             context.Calls.Add(call);
             await context.SaveChangesAsync();

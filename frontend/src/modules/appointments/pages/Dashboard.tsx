@@ -1,84 +1,127 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { Card } from "@/shared/components/Card";
 import { StatTile } from "@/shared/components/StatTile";
-import { BarRow } from "@/shared/components/BarRow";
+import { OutcomeTile } from "@/shared/components/OutcomeTile";
+import { OUTCOME_TONE } from "@/modules/appointments/lib/outcomes";
 import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
-import { formatTokens, formatUsd } from "@/shared/lib/money";
+import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
 import { pipelineLabel } from "@/shared/lib/pipelines";
-import { CALL_PIPELINES } from "@/shared/api/types";
+import { APPOINTMENT_CALL_OUTCOMES, CALL_PIPELINES, type AppointmentCallOutcome } from "@/shared/api/types";
 import { getDashboardSummary } from "@/modules/appointments/api/dashboard";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
+import { appointmentCallOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
 
-type RangeOption = "today" | "week" | "month";
+/** yyyy-MM-dd, which is what <input type="date"> speaks. */
+function isoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
-function rangeToDates(range: RangeOption): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  if (range === "today") from.setHours(0, 0, 0, 0);
-  if (range === "week") from.setDate(from.getDate() - 7);
-  if (range === "month") from.setMonth(from.getMonth() - 1);
-  return { from: from.toISOString(), to: to.toISOString() };
+function daysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return isoDate(date);
 }
 
 export function DashboardPage() {
   const { token } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const shell = useBusinessShell();
-  const [range, setRange] = useState<RangeOption>("week");
-  const { from, to } = rangeToDates(range);
-  const state = useApiData(() => getDashboardSummary(token!, from, to), [token, range]);
+  const navigate = useNavigate();
 
-  const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const fmtSeconds = (s: number) => `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+  // ⚠ Two dates rather than today/week/month. Those three answered whichever question they were
+  // built for and nothing else — "how did last Tuesday go" and "what did the campaign week cost"
+  // were both unaskable — and the buttons read as disabled controls besides.
+  const [from, setFrom] = useState(() => daysAgo(7));
+  const [to, setTo] = useState(() => isoDate(new Date()));
 
-  // Every mode gets a row whether or not it was dialled in this range: an absent row reads as
-  // "no data available", when the useful fact is "this one has not been tried yet". Unused
-  // rows show dashes rather than $0.00, which would read as free. Calls logged before mode
-  // tracking existed (Unknown) have no row — they still count in the totals above, where they
-  // contribute the $0 they genuinely cost.
+  // The end of the chosen day, not its midnight. Picking the same date for both otherwise asks
+  // for a range of zero length and reports an empty day back at you.
+  const state = useApiData(
+    () => getDashboardSummary(token!, new Date(`${from}T00:00:00`).toISOString(), new Date(`${to}T23:59:59.999`).toISOString()),
+    [token, from, to],
+    { keepPrevious: true },
+  );
+
   const spendRows = CALL_PIPELINES.map((pipeline) => ({
     pipeline,
     data: state.status === "success" ? state.data.spendByPipeline.find((row) => row.pipeline === pipeline) : undefined,
   }));
-  function rangeLabel(r: RangeOption) {
-    if (r === "today") return t("today");
-    if (r === "week") return t("rangeWeek");
-    return t("rangeMonth");
+
+  /** Straight through to the calls that make up a tile, with the same range applied. A number
+   *  you cannot open is a number you have to take on trust. */
+  function openCalls(outcome?: AppointmentCallOutcome) {
+    const query = new URLSearchParams({ from, to });
+    if (outcome) query.set("outcome", outcome);
+    navigate(`/appointments/calls?${query.toString()}`);
   }
 
   return (
     <AppShell {...shell}>
       <div className="toolbar">
         <h1 className="page-title">{t("kpiDashboard")}</h1>
-        <div className="view-toggle">
-          {(["today", "week", "month"] as RangeOption[]).map((r) => (
-            <span key={r} className={range === r ? "active" : ""} onClick={() => setRange(r)}>
-              {rangeLabel(r)}
-            </span>
-          ))}
+        <div className="filter-bar">
+          <label className="field" style={{ margin: 0 }}>
+            <span className="label">{t("dateFrom")}</span>
+            <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label className="field" style={{ margin: 0 }}>
+            <span className="label">{t("dateTo")}</span>
+            <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+          </label>
         </div>
       </div>
 
       {state.status === "error" && <div className="field-error">{t("failedToLoadDashboard")}</div>}
       {state.status === "success" && (
         <>
-          <div className="stat-grid">
-            <StatTile label={t("totalCalls")} value={String(state.data.totalCalls)} />
-            <StatTile
-              label={t("resolvedByAgent")}
-              value={pct(state.data.resolvedByAgentRate)}
-              sub={`${state.data.resolvedByAgentCount} ${t("callsSuffix")}`}
+          <div className="outcome-grid">
+            <OutcomeTile
+              label={t("totalCalls")}
+              count={state.data.totalCalls}
+              tone="total"
+              onClick={() => openCalls()}
             />
-            <StatTile label={t("escalationRate")} value={pct(state.data.escalationRate)} sub={`${state.data.escalationCount} ${t("callsSuffix")}`} />
+            {/* In the declared order, not the order the server happened to return. The tiles keep
+                their positions between ranges, which is what lets somebody read the page at a
+                glance after the first week. */}
+            {APPOINTMENT_CALL_OUTCOMES.map((outcome) => {
+              const row = state.data.byOutcome.find((o) => o.outcome === outcome);
+              return (
+                <OutcomeTile
+                  key={outcome}
+                  label={translateEnum(appointmentCallOutcomeLabels, outcome, language)}
+                  count={row?.calls ?? 0}
+                  share={row?.share ?? 0}
+                  tone={OUTCOME_TONE[outcome]}
+                  onClick={() => openCalls(outcome)}
+                />
+              );
+            })}
+          </div>
+
+          <div className="stat-grid" style={{ marginTop: "var(--space-4)" }}>
+            <StatTile label={t("totalCallMinutes")} value={formatDuration(state.data.totalDurationSeconds)} />
             <StatTile
               label={t("avgCallDuration")}
-              value={fmtSeconds(state.data.averageCallDurationSeconds)}
-              sub={`${state.data.averageTurnsToResolution.toFixed(1)} ${t("avgTurnsSuffix")}`}
+              value={formatDuration(Math.round(state.data.averageCallDurationSeconds))}
             />
+            {/* Over resolved calls only — see the server. Dashes rather than 0m when nothing
+                resolved: zero would read as a line that finishes everything instantly. */}
+            <StatTile
+              label={t("avgResolvedCallDuration")}
+              value={
+                state.data.averageResolvedCallDurationSeconds === null
+                  ? "—"
+                  : formatDuration(Math.round(state.data.averageResolvedCallDurationSeconds))
+              }
+            />
+            <StatTile label={t("appointmentsMade")} value={String(state.data.appointmentsMade)} />
           </div>
+
           {/* What the agent cost to run over this range. Sits directly under the volume tiles
               because the two only mean anything together: 400 calls is good news or bad
               depending entirely on the line below it.
@@ -113,9 +156,9 @@ export function DashboardPage() {
             </div>
           </Card>
           )}
+
           {/* Per mode, because a blended average across architectures that differ tenfold in
-              cost describes none of them. All four are listed whether or not they were dialled
-              in this range — the gaps are part of the comparison. */}
+              cost describes none of them. */}
           {state.data.spendByPipeline.length > 0 && CALL_PIPELINES.length > 1 && (
           <Card style={{ marginTop: "var(--space-4)" }}>
             <h2>{t("spendByPipeline")}</h2>
@@ -140,7 +183,7 @@ export function DashboardPage() {
                       <td className="mono">{data ? formatUsd(data.totalCostUsd) : "—"}</td>
                       <td className="mono">{data ? formatUsd(data.averageCostPerCallUsd) : "—"}</td>
                       <td className="mono">{data ? formatUsd(data.averageCostPerMinuteUsd) : "—"}</td>
-                      <td className="mono">{data ? fmtSeconds(data.averageCallDurationSeconds) : "—"}</td>
+                      <td className="mono">{data ? formatDuration(Math.round(data.averageCallDurationSeconds)) : "—"}</td>
                       <td className="mono">{data?.models || "—"}</td>
                     </tr>
                   ))}
@@ -149,34 +192,6 @@ export function DashboardPage() {
             </div>
           </Card>
           )}
-          <div className="row" style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-            <Card style={{ flex: 1 }}>
-              <h2>{t("escalationOutcomes")}</h2>
-              <BarRow label={t("resolvedByStaff")} pct={state.data.escalationResolvedByStaffRate} color="var(--color-success)" />
-              <BarRow label={t("abandonedNoPickup")} pct={state.data.escalationAbandonedRate} color="var(--color-critical)" />
-            </Card>
-            <Card style={{ flex: 1 }}>
-              <h2>{t("failureBreakdown")}</h2>
-              <BarRow label={t("noCalendarAvailability")} pct={state.data.failedNoAvailabilityRate} color="var(--color-warning)" />
-              <BarRow label={t("agentLimitation")} pct={state.data.failedAgentLimitationRate} color="var(--color-critical)" />
-            </Card>
-          </div>
-          <div className="row" style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-            <Card style={{ flex: 1 }}>
-              <h2>{t("appointmentVolume")}</h2>
-              <div className="stat" style={{ border: "none", padding: 0, background: "none" }}>
-                <div className="value">{state.data.appointmentVolume}</div>
-                <div className="sub">{t("bookedInThisRange")}</div>
-              </div>
-            </Card>
-            <Card style={{ flex: 1 }}>
-              <h2>{t("reminderNoAnswerRate")}</h2>
-              <div className="stat" style={{ border: "none", padding: 0, background: "none" }}>
-                <div className="value">{pct(state.data.reminderNoAnswerRate)}</div>
-                <div className="sub">{t("ofReminderCallsInRange")}</div>
-              </div>
-            </Card>
-          </div>
         </>
       )}
     </AppShell>

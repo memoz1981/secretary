@@ -27,23 +27,27 @@ public sealed class DashboardServiceTests
     }
 
     private static Call MakeCall(
-        CallClassification classification, CallOutcome outcome, int duration = 60, int turns = 3,
+        CallClassification classification, AppointmentCallOutcome outcome, int duration = 60, int turns = 3,
         decimal costUsd = 0m, TokenUsage? usage = null)
         => Call.Log(
             TenantId, null, "+994000000", null, classification, outcome, duration, turns, turns, null, "url", null,
             From, "gpt-realtime-2.1", CallPipeline.OpenAiRealtime_2_1, usage ?? TokenUsage.Zero, costUsd, From);
 
+    /// <summary>⚠ Counts first, shares derived from them — never an average of averages. Four
+    /// tiles each dividing by a total handed to them separately is four chances to divide by a
+    /// different number, and the first symptom is percentages that do not add to 100 in front of
+    /// a customer.</summary>
     [Fact]
-    public async Task GetSummaryAsync_computes_rates_across_all_calls()
+    public async Task GetSummaryAsync_counts_every_outcome_and_shares_them_against_the_total()
     {
         var calls = new List<Call>
         {
-            MakeCall(CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, 100, 6),
-            MakeCall(CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, 140, 4),
-            MakeCall(CallClassification.UpdateReschedule, CallOutcome.EscalatedResolvedByStaff, 200, 10),
-            MakeCall(CallClassification.InquiryOther, CallOutcome.EscalatedAbandoned, 90, 8),
-            MakeCall(CallClassification.NewAppointment, CallOutcome.FailedNoAvailability, 60, 5),
-            MakeCall(CallClassification.NewAppointment, CallOutcome.FailedAgentLimitation, 60, 5),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 100, 6),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 140, 4),
+            MakeCall(CallClassification.UpdateReschedule, AppointmentCallOutcome.Forwarded, 200, 10),
+            MakeCall(CallClassification.InquiryOther, AppointmentCallOutcome.Forwarded, 90, 8),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.NoAvailability, 60, 5),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Unfinished, 60, 5),
         };
 
         _uow.Calls.Setup(c => c.SearchAsync(From, To, null, null, null, null, default)).ReturnsAsync(calls);
@@ -52,25 +56,38 @@ public sealed class DashboardServiceTests
         var result = await _sut.GetSummaryAsync(From, To, default);
 
         result.TotalCalls.ShouldBe(6);
-        result.ResolvedByAgentCount.ShouldBe(2);
-        result.ResolvedByAgentRate.ShouldBe(2.0 / 6);
-        result.EscalationCount.ShouldBe(2);
-        result.EscalationResolvedByStaffRate.ShouldBe(0.5);
-        result.EscalationAbandonedRate.ShouldBe(0.5);
-        result.FailedNoAvailabilityRate.ShouldBe(0.5);
-        result.FailedAgentLimitationRate.ShouldBe(0.5);
+
+        int Count(AppointmentCallOutcome outcome) => result.ByOutcome.Single(o => o.Outcome == outcome).Calls;
+        double Share(AppointmentCallOutcome outcome) => result.ByOutcome.Single(o => o.Outcome == outcome).Share;
+
+        Count(AppointmentCallOutcome.Resolved).ShouldBe(2);
+        Count(AppointmentCallOutcome.Forwarded).ShouldBe(2);
+        Count(AppointmentCallOutcome.Unfinished).ShouldBe(1);
+        Count(AppointmentCallOutcome.NoAvailability).ShouldBe(1);
+
+        Share(AppointmentCallOutcome.Resolved).ShouldBe(2.0 / 6);
+        Share(AppointmentCallOutcome.NoAvailability).ShouldBe(1.0 / 6);
+
+        // The property that makes the percentages worth printing: four outcomes, every call in
+        // exactly one of them, and nothing left over.
+        result.ByOutcome.Sum(o => o.Calls).ShouldBe(6);
+        result.ByOutcome.Sum(o => o.Share).ShouldBe(1.0, 0.000001);
+
+        result.TotalDurationSeconds.ShouldBe(650);
         result.AverageCallDurationSeconds.ShouldBe(calls.Average(c => c.DurationSeconds));
-        result.AverageTurnsToResolution.ShouldBe(calls.Average(c => c.TurnCount));
     }
 
+    /// <summary>⚠ Over resolved calls only. A line whose failures last three seconds looks fast
+    /// in a blended average, which is the opposite of what this number is for: how long the agent
+    /// takes to actually finish something.</summary>
     [Fact]
-    public async Task GetSummaryAsync_computes_reminder_no_answer_rate_only_over_reminder_calls()
+    public async Task The_resolved_average_ignores_calls_that_did_not_resolve()
     {
         var calls = new List<Call>
         {
-            MakeCall(CallClassification.ReminderConfirmation, CallOutcome.ResolvedByAgent),
-            MakeCall(CallClassification.ReminderConfirmation, CallOutcome.NoAnswer),
-            MakeCall(CallClassification.NewAppointment, CallOutcome.ResolvedByAgent),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 200),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 100),
+            MakeCall(CallClassification.InquiryOther, AppointmentCallOutcome.Unfinished, 3),
         };
 
         _uow.Calls.Setup(c => c.SearchAsync(From, To, null, null, null, null, default)).ReturnsAsync(calls);
@@ -78,7 +95,22 @@ public sealed class DashboardServiceTests
 
         var result = await _sut.GetSummaryAsync(From, To, default);
 
-        result.ReminderNoAnswerRate.ShouldBe(0.5);
+        result.AverageResolvedCallDurationSeconds.ShouldBe(150);
+        result.AverageCallDurationSeconds.ShouldBe(101);
+    }
+
+    /// <summary>An average over no calls is not zero. Zero would read as a line that resolves
+    /// everything instantly.</summary>
+    [Fact]
+    public async Task The_resolved_average_is_absent_when_nothing_resolved()
+    {
+        _uow.Calls.Setup(c => c.SearchAsync(From, To, null, null, null, null, default))
+            .ReturnsAsync([MakeCall(CallClassification.InquiryOther, AppointmentCallOutcome.Unfinished, 3)]);
+        _uow.Appointments.Setup(a => a.GetForDateRangeAsync(From, To, null, default)).ReturnsAsync([]);
+
+        var result = await _sut.GetSummaryAsync(From, To, default);
+
+        result.AverageResolvedCallDurationSeconds.ShouldBeNull();
     }
 
     [Fact]
@@ -90,10 +122,13 @@ public sealed class DashboardServiceTests
         var result = await _sut.GetSummaryAsync(From, To, default);
 
         result.TotalCalls.ShouldBe(0);
-        result.ResolvedByAgentRate.ShouldBe(0);
-        result.EscalationResolvedByStaffRate.ShouldBe(0);
+
+        // Every outcome still listed. A tile that vanishes when its count is zero moves the ones
+        // beside it, so the page reshuffles between one range and the next.
+        result.ByOutcome.Count.ShouldBe(4);
+        result.ByOutcome.ShouldAllBe(o => o.Calls == 0 && o.Share == 0);
         result.AverageCallDurationSeconds.ShouldBe(0);
-        result.ReminderNoAnswerRate.ShouldBe(0);
+        result.AverageResolvedCallDurationSeconds.ShouldBeNull();
         result.TotalCostUsd.ShouldBe(0m);
         result.AverageCostPerMinuteUsd.ShouldBe(0m);
         result.AverageCostPerAnswerUsd.ShouldBe(0m);
@@ -105,8 +140,8 @@ public sealed class DashboardServiceTests
     {
         var calls = new List<Call>
         {
-            MakeCall(CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, 120, 4, 0.40m, new TokenUsage(1_000, 0, 0, 0, 0, 0)),
-            MakeCall(CallClassification.Cancellation, CallOutcome.ResolvedByAgent, 60, 2, 0.20m, new TokenUsage(0, 0, 500, 0, 0, 0)),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 120, 4, 0.40m, new TokenUsage(1_000, 0, 0, 0, 0, 0)),
+            MakeCall(CallClassification.Cancellation, AppointmentCallOutcome.Resolved, 60, 2, 0.20m, new TokenUsage(0, 0, 500, 0, 0, 0)),
         };
 
         _uow.Calls.Setup(c => c.SearchAsync(From, To, null, null, null, null, default)).ReturnsAsync(calls);
@@ -132,8 +167,8 @@ public sealed class DashboardServiceTests
         // what the range actually cost per minute of talking is $0.30.
         var calls = new List<Call>
         {
-            MakeCall(CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, 30, 1, 0.30m),
-            MakeCall(CallClassification.NewAppointment, CallOutcome.ResolvedByAgent, 570, 19, 2.70m),
+            MakeCall(CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, 30, 1, 0.30m),
+            MakeCall(CallClassification.NewAppointment, AppointmentCallOutcome.Resolved, 570, 19, 2.70m),
         };
 
         _uow.Calls.Setup(c => c.SearchAsync(From, To, null, null, null, null, default)).ReturnsAsync(calls);
@@ -147,7 +182,7 @@ public sealed class DashboardServiceTests
     }
 
     [Fact]
-    public async Task GetSummaryAsync_appointment_volume_excludes_cancelled()
+    public async Task GetSummaryAsync_appointments_made_excludes_cancelled()
     {
         var confirmed = Appointment.Create(
             TenantId, 10, 20, 30, From, From + Duration.FromMinutes(30), null, AppointmentCreatedBy.Staff, From);
@@ -160,7 +195,7 @@ public sealed class DashboardServiceTests
 
         var result = await _sut.GetSummaryAsync(From, To, default);
 
-        result.AppointmentVolume.ShouldBe(1);
+        result.AppointmentsMade.ShouldBe(1);
     }
 
     /// <summary>Costs visible, so these tests are about the figures rather than about who may

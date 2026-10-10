@@ -909,6 +909,15 @@ export const translations = {
   tenantDashboard: { az: "Müştəri paneli", ru: "Панель клиента", en: "Customer dashboard" },
   businessType: { az: "Fəaliyyət sahəsi", ru: "Сфера деятельности", en: "Business type" },
   businessTypeNotSet: { az: "Təyin edilməyib", ru: "Не указано", en: "Not set" },
+  dateFrom: { az: "Başlanğıc", ru: "С", en: "From" },
+  dateTo: { az: "Son", ru: "По", en: "To" },
+  totalCallMinutes: { az: "Ümumi zəng müddəti", ru: "Общая длительность", en: "Total call time" },
+  avgResolvedCallDuration: {
+    az: "Həll olunmuş zənglərin ortalaması",
+    ru: "Средняя длительность решённых",
+    en: "Average resolved call",
+  },
+  appointmentsMade: { az: "Görüşlərin sayı", ru: "Записей создано", en: "Appointments made" },
   chooseBusinessType: { az: "Sahəni seçin", ru: "Выберите сферу", en: "Choose a type" },
   businessTypeRequired: {
     az: "Fəaliyyət sahəsini seçin",
@@ -1075,6 +1084,16 @@ export const businessTypeLabels: Record<string, Dict> = {
   Courier: { az: "Kuryer xidməti", ru: "Курьерская служба", en: "Courier" },
   InternationalCargo: { az: "Beynəlxalq kargo", ru: "Доставка из-за рубежа", en: "International cargo" },
   Other: { az: "Digər", ru: "Другое", en: "Other" },
+};
+
+/** ⚠ The appointment module's own outcomes, kept apart from callOutcomeLabels, which names the
+ *  shared enum that Orders records. The two are not interchangeable and neither are their
+ *  words: an order call is never "təqvimdə yer olmadı". */
+export const appointmentCallOutcomeLabels: Record<string, Dict> = {
+  Resolved: { az: "Həll olundu", ru: "Решён", en: "Resolved" },
+  Forwarded: { az: "Operatora yönləndirildi", ru: "Передан оператору", en: "Forwarded to an operator" },
+  Unfinished: { az: "Zəng yarımçıq qaldı", ru: "Звонок не завершён", en: "Call left unfinished" },
+  NoAvailability: { az: "Təqvimdə yer olmadı", ru: "Нет места в календаре", en: "No slot available" },
 };
 
 export const accountRoleLabels: Record<string, Dict> = {

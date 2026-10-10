@@ -29,7 +29,7 @@ internal sealed class CallRepository : ICallRepository
         Instant? fromInclusive,
         Instant? toExclusive,
         CallClassification? classification,
-        CallOutcome? outcome,
+        AppointmentCallOutcome? outcome,
         int? providerId,
         CallPipeline? pipeline,
         CancellationToken cancellationToken)
@@ -51,7 +51,7 @@ internal sealed class CallRepository : ICallRepository
             query = query.Where(c => c.Classification == classificationValue);
         }
 
-        if (outcome is CallOutcome outcomeValue)
+        if (outcome is AppointmentCallOutcome outcomeValue)
         {
             query = query.Where(c => c.Outcome == outcomeValue);
         }

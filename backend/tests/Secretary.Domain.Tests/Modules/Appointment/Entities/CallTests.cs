@@ -24,14 +24,14 @@ public sealed class CallTests
             OutputTextTokens: 60, OutputAudioTokens: 900);
 
         var call = Call.Log(
-            TenantId, clientId, "+994000000", null, CallClassification.NewAppointment, CallOutcome.ResolvedByAgent,
+            TenantId, clientId, "+994000000", null, CallClassification.NewAppointment, AppointmentCallOutcome.Resolved,
             130, 6, 5, null, "https://recordings/1", "transcript", StartedAt, "gpt-realtime-2.1", CallPipeline.OpenAiRealtime_2_1, usage, 0.3142m, Now);
 
         call.TenantId.ShouldBe(TenantId);
         call.ClientId.ShouldBe(clientId);
         call.CallerPhoneNumber.ShouldBe("+994000000");
         call.Classification.ShouldBe(CallClassification.NewAppointment);
-        call.Outcome.ShouldBe(CallOutcome.ResolvedByAgent);
+        call.Outcome.ShouldBe(AppointmentCallOutcome.Resolved);
         call.DurationSeconds.ShouldBe(130);
         call.TurnCount.ShouldBe(6);
         call.CallerTurnCount.ShouldBe(5);
@@ -50,7 +50,7 @@ public sealed class CallTests
         var usage = new TokenUsage(1_000, 0, 2_000, 0, 100, 500);
 
         var call = Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             60, 3, 3, null, "url", null, StartedAt, "gpt-realtime-2.1", CallPipeline.OpenAiRealtime_2_1, usage, 0.12345678m, Now);
 
         call.CostUsd.ShouldBe(0.12345678m);
@@ -66,7 +66,7 @@ public sealed class CallTests
     public void Log_throws_when_caller_phone_number_is_blank(string? phoneNumber)
     {
         Should.Throw<ArgumentException>(() => Call.Log(
-            TenantId, null, phoneNumber!, null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, phoneNumber!, null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             10, 1, 1, null, "url", null, StartedAt, "", CallPipeline.Unknown, NoUsage, 0m, Now));
     }
 
@@ -74,7 +74,7 @@ public sealed class CallTests
     public void Log_throws_when_duration_is_negative()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             -1, 1, 1, null, "url", null, StartedAt, "", CallPipeline.Unknown, NoUsage, 0m, Now));
     }
 
@@ -82,7 +82,7 @@ public sealed class CallTests
     public void Log_throws_when_turn_count_is_negative()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             10, -1, 1, null, "url", null, StartedAt, "", CallPipeline.Unknown, NoUsage, 0m, Now));
     }
 
@@ -90,7 +90,7 @@ public sealed class CallTests
     public void Log_throws_when_caller_turn_count_is_negative()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             10, 1, -1, null, "url", null, StartedAt, "", CallPipeline.Unknown, NoUsage, 0m, Now));
     }
 
@@ -100,7 +100,7 @@ public sealed class CallTests
         // A negative call would subtract from the month's spend — worse than being missing,
         // because nothing downstream would flag it.
         Should.Throw<ArgumentOutOfRangeException>(() => Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             10, 1, 1, null, "url", null, StartedAt, "gpt-realtime-2.1", CallPipeline.OpenAiRealtime_2_1, NoUsage, -0.01m, Now));
     }
 }

@@ -11,16 +11,12 @@ import { formatDuration, formatTokens, formatUsd } from "@/shared/lib/money";
 import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { pipelineLabel } from "@/shared/lib/pipelines";
 import { getCallDetail } from "@/modules/appointments/api/calls";
-import type { CallOutcome, CallResponse } from "@/shared/api/types";
+import type { CallResponse } from "@/shared/api/types";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
-import { callClassificationLabels, callOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
+import { callClassificationLabels, appointmentCallOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
+import { outcomePillVariant } from "@/modules/appointments/lib/outcomes";
 
-function outcomePillVariant(outcome: CallOutcome): "success" | "warning" | "critical" {
-  if (outcome === "ResolvedByAgent") return "success";
-  if (outcome === "EscalatedResolvedByStaff") return "warning";
-  return "critical";
-}
 
 /** What this one call cost to run, and where the money went. The per-kind breakdown is the
  *  useful part: audio output is priced 16× audio input, so seeing which line dominates is what
@@ -139,7 +135,7 @@ export function CallDetailPage() {
             >
               {formatDayMonthTime(state.data.call.startedAt, language)}{" "}
               <Pill variant={outcomePillVariant(state.data.call.outcome)}>
-                {translateEnum(callOutcomeLabels, state.data.call.outcome, language)}
+                {translateEnum(appointmentCallOutcomeLabels, state.data.call.outcome, language)}
               </Pill>
             </h1>
             <Card>
@@ -150,7 +146,7 @@ export function CallDetailPage() {
                 </div>
                 <div className="field">
                   <label>{t("colOutcome")}</label>
-                  <div className="value">{translateEnum(callOutcomeLabels, state.data.call.outcome, language)}</div>
+                  <div className="value">{translateEnum(appointmentCallOutcomeLabels, state.data.call.outcome, language)}</div>
                 </div>
                 <div className="field">
                   <label>{t("colDurationShort")}</label>

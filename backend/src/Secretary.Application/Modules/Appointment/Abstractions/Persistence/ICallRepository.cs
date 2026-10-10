@@ -17,7 +17,7 @@ public interface ICallRepository : IRepository<Call>
         Instant? fromInclusive,
         Instant? toExclusive,
         CallClassification? classification,
-        CallOutcome? outcome,
+        AppointmentCallOutcome? outcome,
         int? providerId,
         CallPipeline? pipeline,
         CancellationToken cancellationToken);
