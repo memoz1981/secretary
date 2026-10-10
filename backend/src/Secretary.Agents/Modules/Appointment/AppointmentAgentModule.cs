@@ -39,13 +39,32 @@ public sealed class AppointmentAgentModule : IAgentModule
     public IList<AITool> BuildTools() => PhoneAgentToolset.Build(
         _clientTools, _serviceCatalogTools, _appointmentTools, _escalationTools, _callControlTools);
 
+    /// <summary>How the orchestrator's verdict reads in this module's words.
+    ///
+    /// ⚠ The orchestrator judges the transport — did the session run to a clean end, or did it
+    /// fall over — and it says so in CallOutcome, which Orders records directly. It cannot know
+    /// whether the calendar was full, so it never produces NoAvailability; only the booking tools
+    /// see that, and until they record it this maps what the orchestrator can actually tell us.
+    /// Anything it cannot distinguish becomes Unfinished rather than a guess.</summary>
+    private static AppointmentCallOutcome Translate(CallOutcome outcome) => outcome switch
+    {
+        CallOutcome.ResolvedByAgent => AppointmentCallOutcome.Resolved,
+        CallOutcome.EscalatedResolvedByStaff or CallOutcome.EscalatedAbandoned
+            => AppointmentCallOutcome.Forwarded,
+        CallOutcome.FailedNoAvailability => AppointmentCallOutcome.NoAvailability,
+
+        // NoAnswer included: the shared enum has one and this module has no equivalent, because
+        // an inbound line answers by definition. If it ever arrives, it arrived unfinished.
+        _ => AppointmentCallOutcome.Unfinished,
+    };
+
     /// <summary>app.Calls, unchanged. The client is resolved inside CallService by phone number,
     /// as it always was — the appointment line has a real number to look one up by.</summary>
     public async Task LogCallAsync(CallLogEntry entry, CancellationToken cancellationToken)
         => await _calls.LogAsync(
             new LogCallRequest(
                 _session.ClientId, entry.CallerPhoneNumber, RelatedAppointmentId: null,
-                entry.Classification, entry.Outcome,
+                entry.Classification, Translate(entry.Outcome),
                 entry.DurationSeconds, entry.TurnCount, entry.CallerTurnCount, WaitTimeSeconds: null,
                 entry.RecordingUrl, entry.Transcript, entry.StartedAt, entry.Pipeline, entry.ModelUsages),
             cancellationToken);

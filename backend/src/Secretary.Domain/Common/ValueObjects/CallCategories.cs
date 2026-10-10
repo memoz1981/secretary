@@ -35,7 +35,11 @@ public static class CallCategories
     public static readonly IReadOnlyList<CallCategory> All =
         [CallCategory.Answered, CallCategory.Forwarded, CallCategory.Unfinished, CallCategory.NotAnswered];
 
-    /// <summary>Appointment and order calls, which share CallOutcome.</summary>
+    /// <summary>Order calls, which record CallOutcome.
+    ///
+    /// ⚠ Appointments used to come through here too. They record their own outcome now — see the
+    /// overload below — and the two mappings agree on every value, so the platform's counts did
+    /// not move when they split.</summary>
     public static CallCategory For(CallOutcome outcome) => outcome switch
     {
         CallOutcome.ResolvedByAgent => CallCategory.Answered,
@@ -45,6 +49,22 @@ public static class CallCategories
         // then picked up is the appointment dashboard's business, not the platform's.
         CallOutcome.EscalatedResolvedByStaff or CallOutcome.EscalatedAbandoned => CallCategory.Forwarded,
 
+        _ => CallCategory.Unfinished,
+    };
+
+    /// <summary>Appointment calls, which record their own outcome.
+    ///
+    /// ⚠ Deliberately bucket-for-bucket identical to the CallOutcome mapping above. The platform
+    /// page counts calls across three modules, and a tenant whose totals moved because we renamed
+    /// something inside one module would be right to distrust the page. NoAvailability lands in
+    /// Unfinished exactly where FailedNoAvailability did.</summary>
+    public static CallCategory For(AppointmentCallOutcome outcome) => outcome switch
+    {
+        AppointmentCallOutcome.Resolved => CallCategory.Answered,
+        AppointmentCallOutcome.Forwarded => CallCategory.Forwarded,
+
+        // Unfinished and NoAvailability both. An appointment call never lands in NotAnswered:
+        // there is no outcome for it, because an inbound line answers by definition.
         _ => CallCategory.Unfinished,
     };
 

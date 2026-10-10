@@ -28,16 +28,19 @@ public sealed class DashboardService
         var appointments = await _uow.Appointments.GetForDateRangeAsync(from, to, null, cancellationToken);
 
         var totalCalls = calls.Count;
-        var resolvedByAgent = calls.Count(c => c.Outcome == CallOutcome.ResolvedByAgent);
-        var escalatedResolved = calls.Count(c => c.Outcome == CallOutcome.EscalatedResolvedByStaff);
-        var escalatedAbandoned = calls.Count(c => c.Outcome == CallOutcome.EscalatedAbandoned);
-        var escalatedTotal = escalatedResolved + escalatedAbandoned;
-        var failedNoAvailability = calls.Count(c => c.Outcome == CallOutcome.FailedNoAvailability);
-        var failedAgentLimitation = calls.Count(c => c.Outcome == CallOutcome.FailedAgentLimitation);
-        var failedTotal = failedNoAvailability + failedAgentLimitation;
 
-        var reminderCalls = calls.Where(c => c.Classification == CallClassification.ReminderConfirmation).ToList();
-        var reminderNoAnswer = reminderCalls.Count(c => c.Outcome == CallOutcome.NoAnswer);
+        // ⚠ Every member, including the ones nobody hit. A tile that vanishes when its count is
+        // zero moves the three beside it, so the page reshuffles itself between one range and the
+        // next and a reader loses the position they had learned.
+        var byOutcome = Enum.GetValues<AppointmentCallOutcome>()
+            .Select(outcome =>
+            {
+                var count = calls.Count(c => c.Outcome == outcome);
+                return new CallOutcomeCount(outcome, count, Rate(count, totalCalls));
+            })
+            .ToList();
+
+        var resolvedCalls = calls.Where(c => c.Outcome == AppointmentCallOutcome.Resolved).ToList();
 
         // ⚠ Every money figure on this page goes through the same gate, including the ones
         // derived from a total. Hiding TotalCostUsd while leaving the per-minute average in
@@ -50,18 +53,13 @@ public sealed class DashboardService
 
         return new DashboardSummaryResponse(
             TotalCalls: totalCalls,
-            ResolvedByAgentRate: Rate(resolvedByAgent, totalCalls),
-            ResolvedByAgentCount: resolvedByAgent,
-            EscalationRate: Rate(escalatedTotal, totalCalls),
-            EscalationCount: escalatedTotal,
-            EscalationResolvedByStaffRate: Rate(escalatedResolved, escalatedTotal),
-            EscalationAbandonedRate: Rate(escalatedAbandoned, escalatedTotal),
-            FailedNoAvailabilityRate: Rate(failedNoAvailability, failedTotal),
-            FailedAgentLimitationRate: Rate(failedAgentLimitation, failedTotal),
+            ByOutcome: byOutcome,
+            TotalDurationSeconds: (int)totalSeconds,
             AverageCallDurationSeconds: totalCalls == 0 ? 0 : calls.Average(c => c.DurationSeconds),
-            AverageTurnsToResolution: totalCalls == 0 ? 0 : calls.Average(c => c.TurnCount),
-            AppointmentVolume: appointments.Count(a => a.AppointmentStatus != Domain.Enums.AppointmentStatus.Cancelled),
-            ReminderNoAnswerRate: Rate(reminderNoAnswer, reminderCalls.Count),
+            AverageResolvedCallDurationSeconds:
+                resolvedCalls.Count == 0 ? null : resolvedCalls.Average(c => c.DurationSeconds),
+            AppointmentsMade: appointments.Count(
+                a => a.AppointmentStatus != Domain.Enums.AppointmentStatus.Cancelled),
             TotalCostUsd: showCosts ? totalCostUsd : null,
             AverageCostPerCallUsd: showCosts ? Per(totalCostUsd, totalCalls) : null,
             AverageCostPerMinuteUsd: showCosts ? Per(totalCostUsd * 60m, totalSeconds) : null,

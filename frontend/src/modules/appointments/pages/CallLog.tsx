@@ -1,6 +1,6 @@
 import type { CallResponse } from "@/shared/api/types";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { DataTable } from "@/shared/components/DataTable";
 import { Pill } from "@/shared/components/Pill";
@@ -10,11 +10,18 @@ import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { formatDuration, formatUsd } from "@/shared/lib/money";
 import { callerLabel } from "@/shared/lib/phoneDisplay";
 import { searchCalls } from "@/modules/appointments/api/calls";
-import { CALL_PIPELINES, type CallClassification, type CallOutcome, type CallPipeline } from "@/shared/api/types";
+import {
+  APPOINTMENT_CALL_OUTCOMES,
+  CALL_PIPELINES,
+  type AppointmentCallOutcome,
+  type CallClassification,
+  type CallPipeline,
+} from "@/shared/api/types";
 import { PIPELINE_INFO, pipelineLabel } from "@/shared/lib/pipelines";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 import { formatDayMonthTime } from "@/shared/lib/dates";
-import { callClassificationLabels, callOutcomeLabels, translateEnum } from "@/shared/i18n/translations";
+import { appointmentCallOutcomeLabels, callClassificationLabels, translateEnum } from "@/shared/i18n/translations";
+import { outcomePillVariant } from "@/modules/appointments/lib/outcomes";
 
 const CLASSIFICATIONS: CallClassification[] = [
   "NewAppointment",
@@ -23,28 +30,24 @@ const CLASSIFICATIONS: CallClassification[] = [
   "ReminderConfirmation",
   "InquiryOther",
 ];
-const OUTCOMES: CallOutcome[] = [
-  "ResolvedByAgent",
-  "EscalatedResolvedByStaff",
-  "EscalatedAbandoned",
-  "FailedNoAvailability",
-  "FailedAgentLimitation",
-  "NoAnswer",
-];
 
-function outcomePillVariant(outcome: CallOutcome): "success" | "warning" | "critical" {
-  if (outcome === "ResolvedByAgent") return "success";
-  if (outcome === "EscalatedResolvedByStaff") return "warning";
-  return "critical";
-}
 
 export function CallLogPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
+
+  // The dashboard tiles link here with their outcome and range attached, so a number you clicked
+  // opens the calls it was counting rather than the calls from some other week.
+  const [params] = useSearchParams();
+
   const [classification, setClassification] = useState<CallClassification | "">("");
-  const [outcome, setOutcome] = useState<CallOutcome | "">("");
+  const [outcome, setOutcome] = useState<AppointmentCallOutcome | "">(
+    () => (params.get("outcome") as AppointmentCallOutcome | null) ?? "",
+  );
+  const [from, setFrom] = useState(() => params.get("from") ?? "");
+  const [to, setTo] = useState(() => params.get("to") ?? "");
   const [pipeline, setPipeline] = useState<CallPipeline | "">("");
 
   const state = useApiData(
@@ -53,8 +56,12 @@ export function CallLogPage() {
         classification: classification || undefined,
         outcome: outcome || undefined,
         pipeline: pipeline || undefined,
+        // The end of the chosen day, not its midnight: picking one date for both would
+        // otherwise ask for a range of zero length and report an empty day back.
+        from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+        to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined,
       }),
-    [token, classification, outcome, pipeline],
+    [token, classification, outcome, pipeline, from, to],
   );
 
   // Calls logged before mode tracking existed carry no mode, and with four architectures in
@@ -72,7 +79,7 @@ export function CallLogPage() {
       <h1 className="page-title" style={{ marginBottom: "var(--space-4)" }}>
         {t("callLog")}
       </h1>
-      <div className="filters" style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+      <div className="filter-bar" style={{ marginBottom: "var(--space-4)" }}>
         <select value={classification} onChange={(e) => setClassification(e.target.value as CallClassification | "")}>
           <option value="">{t("allClassifications")}</option>
           {CLASSIFICATIONS.map((c) => (
@@ -81,14 +88,24 @@ export function CallLogPage() {
             </option>
           ))}
         </select>
-        <select value={outcome} onChange={(e) => setOutcome(e.target.value as CallOutcome | "")}>
+        <select value={outcome} onChange={(e) => setOutcome(e.target.value as AppointmentCallOutcome | "")}>
           <option value="">{t("allOutcomes")}</option>
-          {OUTCOMES.map((o) => (
+          {APPOINTMENT_CALL_OUTCOMES.map((o) => (
             <option key={o} value={o}>
-              {translateEnum(callOutcomeLabels, o, language)}
+              {translateEnum(appointmentCallOutcomeLabels, o, language)}
             </option>
           ))}
         </select>
+        {/* Handed over by the dashboard tiles along with the outcome, so a number you clicked
+            opens the calls it was counting rather than the calls from some other week. */}
+        <label className="field" style={{ margin: 0 }}>
+          <span className="label">{t("dateFrom")}</span>
+          <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          <span className="label">{t("dateTo")}</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+        </label>
         {/* The filter that made the architectures comparable, one at a time. Absent while there
             is only one to pick — see CALL_PIPELINES. */}
         {CALL_PIPELINES.length > 1 && (
@@ -126,7 +143,7 @@ export function CallLogPage() {
           {
             header: t("colOutcome"),
             render: (c) => (
-              <Pill variant={outcomePillVariant(c.outcome)}>{translateEnum(callOutcomeLabels, c.outcome, language)}</Pill>
+              <Pill variant={outcomePillVariant(c.outcome)}>{translateEnum(appointmentCallOutcomeLabels, c.outcome, language)}</Pill>
             ),
           },
           {

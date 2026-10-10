@@ -84,12 +84,12 @@ public sealed class CallServiceTests
         int durationSeconds = 120, int turnCount = 5, int callerTurnCount = 4,
         CallClassification classification = CallClassification.NewAppointment)
         => new(
-            ClientId: null, "+994000000", null, classification, CallOutcome.ResolvedByAgent,
+            ClientId: null, "+994000000", null, classification, AppointmentCallOutcome.Resolved,
             durationSeconds, turnCount, callerTurnCount, null, "url", null, Now, CallPipeline.OpenAiRealtime_2_1, usages);
 
     private static Call LoggedCall(int durationSeconds = 30, int turnCount = 2, string? transcript = null)
         => Call.Log(
-            TenantId, null, "+994000000", null, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
+            TenantId, null, "+994000000", null, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved,
             durationSeconds, turnCount, turnCount, null, "url", transcript, Now, Model, CallPipeline.OpenAiRealtime_2_1, TokenUsage.Zero, 0m, Now);
 
     [Fact]
@@ -265,10 +265,10 @@ public sealed class CallServiceTests
     public async Task SearchAsync_delegates_to_repository_with_all_filters()
     {
         var call = LoggedCall();
-        var request = new CallSearchRequest(Now, Now, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, null);
+        var request = new CallSearchRequest(Now, Now, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, null);
 
         _uow.Calls
-            .Setup(c => c.SearchAsync(Now, Now, CallClassification.InquiryOther, CallOutcome.ResolvedByAgent, null, null, default))
+            .Setup(c => c.SearchAsync(Now, Now, CallClassification.InquiryOther, AppointmentCallOutcome.Resolved, null, null, default))
             .ReturnsAsync([call]);
 
         var result = await _sut.SearchAsync(request, default);

@@ -2,20 +2,34 @@ using Secretary.Domain.Enums;
 
 namespace Secretary.Application.Dtos;
 
+/// <summary>One outcome, its count, and its share of every call in the range.
+///
+/// ⚠ The share is computed here rather than on the page. Four tiles each dividing by a total they
+/// were handed separately is four chances to divide by a different number, and the first symptom
+/// is percentages that do not add up in front of a customer.</summary>
+public sealed record CallOutcomeCount(AppointmentCallOutcome Outcome, int Calls, double Share);
+
 public sealed record DashboardSummaryResponse(
     int TotalCalls,
-    double ResolvedByAgentRate,
-    int ResolvedByAgentCount,
-    double EscalationRate,
-    int EscalationCount,
-    double EscalationResolvedByStaffRate,
-    double EscalationAbandonedRate,
-    double FailedNoAvailabilityRate,
-    double FailedAgentLimitationRate,
+
+    /// <summary>Every outcome that can occur, whether or not it did. An absent row reads as "no
+    /// data"; a zero reads as "this did not happen", and those are different things to know.</summary>
+    IReadOnlyList<CallOutcomeCount> ByOutcome,
+
+    // ---- How long the agent spent (see the Call statistics row) ----
+    int TotalDurationSeconds,
     double AverageCallDurationSeconds,
-    double AverageTurnsToResolution,
-    int AppointmentVolume,
-    double ReminderNoAnswerRate,
+
+    /// <summary>Averaged over resolved calls only. A line whose failures are three seconds long
+    /// looks fast in a blended average, which is the opposite of what the number is for: how long
+    /// it takes the agent to actually finish something. Null when nothing resolved — an average
+    /// over no calls is not zero.</summary>
+    double? AverageResolvedCallDurationSeconds,
+
+    /// <summary>Appointments still standing that the agent made in this range. Cancelled ones are
+    /// left out: the question is what the line produced, and a booking that was cancelled
+    /// produced nothing.</summary>
+    int AppointmentsMade,
     // ---- Agent spend for the range (see backend/README.md, "What a call costs") ----
     decimal? TotalCostUsd,
     decimal? AverageCostPerCallUsd,

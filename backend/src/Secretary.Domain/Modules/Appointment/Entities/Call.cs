@@ -20,7 +20,7 @@ public sealed class Call : BaseEntity
     public string CallerPhoneNumber { get; private set; }
     public int? RelatedAppointmentId { get; private set; }
     public CallClassification Classification { get; private set; }
-    public CallOutcome Outcome { get; private set; }
+    public AppointmentCallOutcome Outcome { get; private set; }
     public int DurationSeconds { get; private set; }
 
     /// <summary>Answers: replies the agent actually completed. Together with
@@ -68,7 +68,7 @@ public sealed class Call : BaseEntity
 
     private Call(
         int tenantId, int? clientId, string callerPhoneNumber, int? relatedAppointmentId,
-        CallClassification classification, CallOutcome outcome, int durationSeconds, int turnCount,
+        CallClassification classification, AppointmentCallOutcome outcome, int durationSeconds, int turnCount,
         int callerTurnCount, int? waitTimeSeconds, string recordingUrl, string? transcript,
         Instant startedAt, string agentModel, CallPipeline pipeline, TokenUsage tokenUsage,
         decimal costUsd, Instant now)
@@ -107,7 +107,7 @@ public sealed class Call : BaseEntity
 
     public static Call Log(
         int tenantId, int? clientId, string callerPhoneNumber, int? relatedAppointmentId,
-        CallClassification classification, CallOutcome outcome, int durationSeconds, int turnCount,
+        CallClassification classification, AppointmentCallOutcome outcome, int durationSeconds, int turnCount,
         int callerTurnCount, int? waitTimeSeconds, string recordingUrl, string? transcript,
         Instant startedAt, string agentModel, CallPipeline pipeline, TokenUsage tokenUsage,
         decimal costUsd, Instant now)

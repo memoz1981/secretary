@@ -20,8 +20,28 @@ public sealed class CallCategoriesTests
     [InlineData(CallOutcome.EscalatedAbandoned, CallCategory.Forwarded)]
     [InlineData(CallOutcome.FailedNoAvailability, CallCategory.Unfinished)]
     [InlineData(CallOutcome.FailedAgentLimitation, CallCategory.Unfinished)]
-    public void A_booking_outcome_maps_to_one_of_the_four(CallOutcome outcome, CallCategory expected)
+    public void An_order_outcome_maps_to_one_of_the_four(CallOutcome outcome, CallCategory expected)
         => CallCategories.For(outcome).ShouldBe(expected);
+
+    /// <summary>⚠ Bucket for bucket the same as the mapping above, and that is the point being
+    /// pinned. Appointments moved to their own outcome enum; the platform page counts calls
+    /// across three modules, and a tenant whose totals shifted because we renamed something
+    /// inside one module would be right to distrust the page.</summary>
+    [Theory]
+    [InlineData(AppointmentCallOutcome.Resolved, CallCategory.Answered)]
+    [InlineData(AppointmentCallOutcome.Forwarded, CallCategory.Forwarded)]
+    [InlineData(AppointmentCallOutcome.Unfinished, CallCategory.Unfinished)]
+    [InlineData(AppointmentCallOutcome.NoAvailability, CallCategory.Unfinished)]
+    public void An_appointment_outcome_maps_to_one_of_the_four(
+        AppointmentCallOutcome outcome, CallCategory expected)
+        => CallCategories.For(outcome).ShouldBe(expected);
+
+    /// <summary>An appointment call never reads as NotAnswered, because there is no outcome for
+    /// it: an inbound line answers by definition.</summary>
+    [Fact]
+    public void No_appointment_outcome_reads_as_unanswered()
+        => Enum.GetValues<AppointmentCallOutcome>()
+            .ShouldAllBe(outcome => CallCategories.For(outcome) != CallCategory.NotAnswered);
 
     /// <summary>Both escalations are the same thing from the platform's seat: a person was
     /// needed. Whether that person then picked up is the appointment dashboard's business.</summary>

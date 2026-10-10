@@ -13,6 +13,17 @@ export type CallClassification =
   | "Cancellation"
   | "ReminderConfirmation"
   | "InquiryOther";
+/** What became of an appointment call — see Domain/Modules/Appointment/Enums.
+ *
+ * ⚠ Separate from CallOutcome, which Orders records. The two enums are not interchangeable and
+ * the compiler is the thing that keeps them apart: an order call cannot be NoAvailability and an
+ * appointment call cannot be NoAnswer, because an inbound line answers by definition.
+ *
+ * Four members, so the four dashboard tiles account for every call. That is what makes their
+ * percentages worth printing. */
+export const APPOINTMENT_CALL_OUTCOMES = ["Resolved", "Forwarded", "Unfinished", "NoAvailability"] as const;
+export type AppointmentCallOutcome = (typeof APPOINTMENT_CALL_OUTCOMES)[number];
+
 export type CallOutcome =
   | "ResolvedByAgent"
   | "EscalatedResolvedByStaff"
@@ -330,7 +341,7 @@ export interface CallResponse {
   clientName: string | null;
   relatedAppointmentId: number | null;
   classification: CallClassification;
-  outcome: CallOutcome;
+  outcome: AppointmentCallOutcome;
   durationSeconds: number;
   /** Answers the agent completed. */
   turnCount: number;
@@ -399,20 +410,25 @@ export interface EscalationResponse {
 }
 
 // ---- Dashboard ----
+export interface CallOutcomeCount {
+  outcome: AppointmentCallOutcome;
+  calls: number;
+  /** 0–1, of every call in the range. Computed on the server so the tiles cannot disagree. */
+  share: number;
+}
+
 export interface DashboardSummaryResponse {
   totalCalls: number;
-  resolvedByAgentRate: number;
-  resolvedByAgentCount: number;
-  escalationRate: number;
-  escalationCount: number;
-  escalationResolvedByStaffRate: number;
-  escalationAbandonedRate: number;
-  failedNoAvailabilityRate: number;
-  failedAgentLimitationRate: number;
+  /** Every outcome, including the ones nothing landed in. A tile that disappears at zero moves
+   *  the ones beside it, so the page reshuffles between one range and the next. */
+  byOutcome: CallOutcomeCount[];
+  totalDurationSeconds: number;
   averageCallDurationSeconds: number;
-  averageTurnsToResolution: number;
-  appointmentVolume: number;
-  reminderNoAnswerRate: number;
+  /** Over resolved calls only, and null when nothing resolved. A line whose failures last three
+   *  seconds looks fast in a blended average, which is the opposite of what this is for. */
+  averageResolvedCallDurationSeconds: number | null;
+  /** Appointments still standing that the agent made in this range. Cancelled ones excluded. */
+  appointmentsMade: number;
   totalCostUsd: number | null;
   averageCostPerCallUsd: number | null;
   /** Weighted by call length, not an average of each call's own rate. */
