@@ -130,7 +130,6 @@ export const BUSINESS_TYPES = [
   "Restaurant",
   "WaterDelivery",
   "Courier",
-  "InternationalCargo",
   "Other",
 ] as const;
 
@@ -372,6 +371,41 @@ export interface CallResponse {
 /** One row of the order line's call log. Narrower than CallResponse on purpose: no
  * classification, and `resolvedByAgent` collapses the six outcomes into the one question the
  * page is actually asking. */
+export interface OrderCallOutcomeCount {
+  outcome: CallOutcome;
+  calls: number;
+  /** 0-1 of every order call in the range. Computed on the server so the tiles cannot disagree. */
+  share: number;
+}
+
+export interface ProductDemand {
+  productId: number;
+  productName: string;
+  orders: number;
+  /** In the product's own unit, so not comparable between rows — see the chart's note. */
+  quantity: number;
+  valueAzn: number;
+}
+
+export interface OrderDashboardResponse {
+  totalCalls: number;
+  byOutcome: OrderCallOutcomeCount[];
+  /** Calls that ended with an order on the books — not the same as a resolved call. */
+  callsWithOrder: number;
+  ordersPlaced: number;
+  ordersCancelled: number;
+  totalValueAzn: number;
+  /** Null when nothing was ordered: an average over no orders is not zero. */
+  averageOrderValueAzn: number | null;
+  totalDurationSeconds: number;
+  averageCallDurationSeconds: number;
+  /** Over calls that produced an order. Null when none did. */
+  averageOrderingCallDurationSeconds: number | null;
+  byProduct: ProductDemand[];
+  /** Of every call in the range. Null on no calls rather than 0%. */
+  orderRate: number | null;
+}
+
 export interface OrderCallResponse {
   id: number;
   customerId: number | null;

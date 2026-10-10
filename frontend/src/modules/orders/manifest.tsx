@@ -1,4 +1,5 @@
 import { Route } from "react-router-dom";
+import { OrderDashboardPage } from "@/modules/orders/pages/OrderDashboard";
 import { RequireRole } from "@/shared/auth/RequireRole";
 import { RequireModule } from "@/shared/auth/RequireModule";
 import { LiveCallPage } from "@/shared/components/LiveCallPage";
@@ -17,11 +18,12 @@ import type { ModuleManifest } from "@/modules/registry";
 export const ordersModule: ModuleManifest = {
   key: "Order",
   pathPrefix: "/orders",
-  home: "/orders/products",
+  home: "/orders/dashboard",
   titleKey: "moduleOrdersTitle",
   descriptionKey: "moduleOrdersText",
 
   nav: (role, t) => [
+    { label: t("orderDashboard"), to: "/orders/dashboard" },
     { label: t("products"), to: "/orders/products" },
     { label: t("orders"), to: "/orders/list" },
     { label: t("navOrderCustomers"), to: "/orders/customers" },
@@ -31,6 +33,26 @@ export const ordersModule: ModuleManifest = {
 
   routes: (
     <Route path="/orders">
+      <Route
+        index
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <OrderDashboardPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
+      <Route
+        path="dashboard"
+        element={
+          <RequireRole roles={["Owner", "Staff"]}>
+            <RequireModule module="Order">
+              <OrderDashboardPage />
+            </RequireModule>
+          </RequireRole>
+        }
+      />
       <Route
         path="products"
         element={
