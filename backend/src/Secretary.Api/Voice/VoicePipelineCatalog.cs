@@ -19,7 +19,7 @@ public static class VoicePipelineCatalog
         CallPipeline Pipeline,
         string Label,
         string ProviderKey,
-        string RealtimeModel,
+        string? RealtimeModel,
         bool Enabled = true);
 
     public static readonly IReadOnlyList<Entry> All =
@@ -33,10 +33,14 @@ public static class VoicePipelineCatalog
         // Roughly four times cheaper than OpenAI. Whether Azerbaijani survives it is the whole
         // reason it is dialable rather than assumed — that only a real call answers.
         new(
-            CallPipeline.GeminiLive_3_1,
-            "Gemini · Live 3.1",
+            CallPipeline.GeminiLive,
+            "Gemini · Live",
             ProviderKey: "gemini",
-            RealtimeModel: "gemini-3.1-flash-live-preview"),
+
+            // Null: the model comes from the backend FeatureFlags:UseVertexAi picks, each with its
+            // own GeminiLive Model setting. Named here, it overrode the configuration and
+            // switching backend would have kept asking for a model the backend lacks.
+            RealtimeModel: null),
     ];
 
     public static IEnumerable<Entry> Dialable => All.Where(entry => entry.Enabled);

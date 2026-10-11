@@ -1,28 +1,20 @@
 namespace Secretary.Voice.Google;
 
-/// <summary>Which Gemini backend to talk to, and as whom.
+/// <summary>How a Gemini Live call behaves, and how to reach each backend.
 ///
-/// AI Studio for the demo (an API key, nothing else to set up), the Enterprise Agent Platform —
-/// what used to be called Vertex AI — for production, where quotas and SLA are real. The SDK
-/// takes both from the same Client constructor, so everything downstream is identical.</summary>
+/// ⚠ The two backends have a section each, and nothing about connecting is shared between them.
+/// AI Studio has no project and no region; Vertex has no API key. A flat list let a setting look
+/// as if it applied to both — Location read as if it moved AI Studio calls, which it never did —
+/// so each section holds only what its own backend reads. Which one a call uses is
+/// FeatureFlags.UseVertexAi; everything outside the two sections is how the call behaves, and is
+/// the same on either.</summary>
 public sealed class GeminiLiveOptions
 {
     public const string SectionName = "GeminiLive";
 
-    public GeminiBackend Backend { get; set; } = GeminiBackend.AiStudio;
+    public AiStudioOptions AiStudio { get; set; } = new();
 
-    /// <summary>AI Studio only.</summary>
-    public string ApiKey { get; set; } = string.Empty;
-
-    /// <summary>Enterprise only.</summary>
-    public string Project { get; set; } = string.Empty;
-
-    /// <summary>Enterprise only. Frankfurt keeps the model near where the app is hosted.</summary>
-    public string Location { get; set; } = "europe-west3";
-
-    /// <summary>Model ids can differ between the two backends, so it lives here rather than
-    /// being derived from the backend.</summary>
-    public string Model { get; set; } = "gemini-3.1-flash-live-preview";
+    public VertexOptions Vertex { get; set; } = new();
 
     /// <summary>One of Gemini's prebuilt voices. Kept configurable because which one carries
     /// Azerbaijani acceptably is exactly the sort of thing only a real call settles.</summary>
@@ -92,8 +84,43 @@ public sealed class GeminiLiveOptions
     public int ThinkingBudgetTokens { get; set; }
 }
 
-public enum GeminiBackend
+/// <summary>Google AI Studio: an API key and a model, nothing else.</summary>
+public sealed class AiStudioOptions
 {
-    AiStudio,
-    Enterprise,
+    /// <summary>Secret.</summary>
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string Model { get; set; } = "gemini-3.8-live";
+}
+
+/// <summary>Vertex AI — the Gemini Enterprise Agent Platform: a service account, a project and a
+/// region. Its model names are not AI Studio's, which is why each section names its own.</summary>
+public sealed class VertexOptions
+{
+    // ⚠ The service account as three named secrets, taken from the key file Google hands out:
+    //   project_id   → Project
+    //   client_email → ClientEmail
+    //   private_key  → PrivateKey
+    // Nothing else in that file is needed. Named rather than the whole file pasted in as one
+    // value, so what each secret holds is visible; and secrets rather than a path to the file,
+    // so a release never has to copy a key onto the server by hand. An API key is not an
+    // option: Vertex refuses one on a Live connection.
+
+    /// <summary>Secret: the key file's project_id.</summary>
+    public string Project { get; set; } = string.Empty;
+
+    /// <summary>Secret: the key file's client_email — which service account this is.</summary>
+    public string ClientEmail { get; set; } = string.Empty;
+
+    /// <summary>Secret: the key file's private_key, copied exactly as it appears between the
+    /// quotes, "\n" escapes and all. The only part of the file that is truly sensitive.</summary>
+    public string PrivateKey { get; set; } = string.Empty;
+
+    /// <summary>us-central1 because it is where the project can reach gemini-3.8-live today:
+    /// europe-west4 answered "model not found or no access" for the same project. Europe is
+    /// the better region for an Amsterdam server — the server-to-Google leg is on every turn —
+    /// and worth trying again once Google opens it up.</summary>
+    public string Location { get; set; } = "us-central1";
+
+    public string Model { get; set; } = "gemini-3.8-live";
 }

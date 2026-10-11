@@ -345,7 +345,7 @@ public sealed class OrderToolsTests
             new CallLogEntry(
                 "local-device-call", CallClassification.InquiryOther, CallOutcome.ResolvedByAgent,
                 DurationSeconds: 39, TurnCount: 7, CallerTurnCount: 6, "no recording", Transcript: null,
-                Now, CallPipeline.GeminiLive_3_1, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
+                Now, CallPipeline.GeminiLive, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
             default);
 
         logged.ShouldNotBeNull();
@@ -369,7 +369,7 @@ public sealed class OrderToolsTests
             new CallLogEntry(
                 "local-device-call", CallClassification.InquiryOther, CallOutcome.FailedAgentLimitation,
                 DurationSeconds: 8, TurnCount: 1, CallerTurnCount: 1, "no recording", Transcript: null,
-                Now, CallPipeline.GeminiLive_3_1, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
+                Now, CallPipeline.GeminiLive, [new ModelUsage("gemini-3.1-flash-live-preview", TokenUsage.Zero)]),
             default);
 
         logged.ShouldNotBeNull();

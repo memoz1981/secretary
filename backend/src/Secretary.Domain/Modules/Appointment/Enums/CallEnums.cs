@@ -45,9 +45,10 @@ public enum CallPipeline
     /// the most expensive, at roughly $0.10 a minute.</summary>
     OpenAiRealtime_2_1 = 1,
 
-    /// <summary>Gemini Live, native audio in and out. Roughly four times cheaper than OpenAI,
-    /// and its Azerbaijani quality is entirely unverified — which is why it exists here but is
-    /// not dialable yet. Gemini Live speaks a different wire protocol, so enabling it needs a
-    /// session implementation of its own, not just an entry in the catalogue.</summary>
-    GeminiLive_3_1 = 2,
+    /// <summary>Gemini Live, native audio in and out, on AI Studio or Vertex AI.
+    ///
+    /// ⚠ No model version in the name. Which model answers is configuration and is recorded
+    /// per call as AgentModel; a version here was wrong the first time the model changed.
+    /// Stored as its number, so the rename from GeminiLive_3_1 touched no data.</summary>
+    GeminiLive = 2,
 }

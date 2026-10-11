@@ -26,7 +26,7 @@ public sealed class OrderDashboardTests
     private static OrderCall Call(CallOutcome outcome, int? orderId, int duration)
         => OrderCall.Log(
             TenantId, null, "+994000000", orderId, outcome, duration, 4, 3, null, "url", null,
-            From, "gemini-live", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0m, From);
+            From, "gemini-live", CallPipeline.GeminiLive, TokenUsage.Zero, 0m, From);
 
     private static Order Order(int customerId, int productId, decimal quantity, bool cancelled = false)
     {

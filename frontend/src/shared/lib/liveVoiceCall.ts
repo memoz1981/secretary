@@ -26,7 +26,7 @@ const REALTIME: PipelineProfile = { sampleRate: 24000, sendChunkSamples: 2400 };
 
 const PIPELINES: Record<CallPipeline, PipelineProfile> = {
   OpenAiRealtime_2_1: REALTIME,
-  GeminiLive_3_1: REALTIME,
+  GeminiLive: REALTIME,
   Unknown: REALTIME,
 };
 

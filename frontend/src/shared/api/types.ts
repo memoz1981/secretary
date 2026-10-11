@@ -38,7 +38,7 @@ export type EscalationStatus = "Ringing" | "Connected" | "Abandoned";
 export type CallPipeline =
   | "Unknown"
   | "OpenAiRealtime_2_1"
-  | "GeminiLive_3_1";
+  | "GeminiLive";
 
 /** The pipelines this front end offers and reports on.
  *
@@ -50,7 +50,7 @@ export type CallPipeline =
  *
  * Putting it back is this array. Nothing in the backend was touched, so historical OpenAI calls
  * keep their pipeline, their model name and their cost, and reappear the moment it returns. */
-export const CALL_PIPELINES: CallPipeline[] = ["GeminiLive_3_1"];
+export const CALL_PIPELINES: CallPipeline[] = ["GeminiLive"];
 
 // ---- Auth ----
 export interface LoginRequest {
