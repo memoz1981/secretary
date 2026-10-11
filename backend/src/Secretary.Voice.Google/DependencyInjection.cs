@@ -10,6 +10,7 @@ public static class GoogleVoiceServiceCollectionExtensions
     public static IServiceCollection AddGeminiLive(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<GeminiLiveOptions>(configuration.GetSection(GeminiLiveOptions.SectionName));
+        services.Configure<FeatureFlags>(configuration.GetSection(FeatureFlags.SectionName));
 
         // Transient: a fresh WebSocket session per live call, never reused across calls.
         services.AddTransient<GeminiLiveSession>();

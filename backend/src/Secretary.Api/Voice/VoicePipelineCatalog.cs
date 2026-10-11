@@ -19,7 +19,7 @@ public static class VoicePipelineCatalog
         CallPipeline Pipeline,
         string Label,
         string ProviderKey,
-        string RealtimeModel,
+        string? RealtimeModel,
         bool Enabled = true);
 
     public static readonly IReadOnlyList<Entry> All =
@@ -34,9 +34,13 @@ public static class VoicePipelineCatalog
         // reason it is dialable rather than assumed — that only a real call answers.
         new(
             CallPipeline.GeminiLive_3_1,
-            "Gemini · Live 3.1",
+            "Gemini · Live",
             ProviderKey: "gemini",
-            RealtimeModel: "gemini-3.1-flash-live-preview"),
+
+            // Null: the model follows GeminiLive:Backend — gemini-3.1-flash-live-preview on AI
+            // Studio, gemini-3.8-live on Enterprise. Named here, it overrode the configuration
+            // and switching backend would have kept asking for a model the backend lacks.
+            RealtimeModel: null),
     ];
 
     public static IEnumerable<Entry> Dialable => All.Where(entry => entry.Enabled);

@@ -29,5 +29,12 @@ public static class GeminiLiveToolSchema
         Name = function.Name,
         Description = function.Description,
         ParametersJsonSchema = JsonSerializer.Deserialize<JsonElement>(function.JsonSchema.GetRawText()),
+
+        // ⚠ Blocking, stated rather than assumed. Gemini 3.8 Live made function calls
+        // non-blocking by default: the model goes on talking while the tool runs. For a tool
+        // whose result is the thing being promised — a booking, an order number — that is the
+        // agent confirming before it knows. Earlier models blocked by default, so this changes
+        // nothing for them.
+        Behavior = Behavior.Blocking,
     };
 }

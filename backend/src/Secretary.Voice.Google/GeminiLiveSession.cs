@@ -53,9 +53,17 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// so it can be attached to the ResponseFinished the loop actually acts on.</summary>
     private UsageMetadata? _pendingUsage;
 
-    public GeminiLiveSession(IOptions<GeminiLiveOptions> options, ILogger<GeminiLiveSession> logger)
+    /// <summary>The flag, read as of the moment this call's session was created.</summary>
+    private readonly bool _useVertexAi;
+
+    // Monitors rather than plain options: a session is created per call, so taking the current
+    // value here means an edit to appsettings.json applies to the next call without a restart.
+    public GeminiLiveSession(
+        IOptionsMonitor<GeminiLiveOptions> options, IOptionsMonitor<FeatureFlags> flags,
+        ILogger<GeminiLiveSession> logger)
     {
-        _options = options.Value;
+        _options = options.CurrentValue;
+        _useVertexAi = flags.CurrentValue.UseVertexAi;
         _logger = logger;
     }
 
@@ -77,12 +85,15 @@ public sealed class GeminiLiveSession : IRealtimeSession
         string instructions, IList<AITool> tools, string? modelOverride, bool transcribeCaller,
         CancellationToken cancellationToken)
     {
-        Model = string.IsNullOrWhiteSpace(modelOverride) ? _options.Model : modelOverride;
+        var enterprise = _useVertexAi;
+        Model = !string.IsNullOrWhiteSpace(modelOverride) ? modelOverride
+            : enterprise ? _options.EnterpriseModel
+            : _options.Model;
         _functions = tools.OfType<AIFunction>().ToList();
 
-        _client = _options.Backend == GeminiBackend.Enterprise
-            ? new Client(enterprise: true, project: _options.Project, location: _options.Location)
-            : new Client(apiKey: _options.ApiKey);
+        _client = !enterprise
+            ? new Client(apiKey: _options.ApiKey)
+            : CreateEnterpriseClient();
 
         var config = new LiveConnectConfig
         {
@@ -148,7 +159,9 @@ public sealed class GeminiLiveSession : IRealtimeSession
             },
 
             // A caller hears deliberation as dead air. Off by default — see the option.
-            ThinkingConfig = new ThinkingConfig { ThinkingBudget = _options.ThinkingBudgetTokens },
+            // ⚠ AI Studio only. Vertex refuses the whole session for a project not allowlisted to
+            // set the thinking level, so there the model keeps its own default.
+            ThinkingConfig = _useVertexAi ? null : new ThinkingConfig { ThinkingBudget = _options.ThinkingBudgetTokens },
 
             MaxOutputTokens = _options.MaxOutputTokens,
         };
@@ -160,7 +173,8 @@ public sealed class GeminiLiveSession : IRealtimeSession
         }
 
         _session = await _client.Live.ConnectAsync(Model, config, cancellationToken);
-        _logger.LogInformation("Gemini Live session connected ({Model}, backend={Backend}).", Model, _options.Backend);
+        _logger.LogInformation(
+            "Gemini Live session connected ({Model}, backend={Backend}).", Model, _useVertexAi ? "VertexAi" : "AiStudio");
     }
 
     public async Task SendAudioChunkAsync(ReadOnlyMemory<byte> pcm16Chunk, CancellationToken cancellationToken)
@@ -446,6 +460,22 @@ public sealed class GeminiLiveSession : IRealtimeSession
         {
             _sendLock.Release();
         }
+    }
+
+    /// <summary>The Enterprise client: a service account, a project and a region.
+    ///
+    /// No API-key branch. Vertex will not take a key on a Live connection — the SDK refuses
+    /// before connecting — so the only working shape is credentials.</summary>
+    private Client CreateEnterpriseClient()
+    {
+        var credential = string.IsNullOrWhiteSpace(_options.CredentialsJson)
+            ? null
+            : global::Google.Apis.Auth.OAuth2.GoogleCredential
+                .FromJson(_options.CredentialsJson)
+                .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
+
+        return new Client(
+            enterprise: true, credential: credential, project: _options.Project, location: _options.Location);
     }
 
     private AsyncSession Session => _session ?? throw new InvalidOperationException("ConnectAsync must be called before using the session.");
