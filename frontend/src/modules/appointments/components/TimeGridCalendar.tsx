@@ -5,6 +5,9 @@ import { useLanguage } from "@/shared/i18n/LanguageContext";
 interface TimeGridCalendarProps {
   days: Date[];
   hours: number[];
+  /** Whether the business is open on this date. A closed column is greyed and inert — see the
+   *  note on the component. */
+  isOpen: (day: Date) => boolean;
   appointments: AppointmentResponse[];
   serviceName: (serviceOfferingId: number) => string;
   providerColor: (providerId: number) => ProviderColor;
@@ -94,7 +97,15 @@ function layoutDay(
 /** Shared time grid for both the Day view (a single day) and the Week view (7 days).
  * Appointments are absolutely positioned blocks: vertical extent = duration rounded to the
  * half-hour cells it covers, horizontal position = overlap column, color = provider. */
-export function TimeGridCalendar({ days, hours, appointments, serviceName, providerColor, onApptClick }: TimeGridCalendarProps) {
+export function TimeGridCalendar({
+  days,
+  hours,
+  isOpen,
+  appointments,
+  serviceName,
+  providerColor,
+  onApptClick,
+}: TimeGridCalendarProps) {
   const { t } = useLanguage();
   const firstHour = hours[0];
   const totalMinutes = hours.length * 60;
@@ -104,7 +115,7 @@ export function TimeGridCalendar({ days, hours, appointments, serviceName, provi
     <div className="week-grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
       <div className="head" />
       {days.map((d, i) => (
-        <div className="head" key={i}>
+        <div className={`head ${isOpen(d) ? "" : "closed"}`} key={i}>
           {t(DAY_LABEL_KEYS[(d.getDay() + 6) % 7])} {d.getDate()}
         </div>
       ))}
@@ -118,7 +129,11 @@ export function TimeGridCalendar({ days, hours, appointments, serviceName, provi
       </div>
 
       {days.map((day, dayIndex) => (
-        <div className="day-col" key={dayIndex} style={{ height: totalHeight }}>
+        // ⚠ A closed day is drawn and not offered. Hiding the column entirely would make the week
+        // change shape depending on the tenant's opening hours, and an appointment that somehow
+        // exists on a closed day has to stay visible — it is exactly the row somebody needs to
+        // find and move.
+        <div className={`day-col ${isOpen(day) ? "" : "closed"}`} key={dayIndex} style={{ height: totalHeight }}>
           {layoutDay(appointments, day, firstHour, totalMinutes).map((p) => {
             const color = providerColor(p.appt.providerId);
             const width = 100 / p.cols;

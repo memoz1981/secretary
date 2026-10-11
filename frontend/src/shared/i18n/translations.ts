@@ -135,15 +135,15 @@ export const translations = {
   landingHowTitle: { az: "Necə işləyir", ru: "Как это работает", en: "How it works" },
   landingStep1Title: { az: "Zəng başlayır", ru: "Звонок начинается", en: "A call begins" },
   landingStep1Text: {
-    az: "Müştəri özü zəng edir, ya da agent onu axtarır. Xətt heç vaxt məşğul olmur — gecə, həftəsonu və bayram günlərində də.",
-    ru: "Клиент звонит сам или агент набирает его. Линия никогда не занята — ночью, в выходные и в праздники тоже.",
+    az: "Müştəri özü zəng edir, ya da agent ona zəng edir. Xətt heç vaxt məşğul olmur — gecə, həftəsonu və bayram günlərində də.",
+    ru: "Клиент звонит сам, или агент звонит ему. Линия никогда не занята — ночью, в выходные и в праздники тоже.",
     en: "The customer rings, or the agent rings them. The line is never busy — nights, weekends and holidays included.",
   },
   landingStep2Title: { az: "Agent danışır", ru: "Агент говорит", en: "The agent talks" },
   landingStep2Text: {
-    az: "Müştərinin dilində danışır, sualı başa düşür, boş vaxtı yoxlayır, sifarişi və ya cavabı yazır.",
-    ru: "Говорит на языке клиента, понимает вопрос, проверяет свободное время, оформляет заказ или записывает ответ.",
-    en: "Speaks the customer's language, understands the request, checks what is free, takes the order or records the answer.",
+    az: "Müştərinin dilində danışır, sualı başa düşür, tələbləri sistemə qeyd edir və sistem məlumatlarına görə cavab verir.",
+    ru: "Говорит на языке клиента, понимает вопрос, записывает запрос в систему и отвечает по данным системы.",
+    en: "Speaks the customer's language, understands the request, records it in the system, and answers from what the system knows.",
   },
   landingStep3Title: {
     az: "Nəticə sistemə düşür",
@@ -167,9 +167,9 @@ export const translations = {
 
   moduleAppointmentsTitle: { az: "Randevu", ru: "Запись на приём", en: "Appointments" },
   moduleAppointmentsText: {
-    az: "Axşam saat 23:00-da zəng edən müştəri səhərə qədər gözləmir — başqa yerə yazılır. Agent həmin an yazır, təqvim özü dolur.",
-    ru: "Клиент, позвонивший в 23:00, не станет ждать до утра — он запишется в другом месте. Агент записывает сразу, календарь заполняется сам.",
-    en: "A customer who calls at 11pm will not wait until morning — they book somewhere else. The agent books them there and then, and the calendar fills itself.",
+    az: "Hər cavabsız zəng itirilmiş fürsətdir. Agent 24/7 təqvimə bronları qeyd edir.",
+    ru: "Каждый неотвеченный звонок — упущенная возможность. Агент круглосуточно вносит брони в календарь.",
+    en: "Every unanswered call is a lost opportunity. The agent books into the calendar around the clock.",
   },
   moduleInfoTitle: { az: "Məlumat xətti", ru: "Информационная линия", en: "Information line" },
   moduleInfoText: {
@@ -205,9 +205,9 @@ export const translations = {
   },
   moduleSurveysTitle: { az: "Sorğu və araşdırma", ru: "Опросы и исследования", en: "Surveys and research" },
   moduleSurveysText: {
-    az: "500 müştəriyə zəng etmək bir işçinin bir həftəsidir. Agent üçün bu, bir gecədir.",
-    ru: "Обзвонить 500 клиентов — это неделя работы сотрудника. Для агента — одна ночь.",
-    en: "Calling 500 customers is a week of somebody's work. For an agent it is one night.",
+    az: "500 müştəriyə zəng etmək bir işçinin bir həftəsidir. Agent üçün bu, bir gündür.",
+    ru: "Обзвонить 500 клиентов — это неделя работы сотрудника. Для агента — один день.",
+    en: "Calling 500 customers is a week of somebody's work. For an agent it is one day.",
   },
 
   landingWhyTitle: { az: "Niyə sekretar.az", ru: "Почему sekretar.az", en: "Why sekretar.az" },
@@ -229,15 +229,15 @@ export const translations = {
     en: "A transcript of every conversation",
   },
   landingWhy3Text: {
-    az: "Hər zəng tam mətnə çevrilir. Nəyin necə deyildiyini oxuyur, keyfiyyəti özünüz yoxlayırsınız — səsə qulaq asmadan.",
-    ru: "Каждый звонок превращается в текст. Вы читаете, что и как было сказано, и проверяете качество сами — не прослушивая запись.",
-    en: "Every call is turned into text. You read what was said and how it was said, and check quality yourself — without listening to a recording.",
+    az: "Zəng tam mətnə çevrilir. Nəyin necə deyildiyini oxuyur, keyfiyyəti özünüz yoxlayırsınız — səsə qulaq asmadan. Ayrı-ayrı modullar üçün mövcuddur.",
+    ru: "Звонок превращается в текст. Вы читаете, что и как было сказано, и проверяете качество сами — не прослушивая запись. Доступно для отдельных модулей.",
+    en: "The call is turned into text. You read what was said and how it was said, and check quality yourself — without listening to a recording. Available for selected modules.",
   },
   landingWhy4Title: { az: "Hər zəng ölçülür", ru: "Каждый звонок измерим", en: "Every call is measured" },
   landingWhy4Text: {
-    az: "Müddət, nəticə və dəqiq maya dəyəri jurnalda saxlanılır. Nəyə nə qədər xərclədiyinizi təxmin etmək lazım deyil.",
-    ru: "Длительность, результат и точная себестоимость сохраняются в журнале. Гадать, во сколько вам это обошлось, не нужно.",
-    en: "Duration, outcome and exact cost are kept in the log. No guessing what any of it came to.",
+    az: "Neçə zəng gəldi, neçəsi nəticə ilə bitdi, hansılarına agent cavab verə bilmədi — hamısı görünür. Cavabsız qalanlar növbəti addımı özləri göstərir.",
+    ru: "Сколько звонков поступило, сколько закончились результатом, на какие агент не смог ответить — всё видно. Именно необслуженные звонки показывают, что развивать дальше.",
+    en: "How many calls came in, how many ended in a result, and which ones the agent could not handle — all of it visible. The calls it could not take are the ones that show you what to build next.",
   },
   landingWhy5Title: { az: "İnsana ötürmə", ru: "Передача человеку", en: "Hand-off to a person" },
   landingWhy5Text: {
