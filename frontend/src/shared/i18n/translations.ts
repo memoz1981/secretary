@@ -290,6 +290,8 @@ export const translations = {
   navAdmin: { az: "İdarəetmə", ru: "Администрирование", en: "Administration" },
   navCallLog: { az: "Zəng jurnalı", ru: "Журнал звонков", en: "Call log" },
   navCall: { az: "Zəng et", ru: "Позвонить", en: "Make a call" },
+  /** One name for every module's dashboard — menu item and page title alike. It went by four
+   *  (Göstəricilər, Göstəricilər paneli, Sifariş göstəriciləri, Rəy paneli) for one idea. */
   navDashboard: { az: "Göstəricilər", ru: "Показатели", en: "Dashboard" },
   navTenants: { az: "Müştərilər", ru: "Клиенты", en: "Clients" },
 
@@ -652,7 +654,6 @@ export const translations = {
   colCost: { az: "Dəyər", ru: "Стоимость", en: "Cost" },
 
   // ---- Feedback module ----
-  navFeedbackDashboard: { az: "Panel", ru: "Панель", en: "Dashboard" },
   questionnaires: { az: "Sorğular", ru: "Опросы", en: "Questionnaires" },
   questionnaire: { az: "Sorğu", ru: "Опрос", en: "Questionnaire" },
   addQuestionnaire: { az: "Sorğu əlavə et", ru: "Добавить опрос", en: "Add questionnaire" },
@@ -754,7 +755,6 @@ export const translations = {
   // as part of the session, while transcribing the agent's own voice is a separate bill nothing
   // has asked for — and calling it "the transcript" would have people looking for the other half.
   transcript: { az: "Danışığın mətni", ru: "Расшифровка разговора", en: "The conversation" },
-  feedbackDashboard: { az: "Rəy paneli", ru: "Панель отзывов", en: "Feedback dashboard" },
   agentQuality: { az: "Agentin işi", ru: "Работа агента", en: "Agent quality" },
   callsQueued: { az: "Növbədə", ru: "В очереди", en: "Queued" },
   callsStarted: { az: "Başlayan", ru: "Начато", en: "Started" },
@@ -897,7 +897,6 @@ export const translations = {
   },
 
   // ---- Dashboard ----
-  kpiDashboard: { az: "Göstəricilər paneli", ru: "Панель показателей", en: "Dashboard" },
   rangeWeek: { az: "Bu həftə", ru: "На этой неделе", en: "This week" },
   rangeMonth: { az: "Bu ay", ru: "В этом месяце", en: "This month" },
   totalCalls: { az: "Ümumi zənglər", ru: "Всего звонков", en: "Total calls" },
@@ -932,7 +931,6 @@ export const translations = {
   },
   savedNote: { az: "Yadda saxlanıldı.", ru: "Сохранено.", en: "Saved." },
   dateFrom: { az: "Başlanğıc", ru: "С", en: "From" },
-  orderDashboard: { az: "Sifariş göstəriciləri", ru: "Показатели заказов", en: "Order metrics" },
   orderResults: { az: "Sifarişlər", ru: "Заказы", en: "Orders" },
   callStatistics: { az: "Zəng statistikası", ru: "Статистика звонков", en: "Call statistics" },
   callsWithOrder: { az: "Sifarişlə bitən zənglər", ru: "Звонки с заказом", en: "Calls with an order" },

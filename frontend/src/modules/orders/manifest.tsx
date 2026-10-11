@@ -23,7 +23,7 @@ export const ordersModule: ModuleManifest = {
   descriptionKey: "moduleOrdersText",
 
   nav: (role, t) => [
-    { label: t("orderDashboard"), to: "/orders/dashboard" },
+    { label: t("navDashboard"), to: "/orders/dashboard" },
     { label: t("products"), to: "/orders/products" },
     { label: t("orders"), to: "/orders/list" },
     { label: t("navOrderCustomers"), to: "/orders/customers" },

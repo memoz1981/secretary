@@ -92,7 +92,7 @@ export function FeedbackDashboardPage() {
   return (
     <AppShell {...shell}>
       <h1 className="page-title" style={{ marginBottom: "var(--space-4)" }}>
-        {t("feedbackDashboard")}
+        {t("navDashboard")}
       </h1>
 
       <div className="filters" style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>

@@ -62,7 +62,7 @@ export function DashboardPage() {
   return (
     <AppShell {...shell}>
       <div className="toolbar">
-        <h1 className="page-title">{t("kpiDashboard")}</h1>
+        <h1 className="page-title">{t("navDashboard")}</h1>
         <div className="filter-bar">
           <label className="filter-field">
             <span className="label">{t("dateFrom")}</span>

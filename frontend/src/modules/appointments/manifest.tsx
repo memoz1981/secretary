@@ -23,13 +23,14 @@ import type { ModuleManifest } from "@/modules/registry";
 export const appointmentsModule: ModuleManifest = {
   key: "Appointment",
   pathPrefix: "/appointments",
-  home: "/appointments/calendar",
+  home: "/appointments/dashboard",
   // The landing page's own copy, reused rather than duplicated: a tenant meeting the picker has
   // already read these words on the way in, and one set means the two cannot drift.
   titleKey: "moduleAppointmentsTitle",
   descriptionKey: "moduleAppointmentsText",
 
   nav: (role, t) => [
+    { label: t("navDashboard"), to: "/appointments/dashboard" },
     { label: t("navCalendar"), to: "/appointments/calendar" },
     { label: t("navServices"), to: "/appointments/services" },
     { label: t("navProviders"), to: "/appointments/providers" },
@@ -37,7 +38,6 @@ export const appointmentsModule: ModuleManifest = {
     // Demo live call to the AI agent — Owner only, matching the /voice/live-call policy.
     ...(role === "Owner" ? [{ label: t("navCall"), to: "/appointments/call" }] : []),
     { label: t("navCallLog"), to: "/appointments/calls" },
-    { label: t("navDashboard"), to: "/appointments/dashboard" },
   ],
 
   // The escalation overlay listens on this module's SignalR hub, so it is mounted only for
