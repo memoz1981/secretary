@@ -8,13 +8,29 @@ import { useAuth } from "@/shared/auth/AuthContext";
 import { useApiData } from "@/shared/lib/useApiData";
 import { useBusinessShell } from "@/shared/lib/appShellProps";
 import { getAppointments } from "@/modules/appointments/api/appointments";
+import { getBusinessHours } from "@/shared/api/businessHours";
 import { getProviders } from "@/modules/appointments/api/providers";
 import { getServiceOfferings } from "@/modules/appointments/api/serviceOfferings";
 import type { AppointmentResponse } from "@/shared/api/types";
 import { makeProviderColorLookup } from "@/modules/appointments/lib/providerColors";
 import { useLanguage } from "@/shared/i18n/LanguageContext";
 
-const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+/** The grid when opening hours have not loaded yet, or when every day is marked closed.
+ *
+ * ⚠ This used to be the grid, full stop — hard-coded 9 to 18 while Administration let a tenant
+ * set anything they liked. A business opening at 08:00 had an hour of its day missing from the
+ * calendar, and one closing at 20:00 had two. */
+const FALLBACK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+
+/** JavaScript counts weeks from Sunday; the API names its days. */
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "09:00" to 9. A half-hour opening rounds down so the first slot is still on the grid, and a
+ *  half-hour closing rounds up so the last one is. */
+function hourOf(time: string, round: "down" | "up"): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return round === "down" ? hours : minutes > 0 ? hours + 1 : hours;
+}
 
 type CalendarView = "day" | "week" | "month";
 
@@ -57,6 +73,30 @@ export function CalendarPage() {
   const [providerFilter, setProviderFilter] = useState<string>("");
   const [panelState, setPanelState] = useState<{ mode: "create" | "edit"; appt?: AppointmentResponse; start?: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // The same hours the agent books against — see BusinessHoursCard. A calendar that disagrees
+  // with them offers staff a slot the phone line would refuse, which is the worst kind of
+  // disagreement: it only shows up as a double booking days later.
+  const hoursState = useApiData(() => getBusinessHours(token!), [token]);
+  const businessHours = hoursState.status === "success" ? hoursState.data : [];
+
+  const openDays = new Set(
+    businessHours.filter((d) => d.opensAt !== null && d.closesAt !== null).map((d) => d.dayOfWeek),
+  );
+  const isOpen = (day: Date) => openDays.size === 0 || openDays.has(DAY_NAMES[day.getDay()]);
+
+  const openings = businessHours.filter((d) => d.opensAt !== null && d.closesAt !== null);
+  const gridHours =
+    openings.length === 0
+      ? FALLBACK_HOURS
+      : (() => {
+          // The widest window any open day keeps. One pair of hours is what Administration sets,
+          // but the storage is still per day and a week edited before that change can hold
+          // several — the grid has to contain all of them or it hides appointments.
+          const first = Math.min(...openings.map((d) => hourOf(d.opensAt!, "down")));
+          const last = Math.max(...openings.map((d) => hourOf(d.closesAt!, "up")));
+          return Array.from({ length: Math.max(1, last - first) }, (_, i) => first + i);
+        })();
 
   const dayStart = startOfDay(anchorDate);
   const weekStart = startOfWeek(anchorDate);
@@ -168,6 +208,7 @@ export function CalendarPage() {
           serviceName={serviceName}
           providerColor={providerColor}
           onApptClick={(appt) => setPanelState({ mode: "edit", appt })}
+          isOpen={isOpen}
           onDayClick={(day) => {
             setAnchorDate(day);
             setView("day");
@@ -176,7 +217,8 @@ export function CalendarPage() {
       ) : (
         <TimeGridCalendar
           days={view === "day" ? [dayStart] : Array.from({ length: 7 }, (_, i) => new Date(weekStart.getTime() + i * 86_400_000))}
-          hours={HOURS}
+          hours={gridHours}
+          isOpen={isOpen}
           appointments={appointments}
           serviceName={serviceName}
           providerColor={providerColor}

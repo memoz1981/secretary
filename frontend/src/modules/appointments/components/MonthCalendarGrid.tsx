@@ -9,6 +9,8 @@ interface MonthCalendarGridProps {
   providerColor: (providerId: number) => ProviderColor;
   onApptClick: (appt: AppointmentResponse) => void;
   onDayClick: (day: Date) => void;
+  /** Whether the business is open that day. Closed days are greyed and do not open. */
+  isOpen: (day: Date) => boolean;
 }
 
 const DAY_LABEL_KEYS = ["dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat", "daySun"] as const;
@@ -33,7 +35,7 @@ function buildMonthGridDays(monthStart: Date): Date[] {
 /** Month view: a traditional 6x7 day grid. Each cell shows a compact appointment list
  * (client + service) rather than the hourly rows Day/Week use — clicking a day cell jumps
  * to that day in Day view, clicking an appointment chip opens it directly, same as elsewhere. */
-export function MonthCalendarGrid({ monthStart, appointments, serviceName, providerColor, onApptClick, onDayClick }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ monthStart, appointments, serviceName, providerColor, onApptClick, onDayClick, isOpen }: MonthCalendarGridProps) {
   const { t } = useLanguage();
   const days = buildMonthGridDays(monthStart);
   const currentMonth = monthStart.getMonth();
@@ -52,7 +54,11 @@ export function MonthCalendarGrid({ monthStart, appointments, serviceName, provi
         const inCurrentMonth = day.getMonth() === currentMonth;
 
         return (
-          <div key={i} className={`month-cell ${inCurrentMonth ? "" : "outside"}`} onClick={() => onDayClick(day)}>
+          <div
+            key={i}
+            className={`month-cell ${inCurrentMonth ? "" : "outside"} ${isOpen(day) ? "" : "closed"}`}
+            onClick={() => isOpen(day) && onDayClick(day)}
+          >
             <div className="month-cell-date">{day.getDate()}</div>
             <div className="month-cell-appts">
               {dayAppointments.map((appt) => (
