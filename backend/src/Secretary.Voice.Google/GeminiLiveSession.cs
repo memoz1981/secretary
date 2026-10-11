@@ -85,15 +85,14 @@ public sealed class GeminiLiveSession : IRealtimeSession
         string instructions, IList<AITool> tools, string? modelOverride, bool transcribeCaller,
         CancellationToken cancellationToken)
     {
-        var enterprise = _useVertexAi;
         Model = !string.IsNullOrWhiteSpace(modelOverride) ? modelOverride
-            : enterprise ? _options.EnterpriseModel
-            : _options.Model;
+            : _useVertexAi ? _options.Vertex.Model
+            : _options.AiStudio.Model;
         _functions = tools.OfType<AIFunction>().ToList();
 
-        _client = !enterprise
-            ? new Client(apiKey: _options.ApiKey)
-            : CreateEnterpriseClient();
+        _client = _useVertexAi
+            ? CreateVertexClient(_options.Vertex)
+            : new Client(apiKey: _options.AiStudio.ApiKey);
 
         var config = new LiveConnectConfig
         {
@@ -462,20 +461,20 @@ public sealed class GeminiLiveSession : IRealtimeSession
         }
     }
 
-    /// <summary>The Enterprise client: a service account, a project and a region.
+    /// <summary>The Vertex client: a service account, a project and a region.
     ///
     /// No API-key branch. Vertex will not take a key on a Live connection — the SDK refuses
     /// before connecting — so the only working shape is credentials.</summary>
-    private Client CreateEnterpriseClient()
+    private static Client CreateVertexClient(VertexOptions vertex)
     {
-        var credential = string.IsNullOrWhiteSpace(_options.CredentialsJson)
+        var credential = string.IsNullOrWhiteSpace(vertex.CredentialsJson)
             ? null
             : global::Google.Apis.Auth.OAuth2.GoogleCredential
-                .FromJson(_options.CredentialsJson)
+                .FromJson(vertex.CredentialsJson)
                 .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
 
         return new Client(
-            enterprise: true, credential: credential, project: _options.Project, location: _options.Location);
+            enterprise: true, credential: credential, project: vertex.Project, location: vertex.Location);
     }
 
     private AsyncSession Session => _session ?? throw new InvalidOperationException("ConnectAsync must be called before using the session.");

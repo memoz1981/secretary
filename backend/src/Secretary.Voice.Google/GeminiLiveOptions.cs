@@ -1,44 +1,20 @@
 namespace Secretary.Voice.Google;
 
-/// <summary>How to reach Gemini on each backend, and as whom.
+/// <summary>How a Gemini Live call behaves, and how to reach each backend.
 ///
-/// AI Studio needs nothing but an API key; the Enterprise Agent Platform — what used to be called
-/// Vertex AI — has real quotas and an SLA. Which one a call uses is FeatureFlags.UseVertexAi;
-/// this holds the settings for both, so flipping the flag is the only edit a switch needs.</summary>
+/// ⚠ The two backends have a section each, and nothing about connecting is shared between them.
+/// AI Studio has no project and no region; Vertex has no API key. A flat list let a setting look
+/// as if it applied to both — Location read as if it moved AI Studio calls, which it never did —
+/// so each section holds only what its own backend reads. Which one a call uses is
+/// FeatureFlags.UseVertexAi; everything outside the two sections is how the call behaves, and is
+/// the same on either.</summary>
 public sealed class GeminiLiveOptions
 {
     public const string SectionName = "GeminiLive";
 
-    /// <summary>AI Studio only.</summary>
-    public string ApiKey { get; set; } = string.Empty;
+    public AiStudioOptions AiStudio { get; set; } = new();
 
-    /// <summary>Enterprise only: the service-account key, the whole JSON file as one secret.
-    ///
-    /// ⚠ The content, not a path to it. Every other credential here is a secret set the same way
-    /// — user-secrets locally, an environment variable on the server — and a key file would be
-    /// the one thing a release has to copy by hand and the one secret that could end up in a
-    /// publish folder. An API key is not an option: Vertex refuses one on a Live connection.
-    ///
-    /// Empty falls back to the machine's own Google credentials, if it has any.</summary>
-    public string CredentialsJson { get; set; } = string.Empty;
-
-    /// <summary>Enterprise only: the Google Cloud project ID.</summary>
-    public string Project { get; set; } = string.Empty;
-
-    /// <summary>Enterprise only.
-    ///
-    /// us-central1 because it is where the project can reach gemini-3.8-live today:
-    /// europe-west4 answered "model not found or no access" for the same project. Europe is
-    /// the better region for an Amsterdam server — the server-to-Google leg is on every turn —
-    /// and worth trying again once Google opens it up.</summary>
-    public string Location { get; set; } = "us-central1";
-
-    /// <summary>The AI Studio model.</summary>
-    public string Model { get; set; } = "gemini-3.1-flash-live-preview";
-
-    /// <summary>The Enterprise model. Separate from Model because the two backends name their
-    /// models differently, and switching Backend should not mean editing two values.</summary>
-    public string EnterpriseModel { get; set; } = "gemini-3.8-live";
+    public VertexOptions Vertex { get; set; } = new();
 
     /// <summary>One of Gemini's prebuilt voices. Kept configurable because which one carries
     /// Azerbaijani acceptably is exactly the sort of thing only a real call settles.</summary>
@@ -106,4 +82,39 @@ public sealed class GeminiLiveOptions
     /// choosing which tool to call, and the instructions already say when to call each one.
     /// Raise it only if the agent starts making poor choices rather than slow ones.</summary>
     public int ThinkingBudgetTokens { get; set; }
+}
+
+/// <summary>Google AI Studio: an API key and a model, nothing else.</summary>
+public sealed class AiStudioOptions
+{
+    /// <summary>Secret.</summary>
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string Model { get; set; } = "gemini-3.8-live";
+}
+
+/// <summary>Vertex AI — the Gemini Enterprise Agent Platform: a service account, a project and a
+/// region. Its model names are not AI Studio's, which is why each section names its own.</summary>
+public sealed class VertexOptions
+{
+    /// <summary>Enterprise only: the service-account key, the whole JSON file as one secret.
+    ///
+    /// ⚠ The content, not a path to it. Every other credential here is a secret set the same way
+    /// — user-secrets locally, an environment variable on the server — and a key file would be
+    /// the one thing a release has to copy by hand and the one secret that could end up in a
+    /// publish folder. An API key is not an option: Vertex refuses one on a Live connection.
+    ///
+    /// Empty falls back to the machine's own Google credentials, if it has any.</summary>
+    public string CredentialsJson { get; set; } = string.Empty;
+
+    /// <summary>Secret: the Google Cloud project ID.</summary>
+    public string Project { get; set; } = string.Empty;
+
+    /// <summary>us-central1 because it is where the project can reach gemini-3.8-live today:
+    /// europe-west4 answered "model not found or no access" for the same project. Europe is
+    /// the better region for an Amsterdam server — the server-to-Google leg is on every turn —
+    /// and worth trying again once Google opens it up.</summary>
+    public string Location { get; set; } = "us-central1";
+
+    public string Model { get; set; } = "gemini-3.8-live";
 }

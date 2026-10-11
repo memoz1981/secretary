@@ -132,18 +132,21 @@ leaks. That is why Gemini lands at step 4, not step 7.
 ### Gemini backend selection
 
 ```json
-"Google": {
-  "Backend": "AiStudio",          // | "Enterprise"
-  "ApiKey": "…",                  // AI Studio — user-secrets
-  "Project": "…",                 // Enterprise
-  "Location": "europe-west3",
-  "Model": "…"                    // model ids can differ between backends
+"FeatureFlags": { "UseVertexAi": true },        // which section a call uses
+"GeminiLive": {
+  "AiStudio": { "ApiKey": "…", "Model": "…" },  // ApiKey — secret
+  "Vertex": {
+    "CredentialsJson": "…", "Project": "…",     // secrets
+    "Location": "us-central1", "Model": "…"
+  },
+  "Voice": "…", …                               // call behaviour, shared by both
 }
 ```
 
-One factory reads `Backend` and builds the right `Google.GenAI` `Client`. Everything downstream —
-`Live`, `ConnectAsync()`, the session code — is identical. Setting both `enterprise` and `vertexAI`
-conflictingly throws, so the factory picks exactly one.
+A section per backend, and neither reads the other's: AI Studio has no project or region and
+Vertex takes no API key on a Live connection. The session reads the flag and builds the matching
+`Google.GenAI` `Client`; everything downstream — `Live`, `ConnectAsync()`, the session code — is
+identical. The flag is read per call, so a switch needs no restart.
 
 ---
 
