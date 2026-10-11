@@ -44,6 +44,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<BusinessHoursService>();
         services.AddScoped<CustomerIdentityService>();
         services.AddScoped<OrderService>();
+        services.AddScoped<OrderDashboardService>();
         services.AddScoped<ProductService>();
 
         // Scoped so the module lookup happens once per request, however many times the

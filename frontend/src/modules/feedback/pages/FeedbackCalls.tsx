@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { DataTable } from "@/shared/components/DataTable";
@@ -39,8 +40,16 @@ export function FeedbackCallsPage() {
   const { t, language } = useLanguage();
   const shell = useBusinessShell();
   const navigate = useNavigate();
-  const [surveyId, setSurveyId] = useState("");
-  const [status, setStatus] = useState<FeedbackCallStatus | "">("");
+  // The dashboard's coverage tiles link here with the questionnaire, the range and often a
+  // status attached, so a number you clicked opens the dials it was counting.
+  const [params] = useSearchParams();
+
+  const [surveyId, setSurveyId] = useState(() => params.get("surveyId") ?? "");
+  const [status, setStatus] = useState<FeedbackCallStatus | "">(
+    () => (params.get("status") as FeedbackCallStatus | null) ?? "",
+  );
+  const [from, setFrom] = useState(() => params.get("from") ?? "");
+  const [to, setTo] = useState(() => params.get("to") ?? "");
 
   // One switch for the page, not one per row. Somebody who needs a number usually needs to scan
   // several, and clicking each in turn is a reveal that pretends to be a decision.
@@ -48,8 +57,15 @@ export function FeedbackCallsPage() {
 
   const surveys = useApiData(() => getSurveys(token!), [token]);
   const state = useApiData(
-    () => searchFeedbackCalls(token!, { surveyId: surveyId === "" ? undefined : Number(surveyId) }),
-    [token, surveyId],
+    () =>
+      searchFeedbackCalls(token!, {
+        surveyId: surveyId === "" ? undefined : Number(surveyId),
+        // The end of the chosen day, not its midnight: one date in both boxes would otherwise
+        // ask for a range of zero length and report an empty day back.
+        from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+        to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined,
+      }),
+    [token, surveyId, from, to],
   );
 
   // Filtered here rather than in the query: the page already holds every call for the chosen
@@ -68,8 +84,12 @@ export function FeedbackCallsPage() {
         {t("feedbackCalls")}
       </h1>
 
-      <div className="filters" style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <select value={surveyId} onChange={(e) => setSurveyId(e.target.value)}>
+      {/* Every filter carries its caption, so every box sits on the same line — see .filter-bar,
+          where centring captioned and bare controls together put them out of line. */}
+      <div className="filter-bar" style={{ marginBottom: "var(--space-4)" }}>
+        <label className="filter-field">
+          <span className="label">{t("questionnaire")}</span>
+          <select value={surveyId} onChange={(e) => setSurveyId(e.target.value)}>
           <option value="">{t("allQuestionnaires")}</option>
           {surveys.status === "success" &&
             surveys.data.map((s) => (
@@ -77,16 +97,28 @@ export function FeedbackCallsPage() {
                 {s.name}
               </option>
             ))}
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value as FeedbackCallStatus | "")}>
+          </select>
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("colStatus")}</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value as FeedbackCallStatus | "")}>
           <option value="">{t("allStatuses")}</option>
           {CALL_STATUSES.map((value) => (
             <option key={value} value={value}>
               {t(`feedbackStatus${value}`)}
             </option>
           ))}
-        </select>
-        <label className="checkbox-row" style={{ margin: 0 }}>
+          </select>
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("dateFrom")}</span>
+          <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("dateTo")}</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <label className="checkbox-row">
           <input
             type="checkbox"
             checked={numbersShown}

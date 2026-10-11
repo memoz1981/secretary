@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppShell } from "@/shared/components/AppShell";
 import { DataTable } from "@/shared/components/DataTable";
 import { Pill } from "@/shared/components/Pill";
@@ -32,11 +33,27 @@ export function OrderCallLogPage() {
   const { token } = useAuth();
   const { language, t } = useLanguage();
   const shell = useBusinessShell();
-  const [outcome, setOutcome] = useState<CallOutcome | "">("");
+
+  // The dashboard tiles link here with their outcome and range attached, so a number you clicked
+  // opens the calls it was counting rather than the calls from some other month.
+  const [params] = useSearchParams();
+
+  const [outcome, setOutcome] = useState<CallOutcome | "">(
+    () => (params.get("outcome") as CallOutcome | null) ?? "",
+  );
+  const [from, setFrom] = useState(() => params.get("from") ?? "");
+  const [to, setTo] = useState(() => params.get("to") ?? "");
 
   const state = useApiData(
-    () => searchOrderCalls(token!, { outcome: outcome || undefined }),
-    [token, outcome],
+    () =>
+      searchOrderCalls(token!, {
+        outcome: outcome || undefined,
+        // The end of the chosen day, not its midnight: one date in both boxes would otherwise
+        // ask for a range of zero length and report an empty day back.
+        from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+        to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined,
+      }),
+    [token, outcome, from, to],
   );
 
   const rows = state.status === "success" ? state.data : [];
@@ -51,15 +68,28 @@ export function OrderCallLogPage() {
       <h1 className="page-title" style={{ marginBottom: "var(--space-4)" }}>
         {t("callLog")}
       </h1>
-      <div className="filters" style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-        <select value={outcome} onChange={(e) => setOutcome(e.target.value as CallOutcome | "")}>
+      {/* Every filter carries its caption, so every box sits on the same line — see the note on
+          .filter-bar, where centring captioned and bare controls together put them out of line. */}
+      <div className="filter-bar" style={{ marginBottom: "var(--space-4)" }}>
+        <label className="filter-field">
+          <span className="label">{t("colOutcome")}</span>
+          <select value={outcome} onChange={(e) => setOutcome(e.target.value as CallOutcome | "")}>
           <option value="">{t("allOutcomes")}</option>
           {OUTCOMES.map((o) => (
             <option key={o} value={o}>
               {translateEnum(callOutcomeLabels, o, language)}
             </option>
           ))}
-        </select>
+          </select>
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("dateFrom")}</span>
+          <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="filter-field">
+          <span className="label">{t("dateTo")}</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+        </label>
       </div>
       {state.status === "error" && <div className="field-error">{t("failedToLoadCalls")}</div>}
       <DataTable

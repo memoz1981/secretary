@@ -25,7 +25,7 @@ export const feedbackModule: ModuleManifest = {
   descriptionKey: "moduleFeedbackText",
 
   nav: (role, t) => [
-    { label: t("navFeedbackDashboard"), to: "/feedback/dashboard" },
+    { label: t("navDashboard"), to: "/feedback/dashboard" },
     { label: t("questionnaires"), to: "/feedback/questionnaires" },
     { label: t("feedbackCalls"), to: "/feedback/calls" },
     { label: t("followUp"), to: "/feedback/follow-up" },
