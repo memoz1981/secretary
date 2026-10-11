@@ -33,13 +33,13 @@ public static class VoicePipelineCatalog
         // Roughly four times cheaper than OpenAI. Whether Azerbaijani survives it is the whole
         // reason it is dialable rather than assumed — that only a real call answers.
         new(
-            CallPipeline.GeminiLive_3_1,
+            CallPipeline.GeminiLive,
             "Gemini · Live",
             ProviderKey: "gemini",
 
-            // Null: the model follows GeminiLive:Backend — gemini-3.1-flash-live-preview on AI
-            // Studio, gemini-3.8-live on Enterprise. Named here, it overrode the configuration
-            // and switching backend would have kept asking for a model the backend lacks.
+            // Null: the model comes from the backend FeatureFlags:UseVertexAi picks, each with its
+            // own GeminiLive Model setting. Named here, it overrode the configuration and
+            // switching backend would have kept asking for a model the backend lacks.
             RealtimeModel: null),
     ];
 

@@ -33,7 +33,7 @@ public sealed class FeedbackCallTests
         var call = Queued();
         call.Begin(Now);
 
-        call.Finish(30, 4, 3, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.01m, Now);
+        call.Finish(30, 4, 3, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0.01m, Now);
 
         call.CallStatus.ShouldBe(FeedbackCallStatus.Abandoned);
     }
@@ -48,7 +48,7 @@ public sealed class FeedbackCallTests
         call.Begin(Now);
         call.Complete(Now);
 
-        call.Finish(45, 6, 5, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.02m, Now);
+        call.Finish(45, 6, 5, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0.02m, Now);
 
         call.CallStatus.ShouldBe(FeedbackCallStatus.Completed);
         call.CompletedAt.ShouldNotBeNull();
@@ -67,7 +67,7 @@ public sealed class FeedbackCallTests
         call.Begin(Now);
         call.HandOverToHuman(Now);
 
-        call.Finish(22, 3, 3, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.01m, Now);
+        call.Finish(22, 3, 3, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0.01m, Now);
 
         call.CallStatus.ShouldBe(FeedbackCallStatus.NeedsHuman);
     }
@@ -97,7 +97,7 @@ public sealed class FeedbackCallTests
     {
         var call = Queued();
         call.Begin(Now);
-        call.Finish(2, 0, 0, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0m, Now);
+        call.Finish(2, 0, 0, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0m, Now);
 
         call.Outcome.ShouldBe(SurveyRequestOutcome.NotReached);
     }
@@ -107,7 +107,7 @@ public sealed class FeedbackCallTests
     {
         var call = Queued();
         call.Begin(Now);
-        call.Finish(40, 4, 3, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0.02m, Now);
+        call.Finish(40, 4, 3, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0.02m, Now);
 
         call.Outcome.ShouldBe(SurveyRequestOutcome.Refused);
     }
@@ -119,7 +119,7 @@ public sealed class FeedbackCallTests
     [Fact]
     public void A_call_cannot_finish_with_negative_figures()
         => Should.Throw<ArgumentOutOfRangeException>(() => Queued().Finish(
-            -1, 0, 0, null, "gemini", CallPipeline.GeminiLive_3_1, TokenUsage.Zero, 0m, Now));
+            -1, 0, 0, null, "gemini", CallPipeline.GeminiLive, TokenUsage.Zero, 0m, Now));
 }
 
 /// <summary>Three states, and the third is not an absence — see FeedbackAnswer.</summary>

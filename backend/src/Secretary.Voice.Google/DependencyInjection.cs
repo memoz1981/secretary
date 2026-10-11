@@ -28,7 +28,7 @@ public sealed class GeminiLiveSessionFactory : IRealtimeSessionFactory
 
     public GeminiLiveSessionFactory(IServiceProvider services) => _services = services;
 
-    public bool CanServe(CallPipeline pipeline) => pipeline == CallPipeline.GeminiLive_3_1;
+    public bool CanServe(CallPipeline pipeline) => pipeline == CallPipeline.GeminiLive;
 
     public IRealtimeSession Create() => _services.GetRequiredService<GeminiLiveSession>();
 }

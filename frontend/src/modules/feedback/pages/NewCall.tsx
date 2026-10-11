@@ -73,7 +73,7 @@ export function NewFeedbackCallPage() {
         },
         // Gemini only, and the server refuses anything else for this module rather than
         // trusting the picker — there is one instruction file and it is written for this model.
-        "GeminiLive_3_1",
+        "GeminiLive",
         "Feedback",
         created.id,
       );

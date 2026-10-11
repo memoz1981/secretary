@@ -36,8 +36,8 @@ export const PIPELINE_INFO: Record<CallPipeline, PipelineInfo> = {
     costPerMinute: "~$0.10",
     enabled: true,
   },
-  GeminiLive_3_1: {
-    short: "Gemini · Live 3.1",
+  GeminiLive: {
+    short: "Gemini · Live",
     what: {
       az: "Gemini Live səsi birbaşa emal edir — ayrıca protokol.",
       ru: "Gemini Live обрабатывает звук напрямую — отдельный протокол.",
