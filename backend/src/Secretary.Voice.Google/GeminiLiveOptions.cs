@@ -97,18 +97,24 @@ public sealed class AiStudioOptions
 /// region. Its model names are not AI Studio's, which is why each section names its own.</summary>
 public sealed class VertexOptions
 {
-    /// <summary>Enterprise only: the service-account key, the whole JSON file as one secret.
-    ///
-    /// ⚠ The content, not a path to it. Every other credential here is a secret set the same way
-    /// — user-secrets locally, an environment variable on the server — and a key file would be
-    /// the one thing a release has to copy by hand and the one secret that could end up in a
-    /// publish folder. An API key is not an option: Vertex refuses one on a Live connection.
-    ///
-    /// Empty falls back to the machine's own Google credentials, if it has any.</summary>
-    public string CredentialsJson { get; set; } = string.Empty;
+    // ⚠ The service account as three named secrets, taken from the key file Google hands out:
+    //   project_id   → Project
+    //   client_email → ClientEmail
+    //   private_key  → PrivateKey
+    // Nothing else in that file is needed. Named rather than the whole file pasted in as one
+    // value, so what each secret holds is visible; and secrets rather than a path to the file,
+    // so a release never has to copy a key onto the server by hand. An API key is not an
+    // option: Vertex refuses one on a Live connection.
 
-    /// <summary>Secret: the Google Cloud project ID.</summary>
+    /// <summary>Secret: the key file's project_id.</summary>
     public string Project { get; set; } = string.Empty;
+
+    /// <summary>Secret: the key file's client_email — which service account this is.</summary>
+    public string ClientEmail { get; set; } = string.Empty;
+
+    /// <summary>Secret: the key file's private_key, copied exactly as it appears between the
+    /// quotes, "\n" escapes and all. The only part of the file that is truly sensitive.</summary>
+    public string PrivateKey { get; set; } = string.Empty;
 
     /// <summary>us-central1 because it is where the project can reach gemini-3.8-live today:
     /// europe-west4 answered "model not found or no access" for the same project. Europe is

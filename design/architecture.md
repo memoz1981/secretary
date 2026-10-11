@@ -136,7 +136,8 @@ leaks. That is why Gemini lands at step 4, not step 7.
 "GeminiLive": {
   "AiStudio": { "ApiKey": "…", "Model": "…" },  // ApiKey — secret
   "Vertex": {
-    "CredentialsJson": "…", "Project": "…",     // secrets
+    "Project": "…", "ClientEmail": "…",         // secrets: project_id, client_email
+    "PrivateKey": "…",                          //   and private_key from the key file
     "Location": "us-central1", "Model": "…"
   },
   "Voice": "…", …                               // call behaviour, shared by both

@@ -467,14 +467,28 @@ public sealed class GeminiLiveSession : IRealtimeSession
     /// before connecting — so the only working shape is credentials.</summary>
     private static Client CreateVertexClient(VertexOptions vertex)
     {
-        var credential = string.IsNullOrWhiteSpace(vertex.CredentialsJson)
-            ? null
-            : global::Google.Apis.Auth.OAuth2.GoogleCredential
-                .FromJson(vertex.CredentialsJson)
-                .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
+        if (string.IsNullOrWhiteSpace(vertex.ClientEmail) || string.IsNullOrWhiteSpace(vertex.PrivateKey))
+        {
+            throw new InvalidOperationException(
+                "Vertex AI needs GeminiLive:Vertex:ClientEmail and GeminiLive:Vertex:PrivateKey "
+                + "(client_email and private_key from the service-account key file).");
+        }
+
+        // A key copied from the JSON file keeps its "\n" escapes; the PEM reader needs real
+        // line breaks. Replacing them is harmless if the secret already has them.
+        var pem = vertex.PrivateKey.Replace("\\n", "\n");
+
+        var serviceAccount = new global::Google.Apis.Auth.OAuth2.ServiceAccountCredential(
+            new global::Google.Apis.Auth.OAuth2.ServiceAccountCredential.Initializer(vertex.ClientEmail)
+            {
+                Scopes = ["https://www.googleapis.com/auth/cloud-platform"],
+            }.FromPrivateKey(pem));
 
         return new Client(
-            enterprise: true, credential: credential, project: vertex.Project, location: vertex.Location);
+            enterprise: true,
+            credential: global::Google.Apis.Auth.OAuth2.GoogleCredential.FromServiceAccountCredential(serviceAccount),
+            project: vertex.Project,
+            location: vertex.Location);
     }
 
     private AsyncSession Session => _session ?? throw new InvalidOperationException("ConnectAsync must be called before using the session.");
